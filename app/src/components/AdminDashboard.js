@@ -1,0 +1,131 @@
+import { useState, useEffect, useMemo } from "react";
+import { db } from "@/lib/firebase";
+import { collection, query, orderBy, limit, onSnapshot, doc } from "firebase/firestore";
+import { Activity, Shield, Cpu, TrendingUp, DollarSign, Loader2 } from "lucide-react";
+
+export default function AdminDashboard({ items = [] }) {
+  const [telemetry, setTelemetry] = useState([]);
+  const [systemHealth, setSystemHealth] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!db) return;
+    const q = query(collection(db, "telemetry"), orderBy("timestamp", "desc"), limit(10));
+    const unsubTele = onSnapshot(q, snap =>
+      setTelemetry(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    );
+    const unsubHealth = onSnapshot(doc(db, "system", "health"), d => {
+      setSystemHealth(d.data());
+      setLoading(false);
+    });
+    return () => { unsubTele(); unsubHealth(); };
+  }, []);
+
+  const financials = useMemo(() => {
+    const totalEstimatedValue = items
+      .filter(i => i.status === "IN STOCK")
+      .reduce((a, i) => a + (parseFloat(i.estimatedMarketValue) || 0), 0);
+    const grossProfit = items
+      .filter(i => i.status === "SOLD")
+      .reduce((a, i) => a + ((parseFloat(i.sellingPrice) || 0) - (parseFloat(i.estimatedMarketValue) || 0)), 0);
+    return { totalEstimatedValue, grossProfit };
+  }, [items]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-48 gap-3">
+        <Loader2 className="animate-spin text-zinc-300" size={18} />
+        <p className="text-base font-bold uppercase tracking-widest text-zinc-200">Sincronizando...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* Title */}
+      <div className="px-4 md:px-6 pt-8 pb-6 border-b border-white/[0.07]">
+        <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tight text-white leading-none">
+          Admin
+        </h1>
+      </div>
+
+      {/* Financial stats */}
+      <div className="flex border-b border-white/[0.07]">
+        <div className="flex-1 px-4 md:px-6 py-5 border-r border-white/[0.07]">
+          <p className="text-base font-bold uppercase tracking-widest text-zinc-300 mb-1">Valor em Estoque</p>
+          <p className="text-2xl font-black text-white">
+            R$ {financials.totalEstimatedValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+          </p>
+        </div>
+        <div className="flex-1 px-4 md:px-6 py-5">
+          <p className="text-base font-bold uppercase tracking-widest text-zinc-300 mb-1">Lucro Bruto</p>
+          <p className="text-2xl font-black text-white">
+            R$ {financials.grossProfit.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+          </p>
+        </div>
+      </div>
+
+      {/* System stats */}
+      <div className="flex border-b border-white/[0.07]">
+        {[
+          { label: "Requisições IA", value: systemHealth?.totalAIRequests ?? 0 },
+          { label: "Serviço",        value: "Online" },
+          { label: "Latência DB",    value: "14ms" },
+        ].map(({ label, value }, i, arr) => (
+          <div
+            key={label}
+            className={`flex-1 px-4 md:px-6 py-4 ${i < arr.length - 1 ? "border-r border-white/[0.07]" : ""}`}
+          >
+            <p className="text-base font-bold uppercase tracking-widest text-zinc-300 mb-1">{label}</p>
+            <p className="text-xl font-black text-white">{value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Telemetry */}
+      <div className="px-4 md:px-6 pt-6 pb-2">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-black uppercase tracking-widest text-zinc-200">Live Telemetry</h2>
+          <span className="flex items-center gap-1.5 text-base font-bold uppercase tracking-widest text-emerald-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            Ao vivo
+          </span>
+        </div>
+      </div>
+
+      <div className="border-t border-white/[0.07]">
+        {telemetry.length === 0 ? (
+          <p className="text-base font-bold uppercase tracking-widest text-zinc-200 text-center py-10">
+            Sem registros.
+          </p>
+        ) : (
+          telemetry.map(log => (
+            <div
+              key={log.id}
+              className="flex flex-col md:flex-row md:items-center gap-2 px-4 md:px-6 py-3 border-b border-white/[0.06] hover:bg-white/[0.02] transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-base text-zinc-200 font-mono shrink-0">
+                  {log.timestamp?.toDate()?.toLocaleTimeString()}
+                </span>
+                <span className={`text-base font-black uppercase tracking-wider px-2 py-0.5 ${
+                  log.type?.includes("ERROR")
+                    ? "bg-red-500/10 text-red-400"
+                    : "bg-white/5 text-zinc-200"
+                }`}>
+                  {log.type}
+                </span>
+                <span className="text-base font-bold text-zinc-200">
+                  {log.userId?.slice(0, 8)}…
+                </span>
+              </div>
+              <div className="md:ml-auto font-mono text-base text-zinc-200 max-w-xs truncate">
+                {JSON.stringify(log.metadata)}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}

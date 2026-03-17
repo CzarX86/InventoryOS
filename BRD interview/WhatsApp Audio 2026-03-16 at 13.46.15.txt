@@ -1,0 +1,3 @@
+O que eu preciso, na verdade, é a parte number, que é o código dele.
+É o que eu vou mais usar para saber o que tem no estoque, entendeu?
+O equipamento que eu preciso é o que está no estoque.

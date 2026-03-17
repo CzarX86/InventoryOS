@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#080808" />
+  <title>InventoryOS — Offline</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: #080808;
+      color: #ffffff;
+      font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Noise texture */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      opacity: 0.03;
+      pointer-events: none;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      max-width: 400px;
+      width: 100%;
+    }
+
+    /* Grid border decoration */
+    .icon-wrap {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 80px;
+      height: 80px;
+      border: 1px solid #2a2a2a;
+      margin-bottom: 2rem;
+    }
+
+    .icon-wrap svg {
+      width: 40px;
+      height: 40px;
+      color: #ffffff;
+    }
+
+    .label {
+      font-size: 9px;
+      font-family: 'JetBrains Mono', 'Courier New', monospace;
+      font-weight: 700;
+      color: #666666;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+    }
+
+    h1 {
+      font-size: clamp(1.5rem, 5vw, 2rem);
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      text-transform: uppercase;
+      margin-bottom: 0.75rem;
+    }
+
+    p {
+      font-size: 0.875rem;
+      color: #a1a1aa;
+      line-height: 1.6;
+      margin-bottom: 2.5rem;
+    }
+
+    .divider {
+      width: 100%;
+      height: 1px;
+      background: #1a1a1a;
+      margin-bottom: 2.5rem;
+    }
+
+    button {
+      background: #ffffff;
+      color: #000000;
+      border: none;
+      padding: 0.875rem 2rem;
+      font-weight: 700;
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      cursor: pointer;
+      font-family: inherit;
+      transition: opacity 0.2s;
+      width: 100%;
+    }
+
+    button:hover { opacity: 0.85; }
+    button:active { opacity: 0.7; }
+
+    .status {
+      margin-top: 1.5rem;
+      font-size: 10px;
+      font-family: monospace;
+      color: #333333;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+
+    .dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      background: #ffdb00;
+      border-radius: 50%;
+      margin-right: 6px;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.2; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon-wrap">
+      <!-- Wifi off icon -->
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18M8.111 8.111A9.955 9.955 0 013 10.5a9.955 9.955 0 003.485 7.5M12 12a3 3 0 000 6M8.657 16.343A6 6 0 0112 15a6 6 0 013.343.657M19.5 10.5a9.955 9.955 0 00-2.635-1.786M12 6a6 6 0 016 6" />
+      </svg>
+    </div>
+
+    <p class="label">INVENTORYOS // SISTEMA OFFLINE</p>
+    <h1>Sem Conexão</h1>
+    <p>Você está offline. Verifique sua conexão com a internet e tente novamente.</p>
+
+    <div class="divider"></div>
+
+    <button onclick="window.location.reload()">
+      TENTAR NOVAMENTE
+    </button>
+
+    <p class="status">
+      <span class="dot"></span>
+      AGUARDANDO CONEXÃO...
+    </p>
+  </div>
+
+  <script>
+    // Reload automatically when connection is restored
+    window.addEventListener("online", () => window.location.reload());
+  </script>
+</body>
+</html>
