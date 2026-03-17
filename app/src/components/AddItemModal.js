@@ -48,7 +48,11 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
 
   useEffect(() => {
     if (suggestions && user) {
-      logAIUsage(user.uid, "IMAGE_OCR", { model: "GEMINI-2.5-FLASH", timestamp: new Date().toISOString() });
+      logAIUsage(user.uid, "IMAGE_OCR", { 
+        strategy: "GEMINI-FLASH-LITE-FALLBACK",
+        optimized: true,
+        timestamp: new Date().toISOString() 
+      });
     }
   }, [suggestions, user]);
 

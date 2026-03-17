@@ -34,6 +34,9 @@ export default function Dashboard() {
   const { user, loading: authLoading, isAdmin, login, logout } = useAuth();
   const { loading: invLoading, searchQuery, setSearchQuery, filteredItems, items, deleteItem } = useInventory();
 
+  const [notification, setNotification] = useState(null);
+  const [removedItems, setRemovedItems] = useState(new Set());
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#141414]">
@@ -81,31 +84,87 @@ export default function Dashboard() {
     sold: items.filter(i => i.status === "SOLD").length,
   };
 
+
   const handleEdit = (item) => { setItemToEdit(item); setIsModalOpen(true); setActiveMenuId(null); };
+
   const handleDelete = async (id) => {
-    if (confirm("Confirmar exclusão permanente?")) { 
-      await deleteItem(id); 
-      setActiveMenuId(null); 
-    }
+    // 1. Mark as removed in local state (Optimistic UI)
+    setRemovedItems(prev => new Set([...prev, id]));
+    
+    setNotification({
+      id,
+      message: "Item movido para a lixeira temporária",
+      action: "Desfazer"
+    });
+
+    // 2. Schedule actual deletion
+    setTimeout(async () => {
+      let isStillDeleted = false;
+      
+      // We use the state setter to safely check and update the set
+      setRemovedItems(current => {
+        if (current.has(id)) {
+          isStillDeleted = true;
+          const next = new Set(current);
+          next.delete(id);
+          return next;
+        }
+        return current;
+      });
+
+      // 3. If it wasn't undone, proceed with Firebase deletion
+      if (isStillDeleted) {
+        try {
+          await deleteItem(id);
+          console.log(`[Firebase] Item ${id} excluded successfully.`);
+        } catch (err) {
+          console.error(`[Firebase] Critical: Failed to delete item ${id}. Check rules.`, err);
+          // Restore the item in UI since deletion failed
+          setRemovedItems(prev => {
+            const next = new Set(prev);
+            next.delete(id);
+            return next;
+          });
+          setNotification({
+            id,
+            message: "Erro de permissão ao excluir.",
+            action: "OK"
+          });
+        }
+      }
+    }, 5000);
   };
 
-  const handleShare = async (item) => {
+  const undoDelete = (id) => {
+    setRemovedItems(prev => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    setNotification(null);
+  };
+
+  const handleShare = async (item, platform = "native") => {
     const includePrice = user?.sharePriceByDefault ?? false;
     const text = `Equipamento: ${item.model}\nMarca: ${item.brand}\nPN: ${item.partNumber}\n\nEspecificações:\n${item.specifications}${includePrice && item.sellingPrice ? `\n\nPreço: R$ ${parseFloat(item.sellingPrice).toLocaleString('pt-BR')}` : ""}`;
     
+    if (platform === "whatsapp") {
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+      return;
+    }
+
     if (navigator.share) {
       try {
-        await navigator.share({
-          title: `InventoryOS - ${item.model}`,
-          text: text,
-          url: window.location.href
-        });
+        await navigator.share({ text });
       } catch (err) {
-        console.log("Share failed", err);
+        if (err.name !== 'AbortError') {
+          navigator.clipboard.writeText(text);
+          setNotification({ message: "Texto copiado para a área de transferência" });
+        }
       }
     } else {
       navigator.clipboard.writeText(text);
-      alert("Copiado!");
+      setNotification({ message: "Texto copiado para a área de transferência" });
     }
   };
 
@@ -233,8 +292,8 @@ export default function Dashboard() {
                 <SettingsView />
               ) : (
                 <InventoryContent
-                  items={items}
-                  filteredItems={filteredItems}
+                  items={items.filter(i => !removedItems.has(i.id))}
+                  filteredItems={filteredItems.filter(i => !removedItems.has(i.id))}
                   stats={stats}
                   loading={invLoading}
                   searchQuery={searchQuery}
@@ -267,6 +326,33 @@ export default function Dashboard() {
         </div>
         </div>
       </div>
+
+      {/* Retro-Premium Notification Toast */}
+      <AnimatePresence>
+        {notification && (
+          <motion.div
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-32px)] max-w-sm"
+          >
+            <div className="bg-[#1a1a1a] border border-white/[0.1] shadow-2xl p-4 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-xs font-black uppercase tracking-widest text-zinc-300">
+                  {notification.message}
+                </span>
+              </div>
+              <button
+                onClick={() => undoDelete(notification.id)}
+                className="text-[10px] font-black uppercase tracking-[0.2em] text-white bg-white/10 px-3 py-1.5 hover:bg-white/20 transition-colors"
+              >
+                {notification.action}
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <ItemDetailModal
         isOpen={!!selectedItem}
@@ -397,7 +483,7 @@ function ItemRow({ item, idx, isMenuOpen, onMenuToggle, onEdit, onDelete, onView
         dragElastic={0.2}
         onDragEnd={(_, info) => {
           if (info.offset.x < -60) {
-            if (confirm("Confirmar exclusão?")) onDelete(item.id);
+            onDelete(item.id);
           } else if (info.offset.x > 60) {
             onShare(item);
           }
@@ -486,10 +572,17 @@ function ItemRow({ item, idx, isMenuOpen, onMenuToggle, onEdit, onDelete, onView
                   </button>
                   <div className="h-px bg-white/[0.07]" />
                   <button
+                    onClick={(e) => { e.stopPropagation(); onShare(item, "whatsapp"); }}
+                    className="w-full text-left px-4 py-3 text-xs font-black uppercase tracking-widest text-[#25D366] hover:bg-[#25D366]/10 transition-colors"
+                  >
+                    WhatsApp
+                  </button>
+                  <div className="h-px bg-white/[0.07]" />
+                  <button
                     onClick={(e) => { e.stopPropagation(); onShare(item); }}
                     className="w-full text-left px-4 py-3 text-xs font-black uppercase tracking-widest text-emerald-400 hover:bg-emerald-500/10 transition-colors"
                   >
-                    Compartilhar
+                    Outros (Sistema)
                   </button>
                   <div className="h-px bg-white/[0.07]" />
                   <button

@@ -6,24 +6,27 @@ import { getBrandLogo } from "@/lib/utils";
 export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
   if (!isOpen || !item) return null;
 
-  const handleShare = async () => {
+  const handleShare = async (platform = "native") => {
     const includePrice = item.userSettings?.sharePriceByDefault ?? false;
     const text = `Equipamento: ${item.model}\nMarca: ${item.brand}\nPN: ${item.partNumber}\n\nEspecificações:\n${item.specifications}${includePrice && item.sellingPrice ? `\n\nPreço: R$ ${parseFloat(item.sellingPrice).toLocaleString('pt-BR')}` : ""}`;
     
+    if (platform === "whatsapp") {
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+      return;
+    }
+
     if (navigator.share) {
       try {
-        await navigator.share({
-          title: `InventoryOS - ${item.model}`,
-          text: text,
-          url: window.location.href
-        });
+        await navigator.share({ text });
       } catch (err) {
-        console.log("Share failed", err);
+        if (err.name !== 'AbortError') {
+          navigator.clipboard.writeText(text);
+          alert("Texto copiado para a área de transferência!");
+        }
       }
     } else {
-      // Fallback: Copy to clipboard
       navigator.clipboard.writeText(text);
-      alert("Link e descrição copiados!");
+      alert("Texto copiado para a área de transferência!");
     }
   };
 
@@ -63,9 +66,27 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
         <div className="relative h-48 shrink-0 bg-gradient-to-br from-zinc-800 to-black p-6 flex flex-col justify-end">
           <div className="absolute top-4 right-4 flex gap-2 z-20">
             <button 
-              onClick={handleShare}
+              onClick={() => handleShare("whatsapp")}
+              className="p-2.5 rounded-full bg-white/10 hover:bg-[#25D366] text-white transition-all backdrop-blur-md"
+              title="Compartilhar no WhatsApp"
+            >
+              <svg 
+                viewBox="0 0 24 24" 
+                width="18" 
+                height="18" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                fill="none" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+              >
+                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+              </svg>
+            </button>
+            <button 
+              onClick={() => handleShare()}
               className="p-2.5 rounded-full bg-white/10 hover:bg-emerald-500 text-white transition-all backdrop-blur-md"
-              title="Compartilhar"
+              title="Compartilhar (Sistema)"
             >
               <Share2 size={18} />
             </button>
