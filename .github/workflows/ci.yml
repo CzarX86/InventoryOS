@@ -42,7 +42,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run tests
-        run: pnpm test -- --runInBand
+        run: pnpm exec jest --runInBand
 
   build:
     name: Build
