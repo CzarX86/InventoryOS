@@ -2,7 +2,7 @@
 
 ## What Exists
 
-- `CI` runs tests and build on pull requests to `main` and pushes to `main` / `codex/**`.
+- `CI` runs tests and builds on pull requests to `main` and pushes to `main` / `codex/**`.
 - `Deploy Staging` runs automatically after a successful `CI` workflow and deploys to the staging Firebase project.
 - `Deploy Production` is manual only and should be protected by the GitHub `production` environment approval rule.
 - `CODEOWNERS` routes app, workflow, and docs reviews to `@CzarX86`.

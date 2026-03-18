@@ -56,6 +56,22 @@ describe("audit helpers", () => {
     expect(next.calls[0].usage.totalTokenCount).toBe(5);
   });
 
+  it("accepts tokenUsage-shaped payloads from the extraction hook", () => {
+    const ledger = createTaskLedger({ taskId: "task-2", actorId: "user-1" });
+    const next = appendTaskUsageCall(ledger, {
+      model: "gemini-2.5-flash",
+      source: "voice-input",
+      step: "processAudioExtraction",
+      tokenUsage: { promptTokenCount: 4, candidatesTokenCount: 3, totalTokenCount: 7 },
+    });
+
+    expect(next.totalTokenCount).toBe(7);
+    expect(next.calls[0]).toMatchObject({
+      source: "voice-input",
+      step: "processAudioExtraction",
+    });
+  });
+
   it("builds reversible descriptors for inventory actions", () => {
     expect(buildUndoDescriptor({ actionType: "CREATE_ITEM", reversible: true, targetId: "a1" })).toEqual({
       actionType: "DELETE_ITEM",

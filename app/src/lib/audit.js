@@ -68,7 +68,7 @@ export function createTaskLedger({
 
 export function appendTaskUsageCall(ledger, call) {
   const next = { ...ledger };
-  const usage = normalizeUsageMetadata(call?.usage);
+  const usage = normalizeUsageMetadata(call?.usage || call?.tokenUsage);
 
   if (!usage) return next;
 

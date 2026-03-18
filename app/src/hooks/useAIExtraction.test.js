@@ -93,6 +93,7 @@ describe("useAIExtraction", () => {
     });
 
     expect(onUsage).toHaveBeenCalledWith(expect.objectContaining({
+      usage: mockExtractedData.tokenUsage,
       tokenUsage: mockExtractedData.tokenUsage,
       source: "label-image",
       step: "processExtraction",
@@ -102,5 +103,33 @@ describe("useAIExtraction", () => {
       brand: "WEG",
       model: "CFW500",
     });
+  });
+
+  it("supports ledger-compatible usage payloads for downstream aggregation", async () => {
+    const onUsage = jest.fn();
+    extractFromLabel.mockResolvedValue({
+      type: "INVERSOR",
+      tokenUsage: {
+        promptTokenCount: 2,
+        candidatesTokenCount: 1,
+        totalTokenCount: 3,
+        cachedContentTokenCount: 0,
+      },
+    });
+
+    const { result } = renderHook(() => useAIExtraction({ onUsage }));
+
+    await act(async () => {
+      await result.current.processExtraction(mockFile);
+    });
+
+    expect(onUsage).toHaveBeenCalledWith(expect.objectContaining({
+      usage: {
+        promptTokenCount: 2,
+        candidatesTokenCount: 1,
+        totalTokenCount: 3,
+        cachedContentTokenCount: 0,
+      },
+    }));
   });
 });

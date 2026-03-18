@@ -37,18 +37,18 @@ export default function PWAInstallPrompt() {
       setDeferredPrompt(e);
       setIsInstallable(true);
     };
-
-    window.addEventListener("beforeinstallprompt", handler);
-
-    // Hide if it gets installed while open
-    window.addEventListener("appinstalled", () => {
+    const onAppInstalled = () => {
       setIsInstallable(false);
       setIsInstalling(false);
       setDeferredPrompt(null);
-    });
+    };
+
+    window.addEventListener("beforeinstallprompt", handler);
+    window.addEventListener("appinstalled", onAppInstalled);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handler);
+      window.removeEventListener("appinstalled", onAppInstalled);
     };
   }, []);
 
