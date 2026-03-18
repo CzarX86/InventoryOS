@@ -1,7 +1,45 @@
+rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+    }
+
+    match /users/{userId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /inventory/{itemId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /telemetry/{logId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /system/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /usage_stats/{userId} {
+      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
+      allow create, update: if isSignedIn() && request.auth.uid == userId;
+      allow delete: if isAdmin();
+    }
+
+    match /task_ai_usage/{taskId} {
+      allow create: if isSignedIn() && request.resource.data.actorId == request.auth.uid;
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /activity_log/{eventId} {
+      allow create: if isSignedIn() && request.resource.data.actorId == request.auth.uid;
+      allow read, update, delete: if isAdmin();
     }
   }
 }

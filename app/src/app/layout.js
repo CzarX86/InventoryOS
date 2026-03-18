@@ -1,16 +1,6 @@
-import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import ServiceWorkerUpdater from "@/components/ServiceWorkerUpdater";
-
-const plusJakartaSans = Plus_Jakarta_Sans({
-  subsets: ["latin"],
-  variable: "--font-plus-jakarta",
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
-  variable: "--font-jetbrains-mono",
-});
+import PWAInstallPrompt from "@/components/PWAInstallPrompt";
 
 export const metadata = {
   title: "InventoryOS",
@@ -42,8 +32,9 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="pt-BR">
-      <body className={`${plusJakartaSans.variable} ${jetbrainsMono.variable} antialiased font-sans`}>
+      <body className="antialiased font-sans flex flex-col min-h-screen">
         <ServiceWorkerUpdater />
+        <PWAInstallPrompt />
         {children}
       </body>
     </html>

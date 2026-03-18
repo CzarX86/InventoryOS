@@ -67,4 +67,40 @@ describe("useAIExtraction", () => {
     expect(result.current.hasPendingConfirmation).toBe(false);
     expect(result.current.suggestions).toBeNull();
   });
+
+  it("should emit token usage metadata without leaking it into suggestions", async () => {
+    const mockExtractedData = {
+      type: "INVERSOR",
+      brand: "WEG",
+      model: "CFW500",
+      aiModel: "gemini-2.5-flash",
+      tokenUsage: {
+        promptTokenCount: 10,
+        candidatesTokenCount: 5,
+        totalTokenCount: 15,
+        cachedContentTokenCount: 0,
+        calls: [{ model: "gemini", source: "direct", step: "generateContent", usage: { promptTokenCount: 10, candidatesTokenCount: 5, totalTokenCount: 15, cachedContentTokenCount: 0 } }],
+      },
+      tokenUsageCalls: [],
+    };
+    const onUsage = jest.fn();
+    extractFromLabel.mockResolvedValue(mockExtractedData);
+
+    const { result } = renderHook(() => useAIExtraction({ onUsage }));
+
+    await act(async () => {
+      await result.current.processExtraction(mockFile);
+    });
+
+    expect(onUsage).toHaveBeenCalledWith(expect.objectContaining({
+      tokenUsage: mockExtractedData.tokenUsage,
+      source: "label-image",
+      step: "processExtraction",
+    }));
+    expect(result.current.suggestions).toEqual({
+      type: "INVERSOR",
+      brand: "WEG",
+      model: "CFW500",
+    });
+  });
 });

@@ -2,8 +2,9 @@
   "name": "app",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.32.1",
   "scripts": {
-    "dev": "next dev",
+    "dev": "lsof -ti:3000 | xargs kill -9 2>/dev/null; rm -rf .next && next dev -p 3000",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
