@@ -1,10 +1,27 @@
 import { useState } from "react";
 import { extractFromLabel } from "@/lib/ai";
 
-export default function useAIExtraction() {
+function stripMetadata(result) {
+  if (!result) return result;
+  const { tokenUsage, tokenUsageCalls, aiModel, ...rest } = result;
+  return rest;
+}
+
+export default function useAIExtraction({ onUsage } = {}) {
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState(null);
   const [hasPendingConfirmation, setHasPendingConfirmation] = useState(false);
+
+  const emitUsage = (result, context) => {
+    if (!onUsage || !result?.tokenUsage) return;
+    onUsage({
+      tokenUsage: result.tokenUsage,
+      tokenUsageCalls: result.tokenUsageCalls || [],
+      aiModel: result.aiModel || null,
+      source: context.source,
+      step: context.step,
+    });
+  };
 
   const processExtraction = async (file, lite = false) => {
     if (!file) return;
@@ -15,7 +32,8 @@ export default function useAIExtraction() {
       const extracted = await extractFromLabel(base64, lite);
       
       if (extracted) {
-        setSuggestions(extracted);
+        emitUsage(extracted, { source: "label-image", step: "processExtraction" });
+        setSuggestions(stripMetadata(extracted));
         setHasPendingConfirmation(true);
       }
     } catch (error) {
@@ -36,7 +54,8 @@ export default function useAIExtraction() {
       const extracted = await extractRegistrationFromAudio(base64, blob.type || "audio/webm", lite);
       
       if (extracted) {
-        setSuggestions(extracted);
+        emitUsage(extracted, { source: "voice-input", step: "processAudioExtraction" });
+        setSuggestions(stripMetadata(extracted));
         setHasPendingConfirmation(true);
       }
     } catch (error) {

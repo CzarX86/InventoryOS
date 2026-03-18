@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { sumUsageMetadata, normalizeUsageMetadata } from "./audit";
 
 const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY);
 
@@ -41,19 +42,25 @@ const resizeImage = async (base64Str, maxWidth = 1024) => {
 
 // Unified call with fallback from 2.5-flash-lite to 3.1-flash-lite
 async function callWithFallback(prompt, visualData = null, useSearch = false) {
-  const models = ["gemini-2.5-flash-lite", "gemini-3.1-flash-lite"];
+  const models = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-1.5-flash"];
   let lastError = null;
+  const usageAttempts = [];
 
   for (const modelName of models) {
     try {
+      // Basic configuration without tools
       const modelConfig = { 
         model: modelName,
-        generationConfig: {
-          response_mime_type: "application/json",
-        }
       };
+
+      // Add options carefully based on rules
+      // For basic JSON extraction we force JSON output. But if using Search Grounding,
+      // the Gemini API throws 400 when combining tools with response_mime_type 'application/json'
+      if (!useSearch) {
+         modelConfig.generationConfig = { response_mime_type: "application/json" };
+      }
       
-      // Enable Google Search Grounding for market research
+      // Google Search Grounding for real-time market research
       if (useSearch) {
         modelConfig.tools = [{ googleSearch: {} }];
       }
@@ -63,14 +70,32 @@ async function callWithFallback(prompt, visualData = null, useSearch = false) {
       const parts = [prompt];
       if (visualData) parts.push(visualData);
 
+      // Using the simpler array format, the Gemini JS SDK automatically
+      // handles the formatting of text and inlineData objects properly.
       const result = await model.generateContent(parts);
       const response = await result.response;
       const text = response.text();
+      const usage = normalizeUsageMetadata(response.usageMetadata);
+      if (usage) {
+        usageAttempts.push({
+          model: modelName,
+          source: useSearch ? "search" : "direct",
+          step: "generateContent",
+          usage,
+        });
+      }
       
       // Attempt to parse JSON
       try {
         const jsonMatch = text.match(/\{[\s\S]*\}/);
-        return JSON.parse(jsonMatch ? jsonMatch[0] : text);
+        const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : text);
+        const tokenUsage = sumUsageMetadata(usageAttempts);
+        return {
+          ...parsed,
+          tokenUsage: tokenUsage.totalTokenCount > 0 ? tokenUsage : null,
+          tokenUsageCalls: usageAttempts,
+          aiModel: modelName,
+        };
       } catch (e) {
         // If JSON fails but we have output, maybe retry with next model
         if (modelName === models[0]) continue;
@@ -147,15 +172,22 @@ export async function extractFromAudio(base64Audio, mimeType = "audio/webm") {
 
 export async function extractRegistrationFromAudio(base64Audio, mimeType = "audio/webm", lite = false) {
   const prompt = `
-    O usuário está ditando informações de um equipamento elétrico.
-    Extraia as informações e estruture no seguinte JSON:
-    - type, brand, model, partNumber, specifications.
+    O usuário está ditando informações de um equipamento elétrico/industrial.
+    Sua tarefa é transcrever e extrair as informações EXATAS ditadas no áudio e estruturá-las no formato JSON abaixo.
+    CRÍTICO: NÃO invente ou assuma informações. Se o usuário não mencionar um campo explicitamente (como o part number ou modelo), defina o valor dele estritamente como null.
+    
+    Campos para extração JSON:
+    - type: (Tipo do equipamento. Ex: INVERSOR DE FREQUÊNCIA, MOTOR)
+    - brand: (Fabricante/Marca. Ex: WEG, SIEMENS)
+    - model: (Modelo do equipamento)
+    - partNumber: (Part number / código do produto)
+    - specifications: (Qualquer outra especificação citada, como potência, tensão, estado, etc.)
     ${!lite ? `
-    - estimatedMarketValue: (Estimativa numérica realista de preço de mercado "semi-novo" em BRL/R$)
-    - marketJustification: (Breve justificativa)
+    - estimatedMarketValue: (Estimativa numérica de preço secundário em BRL se possível buscar baseado no áudio, senão null)
+    - marketJustification: (Justificativa)
     ` : ''}
     
-    Apenas retorne o JSON válido.
+    Apenas retorne o JSON puro e válido, e certifique-se de ser EXTREMAMENTE FIEL ao áudio original, retornando null as chaves que faltarem.
   `;
 
   const audioData = {

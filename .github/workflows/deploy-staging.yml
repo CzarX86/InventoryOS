@@ -1,0 +1,144 @@
+name: Deploy Staging
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+concurrency:
+  group: deploy-staging-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy To Staging
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      (
+        (
+          github.event.workflow_run.event == 'push' &&
+          github.event.workflow_run.head_branch == 'main'
+        ) ||
+        (
+          github.event.workflow_run.event == 'pull_request' &&
+          github.event.workflow_run.head_repository.full_name == github.repository
+        )
+      )
+    runs-on: ubuntu-latest
+    environment: staging
+    defaults:
+      run:
+        working-directory: app
+    env:
+      NEXT_PUBLIC_FIREBASE_API_KEY: ${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
+      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ vars.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+      NEXT_PUBLIC_FIREBASE_APP_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_APP_ID }}
+      NEXT_PUBLIC_GEMINI_API_KEY: ${{ secrets.NEXT_PUBLIC_GEMINI_API_KEY }}
+      STAGING_URL: https://${{ vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}.web.app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build static app
+        run: pnpm build
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Setup Firebase CLI
+        run: npm install --global firebase-tools
+
+      - name: Deploy to Firebase staging
+        run: firebase deploy --project "$NEXT_PUBLIC_FIREBASE_PROJECT_ID" --only hosting,firestore,storage --non-interactive
+
+      - name: Publish staging URL
+        run: |
+          {
+            echo "## Staging Deploy"
+            echo
+            echo "- Commit: \`${{ github.event.workflow_run.head_sha }}\`"
+            echo "- Branch: \`${{ github.event.workflow_run.head_branch }}\`"
+            echo "- URL: ${STAGING_URL}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Notify PR for manual staging test
+        if: ${{ github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.pull_requests[0] }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.workflow_run.pull_requests[0];
+            const body = [
+              "<!-- codex-staging-notification -->",
+              "## Staging Ready",
+              "",
+              `Staging deploy completed for \`${context.payload.workflow_run.head_sha.slice(0, 7)}\`.`,
+              "",
+              `- URL: ${process.env.STAGING_URL}`,
+              `- Branch: \`${context.payload.workflow_run.head_branch}\``,
+              "",
+              "Manual validation checklist:",
+              "- Open the staging URL.",
+              "- Test the changed flow end to end.",
+              "- Confirm no regression in login, inventory, and admin screens.",
+              "- If staging is correct, trigger `Deploy Production` from GitHub Actions.",
+            ].join("\n");
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              per_page: 100,
+            });
+
+            const existing = comments.find(comment =>
+              comment.user?.type === "Bot" &&
+              comment.body?.includes("<!-- codex-staging-notification -->")
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                body,
+              });
+            }

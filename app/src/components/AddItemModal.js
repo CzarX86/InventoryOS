@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { X, Loader2, Camera, Check, Sparkles, RotateCcw, TrendingUp, Mic, Square, Play } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { db, storage } from "@/lib/firebase";
@@ -8,6 +8,15 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import useAIExtraction from "@/hooks/useAIExtraction";
 import { logAIUsage } from "@/lib/usage";
 import useAuth from "@/hooks/useAuth";
+import {
+  appendTaskUsageCall,
+  buildActivityEvent,
+  createAuditTaskId,
+  createTaskLedger,
+  logInventoryActivity,
+  logTaskCompletion,
+} from "@/lib/audit";
+import GlobalLoadingBar from "@/components/GlobalLoadingBar";
 
 const INPUT = "w-full bg-transparent border-b border-white/[0.1] py-2.5 text-base text-white placeholder:text-zinc-200 outline-none focus:border-white/30 transition-colors";
 const STATUS_OPTIONS = ["IN STOCK", "SOLD", "REPAIR", "RESERVED"];
@@ -20,16 +29,36 @@ const EMPTY_FORM = {
 
 export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null }) {
   const { user } = useAuth();
-  const { loading: isExtracting, suggestions, hasPendingConfirmation, processExtraction, processAudioExtraction, confirmSuggestions } = useAIExtraction();
+  const [taskLedger, setTaskLedger] = useState(() =>
+    createTaskLedger({
+      taskId: createAuditTaskId(),
+      actorId: user?.uid || null,
+    })
+  );
+  const resetTaskLedger = useCallback(() => {
+    setTaskLedger(
+      createTaskLedger({
+        taskId: createAuditTaskId(),
+        actorId: user?.uid || null,
+      })
+    );
+  }, [user?.uid]);
+  const { loading: isExtracting, suggestions, hasPendingConfirmation, processExtraction, processAudioExtraction, confirmSuggestions } = useAIExtraction({
+    onUsage: (usageEvent) => {
+      setTaskLedger(prev => appendTaskUsageCall(prev, usageEvent));
+    },
+  });
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [audioBlob, setAudioBlob] = useState(null);
   const [productImageFile, setProductImageFile] = useState(null);
+  const [isProcessingProductPhoto, setIsProcessingProductPhoto] = useState(false);
   const [success, setSuccess] = useState(false);
   
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
+  const cancelRecordingRef = useRef(false);
 
   useEffect(() => {
     setValidationError("");
@@ -43,8 +72,11 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
       setFormData(EMPTY_FORM);
       setAudioBlob(null);
       setProductImageFile(null);
+      if (isOpen) {
+        resetTaskLedger();
+      }
     }
-  }, [editItem, isOpen]);
+  }, [editItem, isOpen, resetTaskLedger]);
 
   useEffect(() => {
     if (suggestions && user) {
@@ -78,6 +110,15 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
     }
   }, [suggestions]);
 
+  useEffect(() => {
+    if (isOpen && !editItem) {
+      resetTaskLedger();
+    }
+    if (!isOpen) {
+      resetTaskLedger();
+    }
+  }, [isOpen, editItem, resetTaskLedger]);
+
   const set = (field, value) => setFormData(prev => ({ ...prev, [field]: value }));
 
   const handleFileUpload = async (e) => {
@@ -100,6 +141,13 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
       };
 
       mediaRecorder.onstop = async () => {
+        if (cancelRecordingRef.current) {
+          cancelRecordingRef.current = false;
+          setIsRecording(false);
+          stream.getTracks().forEach(track => track.stop());
+          return;
+        }
+
         const blob = new Blob(audioChunksRef.current, { type: mimeType });
         setAudioBlob(blob);
         await processAudioExtraction(blob, user?.aiWorkflow === "background");
@@ -120,13 +168,20 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
     }
   };
 
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      cancelRecordingRef.current = true;
+      mediaRecorderRef.current.stop();
+    }
+  };
+
   const [validationError, setValidationError] = useState("");
 
   const validateForm = () => {
     if (!formData.type?.trim()) return "O campo 'Tipo de Equipamento' é obrigatório.";
     if (!formData.brand?.trim()) return "O campo 'Fabricante / Marca' é obrigatório.";
     if (!formData.model?.trim()) return "O campo 'Modelo' é obrigatório.";
-    if (!formData.partNumber?.trim()) return "O campo 'Part Number' é obrigatório.";
+
     return null;
   };
 
@@ -157,6 +212,13 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
         finalProductImageUrl = await getDownloadURL(imageRef);
       }
 
+      const auditSnapshot = {
+        ...formData,
+        audioUrl: finalAudioUrl,
+        productImageUrl: finalProductImageUrl,
+        needsMarketResearch: user?.aiWorkflow === "background" && !formData.estimatedMarketValue,
+        updatedAt: new Date().toISOString(),
+      };
       const data = {
         ...formData,
         audioUrl: finalAudioUrl,
@@ -167,12 +229,59 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
       
       if (editItem) {
         await updateDoc(doc(db, "inventory", editItem.id), data);
+        try {
+          await logInventoryActivity(db, buildActivityEvent({
+            actionType: "UPDATE_ITEM",
+            actorId: user?.uid || null,
+            actorEmail: user?.email || null,
+            targetType: "inventory",
+            targetId: editItem.id,
+            before: editItem,
+            after: { ...editItem, ...auditSnapshot },
+            reversible: true,
+            metadata: { source: "modal" },
+          }));
+        } catch (auditError) {
+          console.error("Audit logging failed for update:", auditError);
+        }
       } else {
-        await addDoc(collection(db, "inventory"), { ...data, createdAt: serverTimestamp() });
+        const createdRef = await addDoc(collection(db, "inventory"), { ...data, createdAt: serverTimestamp() });
+        const createdItem = {
+          ...auditSnapshot,
+          id: createdRef.id,
+          createdAt: new Date().toISOString(),
+        };
+
+        try {
+          await logTaskCompletion(db, taskLedger, {
+            actorEmail: user?.email || null,
+            itemId: createdRef.id,
+            relatedActionType: "CREATE_ITEM",
+            after: createdItem,
+          });
+
+          await logInventoryActivity(db, buildActivityEvent({
+            actionType: "CREATE_ITEM",
+            actorId: user?.uid || null,
+            actorEmail: user?.email || null,
+            targetType: "inventory",
+            targetId: createdRef.id,
+            before: null,
+            after: createdItem,
+            reversible: true,
+            metadata: {
+              taskId: taskLedger.taskId,
+              tokenTotal: taskLedger.totalTokenCount,
+            },
+          }));
+        } catch (auditError) {
+          console.error("Audit logging failed for create:", auditError);
+        }
       }
       onAdded();
       if (!editItem) {
         setSuccess(true);
+        resetTaskLedger();
       } else {
         onClose();
       }
@@ -192,8 +301,9 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 24 }}
         transition={{ duration: 0.18 }}
-        className="w-full md:max-w-xl bg-[#141414] border-t md:border border-white/[0.08] overflow-hidden shadow-2xl max-h-[95vh] flex flex-col"
+        className="w-full md:max-w-xl bg-[#141414] border-t md:border border-white/[0.08] overflow-hidden shadow-2xl max-h-[95vh] flex flex-col relative"
       >
+        <GlobalLoadingBar isLoading={saving || isExtracting || isProcessingProductPhoto} />
         <AnimatePresence mode="wait">
           {success ? (
             <motion.div 
@@ -247,6 +357,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                     setAudioBlob(null);
                     setValidationError("");
                     setSuccess(false);
+                    resetTaskLedger();
                   }}
                   className="w-full py-5 bg-white text-black font-black uppercase tracking-widest text-xs hover:bg-zinc-200 transition-all active:scale-[0.98] shadow-[0_10px_30px_rgba(255,255,255,0.1)]"
                 >
@@ -288,65 +399,108 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
 
                 {/* AI Scanner & Product Photo */}
                 {!editItem ? (
-                  <div className="border-b border-white/[0.08] flex flex-col sm:flex-row">
-                    <div className="relative flex-1 border-b sm:border-b-0 sm:border-r border-white/[0.08]">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileUpload}
-                        disabled={isExtracting || isRecording}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
-                      />
-                      <div className={`flex flex-col items-center justify-center p-6 h-full transition-colors ${
-                        isExtracting ? "bg-white/[0.03]" : "hover:bg-white/[0.02]"
-                      }`}>
-                        <div className={`shrink-0 mb-3 ${isExtracting ? "text-white" : "text-zinc-200"}`}>
-                          {isExtracting
-                            ? <Loader2 size={24} className="animate-spin" />
-                            : <Camera size={24} />
-                          }
+                  <div className="border-b border-white/[0.08]">
+                    {isExtracting ? (
+                      <div className="flex flex-col items-center justify-center py-10 gap-4 bg-white/[0.02]">
+                        <div className="relative flex items-center justify-center w-14 h-14">
+                          <motion.div
+                            animate={{ scale: [1, 2, 1], opacity: [0.2, 0, 0.2] }}
+                            transition={{ duration: 1.5, repeat: Infinity }}
+                            className="absolute inset-0 rounded-full bg-white"
+                          />
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          >
+                            <Sparkles size={22} className="text-white" />
+                          </motion.div>
                         </div>
-                        <p className={`text-sm font-bold uppercase tracking-wider text-center ${isExtracting ? "text-white" : "text-zinc-300"}`}>
-                          {isExtracting ? "Analisando..." : "Scan Etiqueta"}
-                        </p>
-                        <span className="mt-2 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Extração IA</span>
+                        <div className="text-center">
+                          <p className="text-sm font-black uppercase tracking-[0.2em] text-white">IA Processando</p>
+                          <motion.p
+                            animate={{ opacity: [0.3, 1, 0.3] }}
+                            transition={{ duration: 1.4, repeat: Infinity }}
+                            className="text-[11px] font-bold uppercase tracking-widest text-zinc-400 mt-1"
+                          >
+                            Processando base de dados...
+                          </motion.p>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="flex flex-col sm:flex-row">
+                        <div className="relative flex-1 border-b sm:border-b-0 sm:border-r border-white/[0.08]">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleFileUpload}
+                            disabled={isRecording}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
+                          />
+                          <div className="flex flex-col items-center justify-center p-6 h-full hover:bg-white/[0.02] transition-colors">
+                            <Camera size={24} className="shrink-0 mb-3 text-zinc-200" />
+                            <p className="text-sm font-bold uppercase tracking-wider text-center text-zinc-300">Scan Etiqueta</p>
+                            <span className="mt-2 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Extração IA</span>
+                          </div>
+                        </div>
 
-                    <div className="relative flex-1 border-b sm:border-b-0 sm:border-r border-white/[0.08]">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => setProductImageFile(e.target.files[0])}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                      />
-                      <div className={`flex flex-col items-center justify-center p-6 h-full transition-colors ${
-                        productImageFile ? "bg-white/[0.03]" : "hover:bg-white/[0.02]"
-                      }`}>
-                        <div className={`shrink-0 mb-3 ${productImageFile ? "text-emerald-400" : "text-zinc-200"}`}>
-                          {productImageFile ? <Check size={24} /> : <Camera size={24} />}
+                        <div className="relative flex-1 border-b sm:border-b-0 sm:border-r border-white/[0.08]">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files[0];
+                              if (file) {
+                                setIsProcessingProductPhoto(true);
+                                setProductImageFile(file);
+                                // Brief "processing" feel
+                                setTimeout(() => setIsProcessingProductPhoto(false), 800);
+                              }
+                            }}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                          />
+                          <div className={`flex flex-col items-center justify-center p-6 h-full transition-colors ${productImageFile ? "bg-white/[0.03]" : "hover:bg-white/[0.02]"}`}>
+                            <div className={`shrink-0 mb-3 ${productImageFile ? "text-emerald-400" : "text-zinc-200"}`}>
+                              {productImageFile ? <Check size={24} /> : <Camera size={24} />}
+                            </div>
+                            <p className={`text-sm font-bold uppercase tracking-wider text-center ${productImageFile ? "text-emerald-400" : "text-zinc-300"}`}>
+                              {productImageFile ? "Foto Selecionada" : "Foto do Produto"}
+                            </p>
+                            <span className="mt-2 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Visualização</span>
+                          </div>
                         </div>
-                        <p className={`text-sm font-bold uppercase tracking-wider text-center ${productImageFile ? "text-emerald-400" : "text-zinc-300"}`}>
-                          {productImageFile ? "Foto Selecionada" : "Foto do Produto"}
-                        </p>
-                        <span className="mt-2 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Visualização</span>
+
+                        {isRecording ? (
+                          <div className="relative flex-1 flex flex-col items-center justify-center p-6 h-full bg-white/[0.03]">
+                            <div className="flex items-center gap-6 mb-3">
+                              <button onClick={(e) => { e.stopPropagation(); cancelRecording(); }} className="text-zinc-400 hover:text-white transition-colors flex flex-col items-center">
+                                <X size={20} className="mb-1" />
+                                <span className="text-[9px] font-black uppercase tracking-widest">Cancelar</span>
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); stopRecording(); }} className="text-red-500 hover:text-red-400 transition-colors flex flex-col items-center">
+                                <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 0.7, repeat: Infinity }}>
+                                  <Square size={20} className="mb-1 fill-red-500" />
+                                </motion.div>
+                                <span className="text-[9px] font-black uppercase tracking-widest">Enviar AI</span>
+                              </button>
+                            </div>
+                            <span className="mt-2 text-[10px] font-black uppercase tracking-[0.2em] text-red-500 animate-pulse">Gravando...</span>
+                          </div>
+                        ) : (
+                          <div
+                            className="relative flex-1 flex flex-col items-center justify-center p-6 h-full transition-colors cursor-pointer hover:bg-white/[0.02]"
+                            onClick={startRecording}
+                          >
+                            <div className="shrink-0 mb-3 text-zinc-200">
+                              <Mic size={24} />
+                            </div>
+                            <p className="text-sm font-bold uppercase tracking-wider text-center text-zinc-300">
+                              Ditar
+                            </p>
+                            <span className="mt-2 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Voz IA</span>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                    
-                    <div 
-                      className={`relative flex-1 flex flex-col items-center justify-center p-6 h-full transition-colors cursor-pointer ${
-                        isRecording || isExtracting ? "bg-white/[0.03]" : "hover:bg-white/[0.02]"
-                      }`}
-                      onClick={isRecording ? stopRecording : (!isExtracting ? startRecording : undefined)}
-                    >
-                      <div className={`shrink-0 mb-3 ${isRecording ? "text-red-500 animate-pulse" : "text-zinc-200"}`}>
-                        {isExtracting ? <Loader2 size={24} className="animate-spin" /> : (isRecording ? <Square size={24} className="fill-red-500" /> : <Mic size={24} />)}
-                      </div>
-                      <p className={`text-sm font-bold uppercase tracking-wider text-center ${isRecording ? "text-red-500 font-black" : "text-zinc-300"}`}>
-                        {isRecording ? "Parar" : "Ditar"}
-                      </p>
-                      <span className="mt-2 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Voz IA</span>
-                    </div>
+                    )}
                   </div>
                 ) : (
                   <div className="border-b border-white/[0.08] p-6 text-center">
@@ -439,7 +593,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                     <TrendingUp size={13} className="text-zinc-300 shrink-0 mt-0.5" />
                     <div>
                       <p className="text-base font-black uppercase tracking-widest text-zinc-300 mb-1">Insights de Mercado</p>
-                      <p className="text-base text-zinc-300 leading-relaxed italic">"{formData.marketJustification}"</p>
+                      <p className="text-base text-zinc-300 leading-relaxed italic">&quot;{formData.marketJustification}&quot;</p>
                     </div>
                   </div>
                 )}
@@ -535,4 +689,3 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
     </div>
   );
 }
-

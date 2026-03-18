@@ -1,10 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef, useMemo } from "react";
 import {
   Search, Plus, Mic, Package, Boxes, Settings,
   Shield, LogOut, MoreHorizontal, AlertTriangle, Loader2, X, Share2, Trash2
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useTransform, useAnimation } from "framer-motion";
 import AddItemModal from "@/components/AddItemModal";
 import ItemDetailModal from "@/components/ItemDetailModal";
 import VoiceSearch from "@/components/VoiceSearch";
@@ -13,6 +13,7 @@ import SettingsView from "@/components/SettingsView";
 import SplashScreen from "@/components/SplashScreen";
 import useAuth from "@/hooks/useAuth";
 import useInventory from "@/hooks/useInventory";
+import { buildActivityEvent, logInventoryActivity } from "@/lib/audit";
 import { getBrandLogo } from "@/lib/utils";
 
 const STATUS_CONFIG = {
@@ -36,6 +37,7 @@ export default function Dashboard() {
 
   const [notification, setNotification] = useState(null);
   const [removedItems, setRemovedItems] = useState(new Set());
+  const undoIds = useRef(new Set());
 
   if (authLoading) {
     return (
@@ -87,55 +89,61 @@ export default function Dashboard() {
 
   const handleEdit = (item) => { setItemToEdit(item); setIsModalOpen(true); setActiveMenuId(null); };
 
-  const handleDelete = async (id) => {
-    // 1. Mark as removed in local state (Optimistic UI)
-    setRemovedItems(prev => new Set([...prev, id]));
-    
-    setNotification({
-      id,
-      message: "Item movido para a lixeira temporária",
-      action: "Desfazer"
-    });
+  const handleDelete = async (item) => {
+    const id = item?.id;
+    if (!id) return;
 
-    // 2. Schedule actual deletion
+    setRemovedItems(prev => new Set([...prev, id]));
+    setNotification({ id, message: "Item excluído", action: "Desfazer" });
+
     setTimeout(async () => {
-      let isStillDeleted = false;
+      setNotification(prev => prev?.id === id ? null : prev);
       
-      // We use the state setter to safely check and update the set
-      setRemovedItems(current => {
-        if (current.has(id)) {
-          isStillDeleted = true;
-          const next = new Set(current);
+      if (undoIds.current.has(id)) {
+        undoIds.current.delete(id);
+        return;
+      }
+
+      try {
+        await deleteItem(id);
+        if (item) {
+          try {
+            await logInventoryActivity(db, buildActivityEvent({
+              actionType: "DELETE_ITEM",
+              actorId: user?.uid || null,
+              actorEmail: user?.email || null,
+              targetType: "inventory",
+              targetId: id,
+              before: item,
+              after: null,
+              reversible: true,
+              metadata: { source: "inventory-row" },
+            }));
+          } catch (auditError) {
+            console.error("Audit logging failed for delete:", auditError);
+          }
+        }
+        // onSnapshot will remove the item from `items`, then we clean up removedItems
+        setRemovedItems(prev => {
+          const next = new Set(prev);
           next.delete(id);
           return next;
-        }
-        return current;
-      });
-
-      // 3. If it wasn't undone, proceed with Firebase deletion
-      if (isStillDeleted) {
-        try {
-          await deleteItem(id);
-          console.log(`[Firebase] Item ${id} excluded successfully.`);
-        } catch (err) {
-          console.error(`[Firebase] Critical: Failed to delete item ${id}. Check rules.`, err);
-          // Restore the item in UI since deletion failed
-          setRemovedItems(prev => {
-            const next = new Set(prev);
-            next.delete(id);
-            return next;
-          });
-          setNotification({
-            id,
-            message: "Erro de permissão ao excluir.",
-            action: "OK"
-          });
-        }
+        });
+      } catch (err) {
+        console.error("Failed to delete:", err);
+        // Restore item in UI
+        setRemovedItems(prev => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        setNotification({ id, message: "Erro ao excluir. Tente novamente.", action: "OK" });
       }
-    }, 5000);
+    }, 2500);
   };
 
   const undoDelete = (id) => {
+    undoIds.current.add(id);
     setRemovedItems(prev => {
       const next = new Set(prev);
       next.delete(id);
@@ -257,7 +265,7 @@ export default function Dashboard() {
             )}
           </div>
 
-          <div className="flex items-center gap-1 ml-auto">
+          <div className="flex items-center gap-1 ml-auto shrink-0">
             <button
               onClick={() => setIsVoiceOpen(true)}
               className="p-2 text-zinc-200 hover:text-white transition-colors"
@@ -271,6 +279,13 @@ export default function Dashboard() {
             >
               <Plus size={13} />
               <span className="hidden sm:inline">Novo</span>
+            </button>
+            <button
+              onClick={logout}
+              className="md:hidden p-2 text-zinc-200 hover:text-red-400 transition-colors ml-1"
+              title="Sair"
+            >
+              <LogOut size={15} />
             </button>
           </div>
         </header>
@@ -287,7 +302,7 @@ export default function Dashboard() {
               className="h-full"
             >
               {activeTab === "ADMIN" && isAdmin ? (
-                <AdminDashboard items={items} />
+                <AdminDashboard items={items} user={user} />
               ) : activeTab === "SETTINGS" ? (
                 <SettingsView />
               ) : (
@@ -381,6 +396,21 @@ export default function Dashboard() {
 }
 
 function InventoryContent({ items, filteredItems, stats, loading, searchQuery, activeMenuId, setActiveMenuId, onEdit, onDelete, onView = () => {}, onShare = () => {} }) {
+  const [selectedCategory, setSelectedCategory] = useState("Todos");
+
+  const uniqueCategories = useMemo(() => {
+    const cats = items.map(i => i.type || "Geral");
+    return ["Todos", ...Array.from(new Set(cats)).sort()];
+  }, [items]);
+
+  const displayItems = useMemo(() => {
+    let filtered = filteredItems;
+    if (selectedCategory !== "Todos") {
+      filtered = filtered.filter(i => (i.type || "Geral") === selectedCategory);
+    }
+    return filtered;
+  }, [filteredItems, selectedCategory]);
+
   if (loading && items.length === 0) {
     return (
       <div className="flex items-center justify-center h-48 gap-3">
@@ -416,8 +446,25 @@ function InventoryContent({ items, filteredItems, stats, loading, searchQuery, a
         ))}
       </div>
 
+      {/* Category Pills */}
+      <div className="flex items-center gap-2 px-4 md:px-6 py-4 overflow-x-auto border-b border-white/[0.07] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+        {uniqueCategories.map(cat => (
+          <button
+            key={cat}
+            onClick={() => setSelectedCategory(cat)}
+            className={`shrink-0 px-4 py-2 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-[0.15em] transition-all ${
+              selectedCategory === cat
+                ? "bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.3)]"
+                : "bg-white/[0.03] text-zinc-400 border border-white/[0.05] hover:bg-white/[0.08] hover:text-white"
+            }`}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+
       {/* Items */}
-      {filteredItems.length === 0 ? (
+      {displayItems.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
           <Package size={24} className="text-zinc-300" />
           <p className="text-base font-bold uppercase tracking-widest text-zinc-200">
@@ -434,7 +481,7 @@ function InventoryContent({ items, filteredItems, stats, loading, searchQuery, a
             <span className="w-8" />
           </div>
 
-              {filteredItems.map((item, idx) => (
+              {displayItems.map((item, idx) => (
                 <ItemRow
                   key={item.id}
                   item={item}
@@ -455,48 +502,78 @@ function InventoryContent({ items, filteredItems, stats, loading, searchQuery, a
 
 function ItemRow({ item, idx, isMenuOpen, onMenuToggle, onEdit, onDelete, onView = () => {}, onShare = () => {} }) {
   const status = STATUS_CONFIG[item.status] || STATUS_CONFIG["SOLD"];
-  const [isDeleting, setIsDeleting] = useState(false);
+  const x = useMotionValue(0);
+  const controls = useAnimation();
+
+  // Delete (swipe left): revealed on the right
+  const deleteOpacity = useTransform(x, [-80, -40, 0], [1, 0.6, 0]);
+  const deleteScale  = useTransform(x, [-80, -40, 0], [1, 0.85, 0.7]);
+
+  // Share (swipe right): revealed on the left
+  const shareOpacity = useTransform(x, [0, 40, 80], [0, 0.6, 1]);
+  const shareScale   = useTransform(x, [0, 40, 80], [0.7, 0.85, 1]);
 
   return (
     <div className="relative overflow-hidden border-b border-white/[0.04]">
-      {/* Swipe Action Backgrounds */}
-      <div className="absolute inset-0 flex items-center justify-between pointer-events-none">
-        {/* Share (Right) */}
-        <div className="h-full bg-emerald-600 flex items-center px-6 transition-all">
-          <div className="flex flex-col items-center gap-1 text-white opacity-0 group-drag-right:opacity-100">
-            <Share2 size={20} />
-            <span className="text-[10px] font-black uppercase tracking-widest text-white/80">Compartilhar</span>
-          </div>
-        </div>
-        {/* Delete (Left) */}
-        <div className="h-full bg-red-600 flex items-center px-6 transition-all">
-          <div className="flex flex-col items-center gap-1 text-white opacity-0 group-drag-left:opacity-100">
-            <Trash2 size={20} />
-            <span className="text-[10px] font-black uppercase tracking-widest text-white/80">Excluir</span>
-          </div>
-        </div>
+      {/* Share background — left side, revealed on swipe right */}
+      <div 
+        className="absolute left-0 top-0 bottom-0 w-24 bg-emerald-600 flex items-center justify-center cursor-pointer"
+        onClick={() => {
+          controls.start({ x: 0 });
+          onShare(item);
+        }}
+      >
+        <motion.div style={{ opacity: shareOpacity, scale: shareScale }} className="flex flex-col items-center gap-1 text-white">
+          <Share2 size={20} />
+          <span className="text-[10px] font-black uppercase tracking-widest text-white/80">Compartilhar</span>
+        </motion.div>
+      </div>
+
+      {/* Delete background — right side, revealed on swipe left */}
+      <div 
+        className="absolute right-0 top-0 bottom-0 w-24 bg-red-600 flex items-center justify-center cursor-pointer"
+        onClick={() => {
+          controls.start({ x: 0 });
+          onDelete(item);
+        }}
+      >
+        <motion.div style={{ opacity: deleteOpacity, scale: deleteScale }} className="flex flex-col items-center gap-1 text-white">
+          <Trash2 size={20} />
+          <span className="text-[10px] font-black uppercase tracking-widest text-white/80">Excluir</span>
+        </motion.div>
       </div>
 
       <motion.div
         drag="x"
+        style={{ x }}
         dragConstraints={{ left: -100, right: 100 }}
-        dragElastic={0.2}
+        dragElastic={0.15}
+        animate={controls}
         onDragEnd={(_, info) => {
-          if (info.offset.x < -60) {
-            onDelete(item.id);
-          } else if (info.offset.x > 60) {
-            onShare(item);
+          if (info.offset.x < -50) {
+            controls.start({ x: -100 });
+          } else if (info.offset.x > 50) {
+            controls.start({ x: 100 });
+          } else {
+            controls.start({ x: 0 });
           }
         }}
         initial={{ opacity: 0, x: 0 }}
-        animate={{ opacity: 1, x: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true }}
         whileTap={{ cursor: "grabbing" }}
-        transition={{ delay: Math.min(idx * 0.02, 0.2) }}
-        className="relative z-10 bg-[#141414] group"
+        transition={{ type: "spring", stiffness: 300, damping: 25 }}
+        className="relative z-10 bg-[#141414] touch-pan-y"
       >
         <div 
           className="flex items-center gap-4 px-4 md:px-6 py-4 hover:bg-white/[0.02] active:bg-white/[0.04] transition-colors cursor-pointer"
-          onClick={() => onView(item)}
+          onClick={() => {
+            if (x.get() !== 0) {
+              controls.start({ x: 0 });
+            } else {
+              onView(item);
+            }
+          }}
         >
           {/* Thumbnail */}
           <div className="w-12 h-12 rounded-lg bg-white/[0.03] border border-white/[0.05] flex items-center justify-center overflow-hidden shrink-0 shadow-lg">
