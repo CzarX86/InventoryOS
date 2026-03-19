@@ -3,32 +3,39 @@ import { useState, useEffect } from "react";
 import { Download, X, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
+function getClientInstallState() {
+  if (typeof window === "undefined") {
+    return {
+      isIOS: false,
+      isStandalone: false,
+      isInstallable: false,
+    };
+  }
+
+  const isStandalone =
+    window.matchMedia("(display-mode: standalone)").matches ||
+    window.navigator.standalone === true;
+  const isIOS = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
+
+  return {
+    isIOS,
+    isStandalone,
+    isInstallable: isIOS && !isStandalone,
+  };
+}
+
 export default function PWAInstallPrompt() {
+  const clientInstallState = getClientInstallState();
   const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [isInstallable, setIsInstallable] = useState(false);
+  const [isInstallable, setIsInstallable] = useState(clientInstallState.isInstallable);
   const [isInstalling, setIsInstalling] = useState(false);
   const [dismissed, setDismissed] = useState(false);
-  const [isIOS, setIsIOS] = useState(false);
-  const [isStandalone, setIsStandalone] = useState(false);
+  const [isIOS] = useState(clientInstallState.isIOS);
+  const [isStandalone, setIsStandalone] = useState(clientInstallState.isStandalone);
 
   useEffect(() => {
-    // Check if we are already installed/standalone
-    const isStandaloneMode = window.matchMedia('(display-mode: standalone)').matches 
-                          || window.navigator.standalone === true;
-    setIsStandalone(isStandaloneMode);
-
-    if (isStandaloneMode) {
+    if (isStandalone) {
       return; // Already installed, no need to show anything
-    }
-
-    // Check for iOS
-    const userAgent = window.navigator.userAgent.toLowerCase();
-    const isIOSDevice = /iphone|ipad|ipod/.test(userAgent);
-    setIsIOS(isIOSDevice);
-
-    // If it's iOS and not standalone, it is technically "installable" via Share -> Add to Home Screen
-    if (isIOSDevice && !isStandaloneMode) {
-      setIsInstallable(true);
     }
 
     // Handle Android/Desktop beforeinstallprompt
@@ -37,20 +44,21 @@ export default function PWAInstallPrompt() {
       setDeferredPrompt(e);
       setIsInstallable(true);
     };
-
-    window.addEventListener("beforeinstallprompt", handler);
-
-    // Hide if it gets installed while open
-    window.addEventListener("appinstalled", () => {
+    const onAppInstalled = () => {
       setIsInstallable(false);
       setIsInstalling(false);
       setDeferredPrompt(null);
-    });
+      setIsStandalone(true);
+    };
+
+    window.addEventListener("beforeinstallprompt", handler);
+    window.addEventListener("appinstalled", onAppInstalled);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handler);
+      window.removeEventListener("appinstalled", onAppInstalled);
     };
-  }, []);
+  }, [isStandalone]);
 
   const handleInstall = async () => {
     if (!deferredPrompt && !isIOS) return;
@@ -111,7 +119,7 @@ export default function PWAInstallPrompt() {
               </p>
               {isIOS && !deferredPrompt ? (
                 <p className="text-xs text-zinc-400 leading-relaxed max-w-[200px]">
-                  No iOS, toque no botão "Compartilhar" e depois em "Adicionar à Tela de Início".
+                  No iOS, toque no botao &quot;Compartilhar&quot; e depois em &quot;Adicionar a Tela de Inicio&quot;.
                 </p>
               ) : (
                 <p className="text-xs text-zinc-400 leading-relaxed max-w-[200px]">

@@ -63,6 +63,15 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
   useEffect(() => {
     setValidationError("");
     setSuccess(false);
+
+    if (!isOpen) {
+      setFormData(EMPTY_FORM);
+      setAudioBlob(null);
+      setProductImageFile(null);
+      resetTaskLedger();
+      return;
+    }
+
     if (editItem) {
       setFormData({
         ...EMPTY_FORM,
@@ -72,9 +81,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
       setFormData(EMPTY_FORM);
       setAudioBlob(null);
       setProductImageFile(null);
-      if (isOpen) {
-        resetTaskLedger();
-      }
+      resetTaskLedger();
     }
   }, [editItem, isOpen, resetTaskLedger]);
 
@@ -109,15 +116,6 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
       }));
     }
   }, [suggestions]);
-
-  useEffect(() => {
-    if (isOpen && !editItem) {
-      resetTaskLedger();
-    }
-    if (!isOpen) {
-      resetTaskLedger();
-    }
-  }, [isOpen, editItem, resetTaskLedger]);
 
   const set = (field, value) => setFormData(prev => ({ ...prev, [field]: value }));
 

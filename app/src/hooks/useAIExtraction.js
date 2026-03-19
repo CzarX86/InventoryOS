@@ -15,6 +15,7 @@ export default function useAIExtraction({ onUsage } = {}) {
   const emitUsage = (result, context) => {
     if (!onUsage || !result?.tokenUsage) return;
     onUsage({
+      usage: result.tokenUsage,
       tokenUsage: result.tokenUsage,
       tokenUsageCalls: result.tokenUsageCalls || [],
       aiModel: result.aiModel || null,
