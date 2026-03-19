@@ -15,20 +15,41 @@ app/out/
 
 # Production
 build/
+dist/
+app/build/
+app/dist/
 
-# Misc
+# OS / Misc
 .DS_Store
-*.pem
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
-# Debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
+# Security & Private Keys
+*.pem
+*.key
+*.cert
+*.crt
+*.p12
+*.pfx
+id_rsa*
+*.ovpn
+secrets.json
+credentials.json
+local.config.json
 
 # Environment files
-.env*
-app/.env*
+.env
+.env.*
+!.env.example
+!.env.template
+app/.env
+app/.env.*
+!app/.env.example
+!app/.env.template
 
 # Firebase
 .firebase/
@@ -36,7 +57,24 @@ app/.firebase/
 *-firebase-adminsdk.json
 app/*-firebase-adminsdk.json
 
+# Debug Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+*.log
+
 # Tool logs/cache
 .gemini/
 .swc/
 app/.swc/
+
+# IDE & Editor files
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
