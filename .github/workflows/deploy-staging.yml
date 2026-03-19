@@ -80,6 +80,10 @@ jobs:
       - name: Setup Firebase CLI
         run: npm install --global firebase-tools
 
+      - name: Install functions dependencies
+        run: npm install
+        working-directory: app/functions
+
       - name: Deploy to Firebase staging
         run: firebase deploy --project "$NEXT_PUBLIC_FIREBASE_PROJECT_ID" --only hosting,firestore,storage,functions --non-interactive
 
