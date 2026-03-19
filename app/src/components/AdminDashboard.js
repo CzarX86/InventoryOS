@@ -1,15 +1,19 @@
 import { useState, useEffect, useMemo } from "react";
 import { db } from "@/lib/firebase";
 import { collection, query, orderBy, limit, onSnapshot, doc } from "firebase/firestore";
-import { Activity, Shield, Cpu, TrendingUp, DollarSign, Loader2, Undo2 } from "lucide-react";
+import { Activity, Shield, Cpu, TrendingUp, DollarSign, Loader2, Undo2, Bug, Copy, Bell } from "lucide-react";
 import { isActivityUndone, undoActivityEvent } from "@/lib/audit";
+import { updateErrorStatus } from "@/lib/errorReporting";
+import AdminPushRegistration from "@/components/AdminPushRegistration";
 
 export default function AdminDashboard({ items = [], user = null }) {
   const [telemetry, setTelemetry] = useState([]);
   const [systemHealth, setSystemHealth] = useState(null);
   const [tokenUsage, setTokenUsage] = useState([]);
   const [activityLog, setActivityLog] = useState([]);
+  const [errorReports, setErrorReports] = useState([]);
   const [undoingId, setUndoingId] = useState(null);
+  const [updatingErrorId, setUpdatingErrorId] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -30,7 +34,11 @@ export default function AdminDashboard({ items = [], user = null }) {
       query(collection(db, "activity_log"), orderBy("createdAt", "desc"), limit(16)),
       snap => setActivityLog(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     );
-    return () => { unsubTele(); unsubHealth(); unsubTokenUsage(); unsubActivity(); };
+    const unsubErrors = onSnapshot(
+      query(collection(db, "error_reports"), orderBy("createdAt", "desc"), limit(20)),
+      snap => setErrorReports(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    );
+    return () => { unsubTele(); unsubHealth(); unsubTokenUsage(); unsubActivity(); unsubErrors(); };
   }, []);
 
   const undoneActivityIds = useMemo(() => {
@@ -65,6 +73,33 @@ export default function AdminDashboard({ items = [], user = null }) {
     }
   };
 
+  const handleCopyError = async (errorReport) => {
+    const payload = JSON.stringify({
+      errorId: errorReport.errorId,
+      ticketId: errorReport.ticketId,
+      humanMessage: errorReport.humanMessage,
+      knownReason: errorReport.knownReason,
+      technicalMessage: errorReport.technicalMessage,
+      errorCode: errorReport.errorCode,
+      httpStatus: errorReport.httpStatus,
+      clientContext: errorReport.clientContext,
+      reproductionContext: errorReport.reproductionContext,
+    }, null, 2);
+
+    await navigator.clipboard.writeText(payload);
+  };
+
+  const handleErrorStatus = async (errorReport, status) => {
+    setUpdatingErrorId(errorReport.id);
+    try {
+      await updateErrorStatus(errorReport.id, status, errorReport.ticketId || null);
+    } catch (error) {
+      console.error("Error status update failed:", error);
+    } finally {
+      setUpdatingErrorId(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-48 gap-3">
@@ -84,6 +119,8 @@ export default function AdminDashboard({ items = [], user = null }) {
       </div>
 
       {/* Financial stats */}
+      <AdminPushRegistration user={user} isAdmin={Boolean(user)} />
+
       <div className="flex border-b border-white/[0.07]">
         <div className="flex-1 px-4 md:px-6 py-5 border-r border-white/[0.07]">
           <p className="text-base font-bold uppercase tracking-widest text-zinc-300 mb-1">Valor em Estoque</p>
@@ -155,6 +192,82 @@ export default function AdminDashboard({ items = [], user = null }) {
       {/* Activity history */}
       <div className="px-4 md:px-6 pt-6 pb-2">
         <h2 className="text-base font-black uppercase tracking-widest text-zinc-200">Activity History</h2>
+      </div>
+
+      {/* Support inbox */}
+      <div className="px-4 md:px-6 pt-6 pb-2">
+        <h2 className="text-base font-black uppercase tracking-widest text-zinc-200">Support Inbox</h2>
+      </div>
+      <div className="border-t border-white/[0.07]">
+        {errorReports.length === 0 ? (
+          <p className="text-base font-bold uppercase tracking-widest text-zinc-200 text-center py-10">
+            Sem erros registrados.
+          </p>
+        ) : (
+          errorReports.map(report => (
+            <div
+              key={report.id}
+              className="px-4 md:px-6 py-4 border-b border-white/[0.06] hover:bg-white/[0.02] transition-colors"
+            >
+              <div className="flex flex-col md:flex-row md:items-center gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Bug size={14} className="text-red-400 shrink-0" />
+                  <span className="text-base font-black uppercase tracking-wider text-white">
+                    {report.action}
+                  </span>
+                  <span className="text-base font-mono text-zinc-400">
+                    {report.errorId}
+                  </span>
+                  {report.ticketId && (
+                    <span className="text-base font-mono text-emerald-300">
+                      {report.ticketId}
+                    </span>
+                  )}
+                </div>
+                <div className="md:ml-auto flex items-center gap-2 text-base text-zinc-300">
+                  <span>{report.severity}</span>
+                  <span>{report.status}</span>
+                  {report.adminNotified && (
+                    <span className="inline-flex items-center gap-1 text-emerald-300">
+                      <Bell size={12} /> push
+                    </span>
+                  )}
+                </div>
+              </div>
+              <p className="text-base font-bold text-zinc-200 mt-3">{report.humanMessage}</p>
+              {report.knownReason && (
+                <p className="text-base text-zinc-400 mt-1">{report.knownReason}</p>
+              )}
+              <div className="mt-3 grid gap-2 text-base text-zinc-300">
+                <p>Usuario: {report.userEmail || report.userId || "desconhecido"}</p>
+                <p>Tecnico: {report.technicalMessage || "sem detalhes"}</p>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  onClick={() => handleCopyError(report)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-white bg-white/10 hover:bg-white/20 transition-colors"
+                >
+                  <Copy size={11} />
+                  Copiar log
+                </button>
+                <button
+                  onClick={() => handleErrorStatus(report, "acknowledged")}
+                  disabled={updatingErrorId === report.id}
+                  className="px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-white bg-white/10 hover:bg-white/20 disabled:opacity-50 transition-colors"
+                >
+                  Reconhecer
+                </button>
+                <button
+                  onClick={() => handleErrorStatus(report, "resolved")}
+                  disabled={updatingErrorId === report.id}
+                  className="px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-white bg-emerald-500/20 hover:bg-emerald-500/30 disabled:opacity-50 transition-colors"
+                >
+                  Resolver
+                </button>
+              </div>
+            </div>
+          ))
+        )}
       </div>
       <div className="border-t border-white/[0.07]">
         {activityLog.length === 0 ? (

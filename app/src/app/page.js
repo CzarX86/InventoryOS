@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import {
   Search, Plus, Mic, Package, Boxes, Settings,
   Shield, LogOut, MoreHorizontal, AlertTriangle, Loader2, X, Share2, Trash2
@@ -14,6 +14,8 @@ import SplashScreen from "@/components/SplashScreen";
 import useAuth from "@/hooks/useAuth";
 import useInventory from "@/hooks/useInventory";
 import { buildActivityEvent, logInventoryActivity } from "@/lib/audit";
+import { escalateErrorReport, recordAppError, toUserFacingError } from "@/lib/errorReporting";
+import { db } from "@/lib/firebase";
 import { getBrandLogo } from "@/lib/utils";
 
 const STATUS_CONFIG = {
@@ -33,11 +35,34 @@ export default function Dashboard() {
   const [showSplash, setShowSplash] = useState(true);
 
   const { user, loading: authLoading, isAdmin, login, logout } = useAuth();
-  const { loading: invLoading, searchQuery, setSearchQuery, filteredItems, items, deleteItem } = useInventory();
+  const { loading: invLoading, searchQuery, setSearchQuery, filteredItems, items, deleteItem, syncError } = useInventory(user);
 
   const [notification, setNotification] = useState(null);
   const [removedItems, setRemovedItems] = useState(new Set());
+  const [reportingNotification, setReportingNotification] = useState(false);
   const undoIds = useRef(new Set());
+
+  useEffect(() => {
+    if (!syncError) return;
+    setNotification({
+      id: "sync-error",
+      error: syncError,
+      actionLabel: "Fechar",
+      onAction: () => setNotification(null),
+    });
+  }, [syncError]);
+
+  const navItems = [
+    { id: "INVENTORY", label: "Inventário", icon: Boxes },
+    ...(isAdmin ? [{ id: "ADMIN", label: "Admin", icon: Shield }] : []),
+    { id: "SETTINGS", label: "Config.", icon: Settings },
+  ];
+
+  const stats = {
+    total: items.length,
+    inStock: items.filter(i => i.status === "IN STOCK").length,
+    sold: items.filter(i => i.status === "SOLD").length,
+  };
 
   if (authLoading) {
     return (
@@ -74,19 +99,6 @@ export default function Dashboard() {
     );
   }
 
-  const navItems = [
-    { id: "INVENTORY", label: "Inventário", icon: Boxes },
-    ...(isAdmin ? [{ id: "ADMIN", label: "Admin", icon: Shield }] : []),
-    { id: "SETTINGS", label: "Config.", icon: Settings },
-  ];
-
-  const stats = {
-    total: items.length,
-    inStock: items.filter(i => i.status === "IN STOCK").length,
-    sold: items.filter(i => i.status === "SOLD").length,
-  };
-
-
   const handleEdit = (item) => { setItemToEdit(item); setIsModalOpen(true); setActiveMenuId(null); };
 
   const handleDelete = async (item) => {
@@ -94,7 +106,7 @@ export default function Dashboard() {
     if (!id) return;
 
     setRemovedItems(prev => new Set([...prev, id]));
-    setNotification({ id, message: "Item excluído", action: "Desfazer" });
+    setNotification({ id, message: "Item excluído", actionLabel: "Desfazer", onAction: () => undoDelete(id) });
 
     setTimeout(async () => {
       setNotification(prev => prev?.id === id ? null : prev);
@@ -137,7 +149,29 @@ export default function Dashboard() {
           next.delete(id);
           return next;
         });
-        setNotification({ id, message: "Erro ao excluir. Tente novamente.", action: "OK" });
+        const report = await recordAppError({
+          error: err,
+          source: "inventory-row",
+          action: "DELETE_ITEM",
+          user,
+          context: {
+            errorContext: "delete-item",
+            reproductionContext: {
+              itemId: id,
+              itemSnapshot: item ? {
+                id: item.id,
+                type: item.type,
+                brand: item.brand,
+                model: item.model,
+              } : null,
+            },
+          },
+        });
+        setNotification({
+          id,
+          error: toUserFacingError(report),
+          actionLabel: "Fechar",
+        });
       }
     }, 2500);
   };
@@ -150,6 +184,26 @@ export default function Dashboard() {
       return next;
     });
     setNotification(null);
+  };
+
+  const handleNotificationSupport = async () => {
+    if (!notification?.error?.errorId || !user) return;
+    setReportingNotification(true);
+    try {
+      const escalated = await escalateErrorReport(notification.error.errorId, user);
+      if (escalated) {
+        setNotification(prev => ({
+          ...prev,
+          error: {
+            ...prev.error,
+            reportedByUser: true,
+            ticketId: escalated.ticketId,
+          },
+        }));
+      }
+    } finally {
+      setReportingNotification(false);
+    }
   };
 
   const handleShare = async (item, platform = "native") => {
@@ -351,19 +405,57 @@ export default function Dashboard() {
             exit={{ y: 100, opacity: 0 }}
             className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-32px)] max-w-sm"
           >
-            <div className="bg-[#1a1a1a] border border-white/[0.1] shadow-2xl p-4 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                <span className="text-xs font-black uppercase tracking-widest text-zinc-300">
-                  {notification.message}
-                </span>
-              </div>
-              <button
-                onClick={() => undoDelete(notification.id)}
-                className="text-[10px] font-black uppercase tracking-[0.2em] text-white bg-white/10 px-3 py-1.5 hover:bg-white/20 transition-colors"
-              >
-                {notification.action}
-              </button>
+            <div className="bg-[#1a1a1a] border border-white/[0.1] shadow-2xl p-4">
+              {notification.error ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                    <span className="text-xs font-black uppercase tracking-widest text-zinc-300">
+                      {notification.error.humanMessage}
+                    </span>
+                  </div>
+                  {notification.error.knownReason && (
+                    <p className="text-xs text-zinc-400">{notification.error.knownReason}</p>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={notification.onAction || (() => setNotification(null))}
+                      className="text-[10px] font-black uppercase tracking-[0.2em] text-white bg-white/10 px-3 py-1.5 hover:bg-white/20 transition-colors"
+                    >
+                      {notification.actionLabel || "Fechar"}
+                    </button>
+                    {!notification.error.reportedByUser && (
+                      <button
+                        onClick={handleNotificationSupport}
+                        disabled={reportingNotification}
+                        className="text-[10px] font-black uppercase tracking-[0.2em] text-white bg-red-500/20 px-3 py-1.5 hover:bg-red-500/30 disabled:opacity-50 transition-colors"
+                      >
+                        {reportingNotification ? "Enviando..." : "Enviar log para suporte"}
+                      </button>
+                    )}
+                    {(notification.error.ticketId || notification.error.errorId) && (
+                      <span className="text-[10px] font-mono text-zinc-500 py-1.5">
+                        {notification.error.ticketId || notification.error.errorId}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                    <span className="text-xs font-black uppercase tracking-widest text-zinc-300">
+                      {notification.message}
+                    </span>
+                  </div>
+                  <button
+                    onClick={notification.onAction || (() => undoDelete(notification.id))}
+                    className="text-[10px] font-black uppercase tracking-[0.2em] text-white bg-white/10 px-3 py-1.5 hover:bg-white/20 transition-colors"
+                  >
+                    {notification.actionLabel || "Fechar"}
+                  </button>
+                </div>
+              )}
             </div>
           </motion.div>
         )}

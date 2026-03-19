@@ -1,28 +1,36 @@
-import { extractRegistrationFromAudio } from "./ai";
+const buildModule = (responseByModel) => {
+  jest.resetModules();
+  jest.doMock("@google/generative-ai", () => ({
+    GoogleGenerativeAI: jest.fn().mockImplementation(() => ({
+      getGenerativeModel: jest.fn(({ model }) => ({
+        generateContent: jest.fn(async () => {
+          const response = responseByModel[model];
 
-const responseByModel = {
-  "gemini-2.5-flash": {
-    text: () => "not json",
-    usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 2, totalTokenCount: 3 },
-  },
-  "gemini-2.5-flash-lite": {
-    text: () => '{"text":"HELLO","intent":"SEARCH"}',
-    usageMetadata: { promptTokenCount: 4, candidatesTokenCount: 5, totalTokenCount: 9 },
-  },
-};
+          if (response instanceof Error) {
+            throw response;
+          }
 
-jest.mock("@google/generative-ai", () => ({
-  GoogleGenerativeAI: jest.fn().mockImplementation(() => ({
-    getGenerativeModel: jest.fn(({ model }) => ({
-      generateContent: jest.fn(async () => ({
-        response: Promise.resolve(responseByModel[model] || responseByModel["gemini-2.5-flash-lite"]),
+          return { response: Promise.resolve(response || responseByModel.default) };
+        }),
       })),
     })),
-  })),
-}));
+  }));
+
+  return import("./ai");
+};
 
 describe("AI extraction helpers", () => {
   it("returns parsed AI output plus aggregated token usage across fallback attempts", async () => {
+    const { extractRegistrationFromAudio } = await buildModule({
+      "gemini-2.5-flash": {
+        text: () => "not json",
+        usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 2, totalTokenCount: 3 },
+      },
+      "gemini-2.5-flash-lite": {
+        text: () => '{"text":"HELLO","intent":"SEARCH"}',
+        usageMetadata: { promptTokenCount: 4, candidatesTokenCount: 5, totalTokenCount: 9 },
+      },
+    });
     const result = await extractRegistrationFromAudio("base64-audio", "audio/webm", false);
 
     expect(result).toMatchObject({
@@ -60,5 +68,15 @@ describe("AI extraction helpers", () => {
       ],
     });
     expect(result.aiModel).toBe("gemini-2.5-flash-lite");
+  });
+
+  it("humanizes quota exhaustion errors for image extraction", async () => {
+    const quotaError = Object.assign(new Error("RESOURCE_EXHAUSTED: quota exceeded"), { status: 429 });
+    const { extractRegistrationFromAudio } = await buildModule({
+      "gemini-2.5-flash": quotaError,
+      "gemini-2.5-flash-lite": quotaError,
+      "gemini-1.5-flash": quotaError,
+    });
+    await expect(extractRegistrationFromAudio("base64-audio", "audio/webm", false)).rejects.toThrow(/limite de uso da api foi atingido/i);
   });
 });

@@ -57,6 +57,28 @@ jest.mock("firebase/firestore", () => ({
         ],
       });
     }
+    if (ref.collectionName === "error_reports") {
+      cb({
+        docs: [
+          {
+            id: "ERR-20260319-AAAA",
+            data: () => ({
+              errorId: "ERR-20260319-AAAA",
+              ticketId: "TKT-20260319-BBBB",
+              action: "IMAGE_EXTRACTION",
+              humanMessage: "A IA esta indisponivel no momento porque o limite de uso da API foi atingido.",
+              knownReason: "O servico de IA ficou sem credito ou atingiu a cota configurada.",
+              technicalMessage: "RESOURCE_EXHAUSTED",
+              severity: "high",
+              status: "open",
+              adminNotified: true,
+              userEmail: "user@example.com",
+              createdAt: { toDate: () => new Date("2026-01-01T10:00:00Z") },
+            }),
+          },
+        ],
+      });
+    }
     if (ref.collectionName === "system") {
       cb({ data: () => ({ totalAIRequests: 7 }) });
     }
@@ -71,6 +93,8 @@ describe("AdminDashboard", () => {
     expect(await screen.findByText("Token Usage")).toBeInTheDocument();
     expect(screen.getByText("42 tokens")).toBeInTheDocument();
     expect(screen.getByText("Activity History")).toBeInTheDocument();
+    expect(screen.getByText("Support Inbox")).toBeInTheDocument();
+    expect(screen.getByText(/RESOURCE_EXHAUSTED/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /undo/i })).toBeInTheDocument();
   });
 });

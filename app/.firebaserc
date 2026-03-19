@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "inventory-os-app"
+    "default": "inventoryos-effd5",
+    "production": "inventory-os-app",
+    "staging": "inventoryos-effd5"
   }
 }

@@ -10,6 +10,17 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
     }
 
+    function canEscalateOwnError() {
+      return isSignedIn() &&
+        resource.data.userId == request.auth.uid &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          "reportedByUser",
+          "reportedAt",
+          "ticketId",
+          "updatedAt"
+        ]);
+    }
+
     match /users/{userId} {
       allow read, write: if isSignedIn();
     }
@@ -40,6 +51,25 @@ service cloud.firestore {
     match /activity_log/{eventId} {
       allow create: if isSignedIn() && request.resource.data.actorId == request.auth.uid;
       allow read, update, delete: if isAdmin();
+    }
+
+    match /error_reports/{errorId} {
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if canEscalateOwnError() || isAdmin();
+      allow read, delete: if isAdmin();
+    }
+
+    match /support_tickets/{ticketId} {
+      allow create: if isSignedIn() &&
+        request.resource.data.createdByUserId == request.auth.uid &&
+        get(/databases/$(database)/documents/error_reports/$(request.resource.data.errorId)).data.userId == request.auth.uid;
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /admin_device_tokens/{tokenId} {
+      allow create, update: if isAdmin() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isAdmin() && resource.data.userId == request.auth.uid;
+      allow read: if isAdmin();
     }
   }
 }

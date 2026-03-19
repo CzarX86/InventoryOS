@@ -1,7 +1,13 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
+import {
+  connectFirestoreEmulator,
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from "firebase/firestore";
+import { connectStorageEmulator, getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -19,12 +25,39 @@ let db;
 let storage;
 
 const googleProvider = new GoogleAuthProvider(); // Define googleProvider here
+const shouldUseEmulators = process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true";
+const firestoreEmulatorHost = process.env.NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST || "127.0.0.1";
+const firestoreEmulatorPort = Number(process.env.NEXT_PUBLIC_FIRESTORE_EMULATOR_PORT || 8080);
+const storageEmulatorHost = process.env.NEXT_PUBLIC_STORAGE_EMULATOR_HOST || "127.0.0.1";
+const storageEmulatorPort = Number(process.env.NEXT_PUBLIC_STORAGE_EMULATOR_PORT || 9199);
 
 if (typeof window !== "undefined") {
   app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
   auth = getAuth(app);
-  db = getFirestore(app);
+  
+  // Enable offline persistence for Firestore
+  try {
+    db = initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+    });
+  } catch (error) {
+    // If initializeFirestore fails (e.g. during fast refresh where it was already initialized)
+    db = getFirestore(app);
+  }
+  
   storage = getStorage(app);
+
+  if (shouldUseEmulators) {
+    if (!window.__inventoryOsFirestoreEmulatorConnected) {
+      connectFirestoreEmulator(db, firestoreEmulatorHost, firestoreEmulatorPort);
+      window.__inventoryOsFirestoreEmulatorConnected = true;
+    }
+
+    if (!window.__inventoryOsStorageEmulatorConnected) {
+      connectStorageEmulator(storage, storageEmulatorHost, storageEmulatorPort);
+      window.__inventoryOsStorageEmulatorConnected = true;
+    }
+  }
 }
 
-export { auth, db, storage, googleProvider };
+export { app, auth, db, storage, googleProvider };

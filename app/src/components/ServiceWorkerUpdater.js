@@ -1,5 +1,5 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 /**
  * Handles two PWA concerns:
@@ -7,6 +7,8 @@ import { useEffect } from "react";
  * 2. Shows/hides the .offline-indicator strip based on network status.
  */
 export default function ServiceWorkerUpdater() {
+  const [isOffline, setIsOffline] = useState(false);
+
   useEffect(() => {
     // --- Service worker update ---
     if ("serviceWorker" in navigator) {
@@ -16,22 +18,24 @@ export default function ServiceWorkerUpdater() {
     }
 
     // --- Offline indicator ---
-    const setOffline = () => document.body.classList.add("is-offline");
-    const setOnline = () => document.body.classList.remove("is-offline");
+    setIsOffline(!navigator.onLine);
 
-    if (!navigator.onLine) setOffline();
+    const handleOffline = () => setIsOffline(true);
+    const handleOnline = () => setIsOffline(false);
 
-    window.addEventListener("offline", setOffline);
-    window.addEventListener("online", setOnline);
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleOnline);
 
     return () => {
-      window.removeEventListener("offline", setOffline);
-      window.removeEventListener("online", setOnline);
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", handleOnline);
     };
   }, []);
 
+  if (!isOffline) return null;
+
   return (
-    <div className="offline-indicator" role="status" aria-live="polite">
+    <div className="fixed top-0 left-0 w-full bg-red-600 text-white text-[10px] font-black uppercase tracking-widest py-1.5 text-center z-[9999]" role="status" aria-live="polite">
       SEM CONEXÃO — MODO OFFLINE
     </div>
   );

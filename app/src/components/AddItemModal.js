@@ -8,6 +8,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import useAIExtraction from "@/hooks/useAIExtraction";
 import { logAIUsage } from "@/lib/usage";
 import useAuth from "@/hooks/useAuth";
+import ErrorNotice from "@/components/ErrorNotice";
 import {
   appendTaskUsageCall,
   buildActivityEvent,
@@ -16,6 +17,7 @@ import {
   logInventoryActivity,
   logTaskCompletion,
 } from "@/lib/audit";
+import { escalateErrorReport, recordAppError, toUserFacingError } from "@/lib/errorReporting";
 import GlobalLoadingBar from "@/components/GlobalLoadingBar";
 
 const INPUT = "w-full bg-transparent border-b border-white/[0.1] py-2.5 text-base text-white placeholder:text-zinc-200 outline-none focus:border-white/30 transition-colors";
@@ -43,10 +45,11 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
       })
     );
   }, [user?.uid]);
-  const { loading: isExtracting, suggestions, hasPendingConfirmation, processExtraction, processAudioExtraction, confirmSuggestions } = useAIExtraction({
+  const { loading: isExtracting, suggestions, hasPendingConfirmation, error: extractionError, processExtraction, processAudioExtraction, confirmSuggestions } = useAIExtraction({
     onUsage: (usageEvent) => {
       setTaskLedger(prev => appendTaskUsageCall(prev, usageEvent));
     },
+    userContext: user,
   });
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState(EMPTY_FORM);
@@ -54,6 +57,8 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
   const [productImageFile, setProductImageFile] = useState(null);
   const [isProcessingProductPhoto, setIsProcessingProductPhoto] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [supportError, setSupportError] = useState(null);
+  const [reportingSupport, setReportingSupport] = useState(false);
   
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef(null);
@@ -63,6 +68,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
   useEffect(() => {
     setValidationError("");
     setSuccess(false);
+    setSupportError(null);
 
     if (!isOpen) {
       setFormData(EMPTY_FORM);
@@ -97,6 +103,8 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
 
   useEffect(() => {
     if (suggestions) {
+      setValidationError("");
+      setSupportError(null);
       setFormData(prev => ({
         ...prev,
         ...Object.keys(suggestions).reduce((acc, key) => {
@@ -117,6 +125,13 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
     }
   }, [suggestions]);
 
+  useEffect(() => {
+    if (extractionError) {
+      setValidationError(extractionError.humanMessage);
+      setSupportError(extractionError);
+    }
+  }, [extractionError]);
+
   const set = (field, value) => setFormData(prev => ({ ...prev, [field]: value }));
 
   const handleFileUpload = async (e) => {
@@ -125,6 +140,8 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
   };
 
   const startRecording = async () => {
+    setValidationError("");
+    setSupportError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const options = { mimeType: 'audio/webm' };
@@ -156,6 +173,21 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
       setIsRecording(true);
     } catch (err) {
       console.error("Microphone error:", err);
+      const report = await recordAppError({
+        error: err,
+        source: "add-item-modal",
+        action: "AUDIO_REGISTRATION_CAPTURE",
+        user,
+        context: {
+          errorContext: "microphone",
+          reproductionContext: {
+            attemptedAction: "start-recording",
+          },
+        },
+      });
+      const userError = toUserFacingError(report);
+      setValidationError(userError.humanMessage);
+      setSupportError(userError);
     }
   };
 
@@ -175,6 +207,23 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
 
   const [validationError, setValidationError] = useState("");
 
+  const handleSupportReport = async () => {
+    if (!supportError?.errorId || !user) return;
+    setReportingSupport(true);
+    try {
+      const escalated = await escalateErrorReport(supportError.errorId, user);
+      if (escalated) {
+        setSupportError(prev => ({
+          ...prev,
+          reportedByUser: true,
+          ticketId: escalated.ticketId,
+        }));
+      }
+    } finally {
+      setReportingSupport(false);
+    }
+  };
+
   const validateForm = () => {
     if (!formData.type?.trim()) return "O campo 'Tipo de Equipamento' é obrigatório.";
     if (!formData.brand?.trim()) return "O campo 'Fabricante / Marca' é obrigatório.";
@@ -189,10 +238,12 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
     const error = validateForm();
     if (error) {
       setValidationError(error);
+      setSupportError(null);
       return;
     }
     
     setValidationError("");
+    setSupportError(null);
     setSaving(true);
     try {
       let finalAudioUrl = formData.audioUrl;
@@ -283,6 +334,32 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
       } else {
         onClose();
       }
+    } catch (error) {
+      console.error("Save item failed:", error);
+      const report = await recordAppError({
+        error,
+        source: "add-item-modal",
+        action: "SAVE_ITEM",
+        user,
+        context: {
+          errorContext: "save-item",
+          reproductionContext: {
+            isEdit: Boolean(editItem),
+            hasAudioBlob: Boolean(audioBlob),
+            hasProductImageFile: Boolean(productImageFile),
+            formData: {
+              type: formData.type,
+              brand: formData.brand,
+              model: formData.model,
+              partNumber: formData.partNumber,
+              status: formData.status,
+            },
+          },
+        },
+      });
+      const userError = toUserFacingError(report);
+      setValidationError(userError.humanMessage);
+      setSupportError(userError);
     } finally {
       setSaving(false);
     }
@@ -524,11 +601,17 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                 )}
                 
                 {/* Validation Error */}
-                {validationError && (
+                {validationError && !supportError && (
                   <div className="px-5 md:px-6 py-4 bg-red-500/10 border-b border-white/[0.08]">
                     <p className="text-sm font-bold text-red-400">{validationError}</p>
                   </div>
                 )}
+
+                <ErrorNotice
+                  error={supportError}
+                  onReport={handleSupportReport}
+                  reporting={reportingSupport}
+                />
 
                 {/* Status */}
                 <div className="border-b border-white/[0.08]">
@@ -634,14 +717,14 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                         <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">
                           <button
                             type="button"
-                            onClick={() => { setFormData(EMPTY_FORM); setAudioBlob(null); setValidationError(""); }}
+                            onClick={() => { setFormData(EMPTY_FORM); setAudioBlob(null); setValidationError(""); setSupportError(null); }}
                             className="flex-1 sm:flex-none px-4 py-2 text-base font-black uppercase tracking-widest text-zinc-200 border border-white/[0.1] hover:bg-white/[0.05] transition-colors"
                           >
                             Recomeçar
                           </button>
                           <button
                             type="button"
-                            onClick={() => { setValidationError(""); confirmSuggestions(); }}
+                            onClick={() => { setValidationError(""); setSupportError(null); confirmSuggestions(); }}
                             className="flex-1 sm:flex-none px-4 py-2 text-base font-black uppercase tracking-widest bg-white text-[#141414] hover:bg-zinc-200 transition-colors"
                           >
                             Confirmar
@@ -657,7 +740,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
               <div className="flex border-t border-white/[0.08] shrink-0">
                 <button
                   type="button"
-                  onClick={() => { setValidationError(""); onClose(); }}
+                  onClick={() => { setValidationError(""); setSupportError(null); onClose(); }}
                   className="flex-1 py-4 text-base font-black uppercase tracking-widest text-zinc-200 hover:text-white border-r border-white/[0.08] hover:bg-white/[0.03] transition-colors"
                 >
                   Cancelar

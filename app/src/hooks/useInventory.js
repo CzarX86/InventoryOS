@@ -10,11 +10,13 @@ import {
   deleteDoc,
   serverTimestamp 
 } from "firebase/firestore";
+import { recordAppError, toUserFacingError } from "@/lib/errorReporting";
 
-export default function useInventory() {
+export default function useInventory(user = null) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [syncError, setSyncError] = useState(null);
 
   useEffect(() => {
     if (!db) return;
@@ -29,13 +31,24 @@ export default function useInventory() {
       }));
       setItems(inventoryData);
       setLoading(false);
+      setSyncError(null);
     }, (error) => {
       console.error("Firebase sync error:", error);
       setLoading(false);
+      recordAppError({
+        error,
+        source: "inventory-hook",
+        action: "INVENTORY_SYNC",
+        user,
+        context: {
+          errorContext: "inventory-sync",
+          reproductionContext: {},
+        },
+      }).then(report => setSyncError(toUserFacingError(report)));
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [user]);
 
   const updateItem = async (id, data) => {
     const itemRef = doc(db, "inventory", id);
@@ -51,12 +64,18 @@ export default function useInventory() {
   };
 
   const filteredItems = useMemo(() => {
-    return items.filter(item => 
-      item.partNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.model?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.brand?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.type?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return items;
+
+    return items.filter(item => {
+      const match = (val) => val && val.toString().toLowerCase().includes(query);
+      return (
+        match(item.partNumber) ||
+        match(item.model) ||
+        match(item.brand) ||
+        match(item.type)
+      );
+    });
   }, [items, searchQuery]);
 
   return {
@@ -65,6 +84,7 @@ export default function useInventory() {
     searchQuery,
     setSearchQuery,
     filteredItems,
+    syncError,
     updateItem,
     deleteItem
   };

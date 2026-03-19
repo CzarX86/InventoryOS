@@ -2,6 +2,22 @@ import { renderHook, act } from "@testing-library/react";
 import useAIExtraction from "./useAIExtraction";
 import { extractFromLabel } from "@/lib/ai";
 
+jest.mock("@/lib/errorReporting", () => ({
+  recordAppError: jest.fn(async ({ context }) => ({
+    errorId: "ERR-20260319-TEST01",
+    humanMessage: context?.errorContext === "image"
+      ? "Nao foi possivel extrair os dados da imagem."
+      : "Erro ao processar.",
+    knownReason: "Falha de teste",
+    userActions: ["Tente novamente."],
+    category: "ai_extraction",
+    severity: "medium",
+    reportedByUser: false,
+    ticketId: null,
+  })),
+  toUserFacingError: jest.fn(report => report),
+}));
+
 // Mock the AI utility
 jest.mock("@/lib/ai", () => ({
   extractFromLabel: jest.fn(),
@@ -9,9 +25,11 @@ jest.mock("@/lib/ai", () => ({
 
 describe("useAIExtraction", () => {
   const mockFile = new File(["dummy content"], "label.png", { type: "image/png" });
+  let consoleErrorSpy;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
     global.FileReader = class {
       readAsDataURL() {
         setTimeout(() => {
@@ -22,11 +40,16 @@ describe("useAIExtraction", () => {
     };
   });
 
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
+  });
+
   it("should initialize with default states", () => {
     const { result } = renderHook(() => useAIExtraction());
     expect(result.current.loading).toBe(false);
     expect(result.current.suggestions).toBeNull();
     expect(result.current.hasPendingConfirmation).toBe(false);
+    expect(result.current.error).toBeNull();
   });
 
   it("should handle extraction and require confirmation (HIL)", async () => {
@@ -48,6 +71,7 @@ describe("useAIExtraction", () => {
     expect(result.current.loading).toBe(false);
     expect(result.current.suggestions).toEqual(mockExtractedData);
     expect(result.current.hasPendingConfirmation).toBe(true);
+    expect(result.current.error).toBeNull();
   });
 
   it("should clear suggestions on confirmation", async () => {
@@ -66,6 +90,7 @@ describe("useAIExtraction", () => {
 
     expect(result.current.hasPendingConfirmation).toBe(false);
     expect(result.current.suggestions).toBeNull();
+    expect(result.current.error).toBeNull();
   });
 
   it("should emit token usage metadata without leaking it into suggestions", async () => {
@@ -130,6 +155,40 @@ describe("useAIExtraction", () => {
         totalTokenCount: 3,
         cachedContentTokenCount: 0,
       },
+    }));
+  });
+
+  it("should expose a user-facing error when extraction returns no data", async () => {
+    extractFromLabel.mockResolvedValue(null);
+    const { result } = renderHook(() => useAIExtraction());
+
+    await act(async () => {
+      await result.current.processExtraction(mockFile);
+    });
+
+    expect(result.current.loading).toBe(false);
+    expect(result.current.suggestions).toBeNull();
+    expect(result.current.hasPendingConfirmation).toBe(false);
+    expect(result.current.error).toEqual(expect.objectContaining({
+      humanMessage: expect.stringMatching(/nao foi possivel extrair os dados da imagem/i),
+      errorId: expect.stringMatching(/^ERR-/),
+    }));
+  });
+
+  it("should expose a user-facing error when extraction throws", async () => {
+    extractFromLabel.mockRejectedValue(new Error("boom"));
+    const { result } = renderHook(() => useAIExtraction());
+
+    await act(async () => {
+      await result.current.processExtraction(mockFile);
+    });
+
+    expect(result.current.loading).toBe(false);
+    expect(result.current.suggestions).toBeNull();
+    expect(result.current.hasPendingConfirmation).toBe(false);
+    expect(result.current.error).toEqual(expect.objectContaining({
+      humanMessage: expect.stringMatching(/nao foi possivel extrair os dados da imagem/i),
+      errorId: expect.stringMatching(/^ERR-/),
     }));
   });
 });
