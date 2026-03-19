@@ -7,7 +7,10 @@ import { useEffect, useState } from "react";
  * 2. Shows/hides the .offline-indicator strip based on network status.
  */
 export default function ServiceWorkerUpdater() {
-  const [isOffline, setIsOffline] = useState(false);
+  const [isOffline, setIsOffline] = useState(() => {
+    if (typeof navigator !== "undefined") return !navigator.onLine;
+    return false;
+  });
 
   useEffect(() => {
     // --- Service worker update ---
@@ -18,7 +21,6 @@ export default function ServiceWorkerUpdater() {
     }
 
     // --- Offline indicator ---
-    setIsOffline(!navigator.onLine);
 
     const handleOffline = () => setIsOffline(true);
     const handleOnline = () => setIsOffline(false);
