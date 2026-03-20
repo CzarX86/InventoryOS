@@ -28,7 +28,7 @@ export default function NotificationPrompt() {
       const timer = setTimeout(() => setShow(true), 3000);
       return () => clearTimeout(timer);
     }
-  }, [user]);
+  }, [user, isAdmin]);
 
   const handleEnable = async () => {
     if (!isAdmin) return;
