@@ -1,5 +1,6 @@
 "use client";
-import { Zap, Clock, LogOut, Check, Share2, ToggleLeft, ToggleRight } from "lucide-react";
+/* global window, localStorage, navigator, process, document, confirm, caches */
+import { Zap, Clock, LogOut, Check, Share2, ToggleLeft, ToggleRight, RefreshCw } from "lucide-react";
 import useAuth from "@/hooks/useAuth";
 
 const WORKFLOWS = [
@@ -111,7 +112,38 @@ export default function SettingsView() {
         </div>
       </div>
 
-      <div className="px-4 md:px-6 py-6 border-b border-white/[0.07]">
+      <div className="px-4 md:px-6 py-6 border-b border-white/[0.07] flex flex-col gap-6">
+        <button
+          onClick={async () => {
+            if (window.confirm("Isso irá limpar o cache local e forçar a atualização para a versão mais recente. Continuar?")) {
+              try {
+                // 1. Unregister all service workers
+                if ("serviceWorker" in window.navigator) {
+                  const registrations = await window.navigator.serviceWorker.getRegistrations();
+                  for (const registration of registrations) {
+                    await registration.unregister();
+                  }
+                }
+                // 2. Clear all cache storages
+                if ("caches" in window) {
+                  const cacheNames = await window.caches.keys();
+                  for (const name of cacheNames) {
+                    await window.caches.delete(name);
+                  }
+                }
+                // 3. Hard reload
+                window.location.reload(true);
+              } catch (err) {
+                console.error("Erro ao limpar cache:", err);
+                window.location.reload();
+              }
+            }
+          }}
+          className="flex items-center gap-2 text-base font-black uppercase tracking-widest text-zinc-400 hover:text-white transition-colors w-fit"
+        >
+          <RefreshCw size={14} /> Limpar Cache e Sincronizar
+        </button>
+
         <p className="text-base font-black uppercase tracking-[0.3em] text-zinc-300">
           InventoryOS v{process.env.NEXT_PUBLIC_APP_VERSION || "0.1.0"}
         </p>

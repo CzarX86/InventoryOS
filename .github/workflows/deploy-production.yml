@@ -64,6 +64,10 @@ jobs:
           VERSION=$(jq -r .version package.json)
           echo "NEXT_PUBLIC_APP_VERSION=${VERSION}.${{ github.run_number }}" >> $GITHUB_ENV
 
+      - name: Create version.json
+        run: |
+          echo "{\"version\": \"$NEXT_PUBLIC_APP_VERSION\"}" > app/public/version.json
+
       - name: Build static app
         run: pnpm build
 
