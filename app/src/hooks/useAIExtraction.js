@@ -1,3 +1,4 @@
+/* global FileReader */
 import { useState } from "react";
 import { extractFromLabel, extractRegistrationFromAudio } from "@/lib/ai";
 import { recordAppError, toUserFacingError } from "@/lib/errorReporting";

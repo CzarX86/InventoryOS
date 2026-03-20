@@ -1,4 +1,4 @@
-/* global process, Image, document */
+/* global process, Image, document, fetch */
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { sumUsageMetadata, normalizeUsageMetadata } from "./audit";
 
