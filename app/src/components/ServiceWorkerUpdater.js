@@ -34,7 +34,6 @@ export default function ServiceWorkerUpdater() {
         window.location.reload();
       });
     }
-    }
 
     // --- Offline indicator ---
 
