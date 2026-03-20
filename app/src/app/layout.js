@@ -1,4 +1,5 @@
 import "./globals.css";
+// v1.0.1 - PWA Updates Verified
 import ServiceWorkerUpdater from "@/components/ServiceWorkerUpdater";
 import PWAInstallPrompt from "@/components/PWAInstallPrompt";
 import NotificationPrompt from "@/components/NotificationPrompt";
