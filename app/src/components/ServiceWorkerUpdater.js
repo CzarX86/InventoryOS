@@ -1,4 +1,5 @@
 "use client";
+/* global window, localStorage, navigator */
 import { useEffect, useState } from "react";
 
 /**
@@ -11,19 +12,18 @@ export default function ServiceWorkerUpdater() {
     if (typeof navigator !== "undefined") return !navigator.onLine;
     return false;
   });
-  const [showUpdateToast, setShowUpdateToast] = useState(false);
+  const [showUpdateToast, setShowUpdateToast] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("pwa_updated") === "true";
+  });
 
   useEffect(() => {
-    // Check if we just updated
-    const wasUpdated = localStorage.getItem("pwa_updated");
-    if (wasUpdated === "true") {
-      setShowUpdateToast(true);
+    if (showUpdateToast) {
       localStorage.removeItem("pwa_updated");
-      // Auto-hide after 5 seconds
       const timer = setTimeout(() => setShowUpdateToast(false), 5000);
       return () => clearTimeout(timer);
     }
-  }, []);
+  }, [showUpdateToast]);
 
   useEffect(() => {
     // --- Service worker update ---

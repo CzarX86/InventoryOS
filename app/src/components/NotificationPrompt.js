@@ -1,4 +1,5 @@
 "use client";
+/* global window, sessionStorage, Notification */
 import { useState, useEffect } from "react";
 import { Bell, ShieldAlert, X, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -8,6 +9,7 @@ import MagneticTooltip from "@/components/MagneticTooltip";
 
 export default function NotificationPrompt() {
   const { user, isAdmin } = useAuth();
+  const canPromptUser = Boolean(user && isAdmin);
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -23,12 +25,12 @@ export default function NotificationPrompt() {
     const isPermissionDefault = "Notification" in window && Notification.permission === "default";
     const sessionDismissed = sessionStorage.getItem("notification_prompt_dismissed");
 
-    if (isStandalone && isPermissionDefault && !sessionDismissed && user && isAdmin) {
+    if (isStandalone && isPermissionDefault && !sessionDismissed && canPromptUser) {
       // Delay slightly for better UX (don't show immediately on load)
       const timer = setTimeout(() => setShow(true), 3000);
       return () => clearTimeout(timer);
     }
-  }, [user, isAdmin]);
+  }, [canPromptUser]);
 
   const handleEnable = async () => {
     if (!isAdmin) return;
