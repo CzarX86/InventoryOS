@@ -96,7 +96,7 @@ export default function SplashScreen({ onComplete }) {
           >
             <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
             <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600">
-              System Ready
+              System Ready {process.env.NEXT_PUBLIC_APP_VERSION && `v${process.env.NEXT_PUBLIC_APP_VERSION}`}
             </span>
           </motion.div>
           
