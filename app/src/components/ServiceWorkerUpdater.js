@@ -134,7 +134,31 @@ export default function ServiceWorkerUpdater() {
       window.addEventListener("offline", handleOffline);
       window.addEventListener("online", handleOnline);
 
+      // 5-minute polling for version.json to force check
+      const pollInterval = setInterval(checkForUpdate, 5 * 60 * 1000);
+
+      const fetchServerVersion = async () => {
+        try {
+          const res = await fetch("/version.json", { cache: "no-store" });
+          if (res.ok) {
+            const data = await res.json();
+            const currentVersion = process.env.NEXT_PUBLIC_APP_VERSION;
+            if (data.version && currentVersion && data.version !== currentVersion) {
+              console.log("Versão do servidor detectada:", data.version);
+              checkForUpdate();
+            }
+          }
+        } catch (err) {
+          // Silently fail version fetch
+        }
+      };
+      
+      // Also check on mount after short delay
+      const initialCheck = setTimeout(fetchServerVersion, 5000);
+
       return () => {
+        clearInterval(pollInterval);
+        clearTimeout(initialCheck);
         window.removeEventListener("focus", checkForUpdate);
         document.removeEventListener("visibilitychange", handleVisibilityChange);
         navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange);
