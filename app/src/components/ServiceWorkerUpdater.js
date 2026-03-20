@@ -12,27 +12,45 @@ export default function ServiceWorkerUpdater() {
     if (typeof navigator !== "undefined") return !navigator.onLine;
     return false;
   });
-  const [showUpdateToast, setShowUpdateToast] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("pwa_updated") === "true";
-  });
+  const [showUpdateToast, setShowUpdateToast] = useState(false);
 
   useEffect(() => {
+    // --- Version-based update detection ---
+    const currentVersion = process.env.NEXT_PUBLIC_APP_VERSION;
+    if (currentVersion) {
+      const lastVersion = localStorage.getItem("last_notified_version");
+      
+      // If we have a stored version and it's different from current,
+      // it means the app just updated (via SW reload or manual refresh).
+      if (lastVersion && lastVersion !== currentVersion) {
+        setShowUpdateToast(true);
+      }
+      
+      // Update stored version to current
+      localStorage.setItem("last_notified_version", currentVersion);
+    }
+
     if (showUpdateToast) {
-      localStorage.removeItem("pwa_updated");
       const timer = setTimeout(() => setShowUpdateToast(false), 5000);
       return () => clearTimeout(timer);
     }
   }, [showUpdateToast]);
 
   useEffect(() => {
-    // --- Service worker update ---
+    // --- Service worker controller change ---
+    // If the SW activates and takes control while the app is open,
+    // we reload to ensure the new code is running.
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.addEventListener("controllerchange", () => {
-        // Set flag to show toast after reload
-        localStorage.setItem("pwa_updated", "true");
-        window.location.reload();
-      });
+      const handleControllerChange = () => {
+        // Only reload if we are actually being controlled by a new worker
+        // and it's not the initial load.
+        if (navigator.serviceWorker.controller) {
+          window.location.reload();
+        }
+      };
+      
+      navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange);
+      return () => navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange);
     }
 
     // --- Offline indicator ---
