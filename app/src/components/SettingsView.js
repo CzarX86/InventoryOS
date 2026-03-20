@@ -111,8 +111,10 @@ export default function SettingsView() {
         </div>
       </div>
 
-      <div className="px-4 md:px-6 py-6">
-        <p className="text-base font-black uppercase tracking-[0.3em] text-zinc-300">InventoryOS v2.0</p>
+      <div className="px-4 md:px-6 py-6 border-b border-white/[0.07]">
+        <p className="text-base font-black uppercase tracking-[0.3em] text-zinc-300">
+          InventoryOS v{process.env.NEXT_PUBLIC_APP_VERSION || "0.1.0"}
+        </p>
       </div>
     </div>
   );
