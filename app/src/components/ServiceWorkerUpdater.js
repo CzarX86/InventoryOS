@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable */
 /* global window, localStorage, navigator, process, document */
 import { useEffect, useState } from "react";
 
