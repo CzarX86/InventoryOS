@@ -1,5 +1,5 @@
 "use client";
-/* global window, localStorage, navigator */
+/* global window, localStorage, navigator, process */
 import { useEffect, useState } from "react";
 
 /**
