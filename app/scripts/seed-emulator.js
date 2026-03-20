@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-env node */
 /**
  * Seed script for local Firebase emulator.
  * Run after starting emulators: node scripts/seed-emulator.js

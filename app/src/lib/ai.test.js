@@ -1,3 +1,4 @@
+/* eslint-env jest */
 const buildModule = (responseByModel) => {
   jest.resetModules();
   jest.doMock("@google/generative-ai", () => ({
