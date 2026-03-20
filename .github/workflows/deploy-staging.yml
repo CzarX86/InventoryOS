@@ -6,6 +6,7 @@ on:
       - CI
     types:
       - completed
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -13,22 +14,25 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: deploy-staging-${{ github.event.workflow_run.head_branch }}
+  group: deploy-staging-${{ github.event.workflow_run.head_branch || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
   deploy:
     name: Deploy To Staging
     if: >
-      github.event.workflow_run.conclusion == 'success' &&
+      github.event_name == 'workflow_dispatch' ||
       (
+        github.event.workflow_run.conclusion == 'success' &&
         (
-          github.event.workflow_run.event == 'push' &&
-          github.event.workflow_run.head_branch == 'main'
-        ) ||
-        (
-          github.event.workflow_run.event == 'pull_request' &&
-          github.event.workflow_run.head_repository.full_name == github.repository
+          (
+            github.event.workflow_run.event == 'push' &&
+            github.event.workflow_run.head_branch == 'main'
+          ) ||
+          (
+            github.event.workflow_run.event == 'pull_request' &&
+            github.event.workflow_run.head_repository.full_name == github.repository
+          )
         )
       )
     runs-on: ubuntu-latest
@@ -51,7 +55,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -72,7 +76,7 @@ jobs:
       - name: Set build version
         run: |
           VERSION=$(jq -r .version package.json)
-          echo "NEXT_PUBLIC_APP_VERSION=${VERSION}.${{ github.event.workflow_run.run_number }}" >> $GITHUB_ENV
+          echo "NEXT_PUBLIC_APP_VERSION=${VERSION}.${{ github.event.workflow_run.run_number || github.run_number }}" >> $GITHUB_ENV
 
       - name: Build static app
         run: pnpm build
