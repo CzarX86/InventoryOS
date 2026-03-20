@@ -79,8 +79,10 @@ jobs:
           echo "NEXT_PUBLIC_APP_VERSION=${VERSION}.${{ github.event.workflow_run.run_number || github.run_number }}" >> $GITHUB_ENV
 
       - name: Create version.json
+        shell: bash
         run: |
-          echo "{\"version\": \"$NEXT_PUBLIC_APP_VERSION\"}" > public/version.json
+          mkdir -p public
+          jq -n --arg v "$NEXT_PUBLIC_APP_VERSION" '{version: $v}' > public/version.json
 
       - name: Build static app
         run: pnpm build
