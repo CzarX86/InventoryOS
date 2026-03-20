@@ -68,7 +68,7 @@ export default function useAIExtraction({ onUsage, userContext = null } = {}) {
         action: "IMAGE_EXTRACTION",
         user: userContext,
         context: {
-          errorContext: "image",
+          errorContext: error.errorContext || "image",
           reproductionContext: {
             lite,
             file,
@@ -126,7 +126,7 @@ export default function useAIExtraction({ onUsage, userContext = null } = {}) {
         action: "AUDIO_REGISTRATION_EXTRACTION",
         user: userContext,
         context: {
-          errorContext: "audio-registration",
+          errorContext: error.errorContext || "audio-registration",
           reproductionContext: {
             lite,
             blob,

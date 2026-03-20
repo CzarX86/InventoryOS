@@ -1,6 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { sumUsageMetadata, normalizeUsageMetadata } from "./audit";
-import { humanizeAIError } from "./errors";
 
 const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY);
 
@@ -143,9 +142,8 @@ export async function extractFromLabel(base64Image, lite = false) {
     return await callWithFallback(prompt, imageData, false);
   } catch (e) {
     console.error("AI Label Extraction failed after all attempts", e);
-    const error = new Error(humanizeAIError(e, "image"));
-    error.cause = e;
-    throw error;
+    e.errorContext = "image";
+    throw e;
   }
 }
 
@@ -171,9 +169,8 @@ export async function extractFromAudio(base64Audio, mimeType = "audio/webm") {
     return await callWithFallback(prompt, audioData);
   } catch (e) {
     console.error("Audio Extraction failed", e);
-    const error = new Error(humanizeAIError(e, "audio-search"));
-    error.cause = e;
-    throw error;
+    e.errorContext = "audio-search";
+    throw e;
   }
 }
 
@@ -208,8 +205,7 @@ export async function extractRegistrationFromAudio(base64Audio, mimeType = "audi
     return await callWithFallback(prompt, audioData, !lite);
   } catch (e) {
     console.error("Audio Registration Extraction failed", e);
-    const error = new Error(humanizeAIError(e, "audio-registration"));
-    error.cause = e;
-    throw error;
+    e.errorContext = "audio-registration";
+    throw e;
   }
 }

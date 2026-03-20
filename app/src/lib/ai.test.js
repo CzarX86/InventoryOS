@@ -70,13 +70,16 @@ describe("AI extraction helpers", () => {
     expect(result.aiModel).toBe("gemini-2.5-flash-lite");
   });
 
-  it("humanizes quota exhaustion errors for image extraction", async () => {
+  it("propagates original error with errorContext when all models fail", async () => {
     const quotaError = Object.assign(new Error("RESOURCE_EXHAUSTED: quota exceeded"), { status: 429 });
     const { extractRegistrationFromAudio } = await buildModule({
       "gemini-2.5-flash": quotaError,
       "gemini-2.5-flash-lite": quotaError,
       "gemini-1.5-flash": quotaError,
     });
-    await expect(extractRegistrationFromAudio("base64-audio", "audio/webm", false)).rejects.toThrow(/limite de uso da api foi atingido/i);
+    await expect(extractRegistrationFromAudio("base64-audio", "audio/webm", false)).rejects.toMatchObject({
+      message: "RESOURCE_EXHAUSTED: quota exceeded",
+      errorContext: "audio-registration",
+    });
   });
 });
