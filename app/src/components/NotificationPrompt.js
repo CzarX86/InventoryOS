@@ -23,7 +23,7 @@ export default function NotificationPrompt() {
     const isPermissionDefault = "Notification" in window && Notification.permission === "default";
     const sessionDismissed = sessionStorage.getItem("notification_prompt_dismissed");
 
-    if (isStandalone && isPermissionDefault && !sessionDismissed && user) {
+    if (isStandalone && isPermissionDefault && !sessionDismissed && user && isAdmin) {
       // Delay slightly for better UX (don't show immediately on load)
       const timer = setTimeout(() => setShow(true), 3000);
       return () => clearTimeout(timer);
@@ -31,6 +31,7 @@ export default function NotificationPrompt() {
   }, [user]);
 
   const handleEnable = async () => {
+    if (!isAdmin) return;
     setLoading(true);
     try {
       await registerAdminPushToken(user);
