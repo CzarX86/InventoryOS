@@ -138,7 +138,9 @@ export async function extractFromLabel(base64Image, lite = false) {
   };
 
   try {
-    return await callWithFallback(prompt, imageData, !lite);
+    // Image + Search Grounding cannot be combined in the same Gemini API call.
+    // Always extract from image without search; model uses internal knowledge for price estimation.
+    return await callWithFallback(prompt, imageData, false);
   } catch (e) {
     console.error("AI Label Extraction failed after all attempts", e);
     const error = new Error(humanizeAIError(e, "image"));
