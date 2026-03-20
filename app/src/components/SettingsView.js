@@ -1,4 +1,5 @@
 "use client";
+/* global window, localStorage, navigator, process, document, confirm, caches */
 import { Zap, Clock, LogOut, Check, Share2, ToggleLeft, ToggleRight, RefreshCw } from "lucide-react";
 import useAuth from "@/hooks/useAuth";
 
@@ -114,20 +115,20 @@ export default function SettingsView() {
       <div className="px-4 md:px-6 py-6 border-b border-white/[0.07] flex flex-col gap-6">
         <button
           onClick={async () => {
-            if (confirm("Isso irá limpar o cache local e forçar a atualização para a versão mais recente. Continuar?")) {
+            if (window.confirm("Isso irá limpar o cache local e forçar a atualização para a versão mais recente. Continuar?")) {
               try {
                 // 1. Unregister all service workers
-                if ("serviceWorker" in navigator) {
-                  const registrations = await navigator.serviceWorker.getRegistrations();
+                if ("serviceWorker" in window.navigator) {
+                  const registrations = await window.navigator.serviceWorker.getRegistrations();
                   for (const registration of registrations) {
                     await registration.unregister();
                   }
                 }
                 // 2. Clear all cache storages
                 if ("caches" in window) {
-                  const cacheNames = await caches.keys();
+                  const cacheNames = await window.caches.keys();
                   for (const name of cacheNames) {
-                    await caches.delete(name);
+                    await window.caches.delete(name);
                   }
                 }
                 // 3. Hard reload
