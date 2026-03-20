@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable */
 /* global window, localStorage, navigator, process, document */
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 function UpdatePrompt({ onUpdate, onClose }) {
   return (
@@ -71,6 +71,7 @@ export default function ServiceWorkerUpdater() {
   const [showUpdateToast, setShowUpdateToast] = useState(false);
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
   const [waitingWorker, setWaitingWorker] = useState(null);
+  const registrationRef = useRef(null);
 
   useEffect(() => {
     const currentVersion = (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_APP_VERSION);
@@ -90,6 +91,7 @@ export default function ServiceWorkerUpdater() {
   useEffect(() => {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.ready.then((registration) => {
+        registrationRef.current = registration;
         if (registration.waiting) {
           setWaitingWorker(registration.waiting);
           setShowUpdatePrompt(true);
@@ -112,12 +114,29 @@ export default function ServiceWorkerUpdater() {
           window.location.reload();
         }
       };
+
+      const checkForUpdate = () => {
+        if (registrationRef.current && registrationRef.current.update) {
+          registrationRef.current.update().catch(err => console.log('SW update error:', err));
+        }
+      };
+
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === "visible") checkForUpdate();
+      };
+      
+      window.addEventListener("focus", checkForUpdate);
+      document.addEventListener("visibilitychange", handleVisibilityChange);
       navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange);
+      
       const handleOffline = () => setIsOffline(true);
       const handleOnline = () => setIsOffline(false);
       window.addEventListener("offline", handleOffline);
       window.addEventListener("online", handleOnline);
+
       return () => {
+        window.removeEventListener("focus", checkForUpdate);
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
         navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange);
         window.removeEventListener("offline", handleOffline);
         window.removeEventListener("online", handleOnline);
