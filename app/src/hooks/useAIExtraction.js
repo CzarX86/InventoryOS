@@ -1,5 +1,6 @@
+/* global FileReader */
 import { useState } from "react";
-import { extractFromLabel } from "@/lib/ai";
+import { extractFromLabel, extractRegistrationFromAudio } from "@/lib/ai";
 import { recordAppError, toUserFacingError } from "@/lib/errorReporting";
 
 function stripMetadata(result) {
@@ -58,17 +59,17 @@ export default function useAIExtraction({ onUsage, userContext = null } = {}) {
         },
       });
       setError(toUserFacingError(report));
-    } catch (error) {
-      console.error("Extraction error:", error);
+    } catch (err) {
+      console.error("Extraction error:", err);
       setSuggestions(null);
       setHasPendingConfirmation(false);
       const report = await recordAppError({
-        error,
+        error: err,
         source: "add-item-modal",
         action: "IMAGE_EXTRACTION",
         user: userContext,
         context: {
-          errorContext: "image",
+          errorContext: err.errorContext || "image",
           reproductionContext: {
             lite,
             file,
@@ -88,8 +89,6 @@ export default function useAIExtraction({ onUsage, userContext = null } = {}) {
     setError(null);
     try {
       const base64 = await fileToBase64(blob);
-      // need to import extractRegistrationFromAudio from lib/ai
-      const { extractRegistrationFromAudio } = await import("@/lib/ai");
       const extracted = await extractRegistrationFromAudio(base64, blob.type || "audio/webm", lite);
 
       if (extracted) {
@@ -116,17 +115,17 @@ export default function useAIExtraction({ onUsage, userContext = null } = {}) {
         },
       });
       setError(toUserFacingError(report));
-    } catch (error) {
-      console.error("Audio extraction error:", error);
+    } catch (err) {
+      console.error("Audio extraction error:", err);
       setSuggestions(null);
       setHasPendingConfirmation(false);
       const report = await recordAppError({
-        error,
+        error: err,
         source: "add-item-modal",
         action: "AUDIO_REGISTRATION_EXTRACTION",
         user: userContext,
         context: {
-          errorContext: "audio-registration",
+          errorContext: err.errorContext || "audio-registration",
           reproductionContext: {
             lite,
             blob,
@@ -151,7 +150,7 @@ export default function useAIExtraction({ onUsage, userContext = null } = {}) {
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => resolve(reader.result.split(',')[1]);
-      reader.onerror = error => reject(error);
+      reader.onerror = e => reject(e);
     });
   };
 

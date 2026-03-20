@@ -1,6 +1,7 @@
 import "./globals.css";
 import ServiceWorkerUpdater from "@/components/ServiceWorkerUpdater";
 import PWAInstallPrompt from "@/components/PWAInstallPrompt";
+import NotificationPrompt from "@/components/NotificationPrompt";
 
 export const metadata = {
   title: "InventoryOS",
@@ -35,6 +36,7 @@ export default function RootLayout({ children }) {
       <body className="antialiased font-sans flex flex-col min-h-screen">
         <ServiceWorkerUpdater />
         <PWAInstallPrompt />
+        <NotificationPrompt />
         {children}
       </body>
     </html>

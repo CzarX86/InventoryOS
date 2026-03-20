@@ -1,4 +1,5 @@
 "use client";
+/* global window, localStorage, navigator */
 import { useEffect, useState } from "react";
 
 /**
@@ -11,11 +12,25 @@ export default function ServiceWorkerUpdater() {
     if (typeof navigator !== "undefined") return !navigator.onLine;
     return false;
   });
+  const [showUpdateToast, setShowUpdateToast] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("pwa_updated") === "true";
+  });
+
+  useEffect(() => {
+    if (showUpdateToast) {
+      localStorage.removeItem("pwa_updated");
+      const timer = setTimeout(() => setShowUpdateToast(false), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [showUpdateToast]);
 
   useEffect(() => {
     // --- Service worker update ---
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.addEventListener("controllerchange", () => {
+        // Set flag to show toast after reload
+        localStorage.setItem("pwa_updated", "true");
         window.location.reload();
       });
     }
@@ -34,11 +49,39 @@ export default function ServiceWorkerUpdater() {
     };
   }, []);
 
-  if (!isOffline) return null;
-
   return (
-    <div className="fixed top-0 left-0 w-full bg-red-600 text-white text-[10px] font-black uppercase tracking-widest py-1.5 text-center z-[9999]" role="status" aria-live="polite">
-      SEM CONEXÃO — MODO OFFLINE
+    <>
+      {isOffline && (
+        <div className="fixed top-0 left-0 w-full bg-red-600 text-white text-[10px] font-black uppercase tracking-widest py-1.5 text-center z-[9999]" role="status" aria-live="polite">
+          SEM CONEXÃO — MODO OFFLINE
+        </div>
+      )}
+      {showUpdateToast && <UpdateToast onClose={() => setShowUpdateToast(false)} />}
+    </>
+  );
+}
+
+function UpdateToast({ onClose }) {
+  return (
+    <div className="fixed bottom-6 right-6 z-[120] pointer-events-auto">
+      <div className="bg-[#1a1c1e] border-l-4 border-emerald-500 shadow-2xl p-4 flex items-center gap-4 min-w-[300px] animate-in slide-in-from-right-10 duration-500">
+        <div className="w-10 h-10 bg-emerald-500/10 rounded-full flex items-center justify-center shrink-0">
+          <div className="w-5 h-5 text-emerald-500">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+            </svg>
+          </div>
+        </div>
+        <div className="flex-1">
+          <p className="text-xs font-black uppercase tracking-widest text-white">App Atualizado</p>
+          <p className="text-[11px] text-zinc-400 mt-0.5">Nova versão ativa e pronta para uso.</p>
+        </div>
+        <button onClick={onClose} className="p-1 text-zinc-500 hover:text-white transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
     </div>
   );
 }
