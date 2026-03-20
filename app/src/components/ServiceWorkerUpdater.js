@@ -1,113 +1,6 @@
 "use client";
-/* global window, localStorage, navigator, process */
+/* global window, localStorage, navigator, process, document */
 import { useEffect, useState } from "react";
-
-/**
- * Handles two PWA concerns:
- * 1. Auto-reload when a new service worker activates (controllerchange).
- * 2. Shows/hides the .offline-indicator strip based on network status.
- */
-export default function ServiceWorkerUpdater() {
-  const [isOffline, setIsOffline] = useState(() => {
-    if (typeof navigator !== "undefined") return !navigator.onLine;
-    return false;
-  });
-  const [showUpdateToast, setShowUpdateToast] = useState(false);
-  const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
-  const [waitingWorker, setWaitingWorker] = useState(null);
-
-  useEffect(() => {
-    // --- Version-based update detection ---
-    const currentVersion = process.env.NEXT_PUBLIC_APP_VERSION;
-    if (currentVersion) {
-      const lastVersion = localStorage.getItem("last_notified_version");
-      
-      // If we have a stored version and it's different from current,
-      // it means the app just updated (via SW reload or manual refresh).
-      if (lastVersion && lastVersion !== currentVersion) {
-        setShowUpdateToast(true);
-      }
-      
-      // Update stored version to current
-      localStorage.setItem("last_notified_version", currentVersion);
-    }
-
-    if (showUpdateToast) {
-      const timer = setTimeout(() => setShowUpdateToast(false), 8000); // 8 seconds for better visibility
-      return () => clearTimeout(timer);
-    }
-  }, [showUpdateToast]);
-
-  useEffect(() => {
-    // --- Service worker update detection ---
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.ready.then((registration) => {
-        // 1. Check if there's already a waiting worker
-        if (registration.waiting) {
-          setWaitingWorker(registration.waiting);
-          setShowUpdatePrompt(true);
-        }
-
-        // 2. Listen for future updates
-        registration.addEventListener("updatefound", () => {
-          const newWorker = registration.installing;
-          if (newWorker) {
-            newWorker.addEventListener("statechange", () => {
-              if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-                setWaitingWorker(newWorker);
-                setShowUpdatePrompt(true);
-              }
-            });
-          }
-        });
-      });
-
-      // --- Controller change (actual reload) ---
-      const handleControllerChange = () => {
-        if (navigator.serviceWorker.controller) {
-          window.location.reload();
-        }
-      };
-      
-      navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange);
-      
-      // --- Offline indicator ---
-      const handleOffline = () => setIsOffline(true);
-      const handleOnline = () => setIsOffline(false);
-      window.addEventListener("offline", handleOffline);
-      window.addEventListener("online", handleOnline);
-
-      return () => {
-        navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange);
-        window.removeEventListener("offline", handleOffline);
-        window.removeEventListener("online", handleOnline);
-      };
-    }
-  }, []);
-
-  const handleUpdate = () => {
-    if (waitingWorker) {
-      waitingWorker.postMessage({ type: "SKIP_WAITING" });
-      setShowUpdatePrompt(false);
-    }
-  };
-
-  return (
-    <>
-      {isOffline && (
-        <div className="fixed top-0 left-0 w-full bg-red-600 text-white text-[10px] font-black uppercase tracking-widest py-1.5 text-center z-[9999]" role="status" aria-live="polite">
-          SEM CONEXÃO — MODO OFFLINE
-        </div>
-      )}
-      {showUpdatePrompt && (
-        <UpdatePrompt onUpdate={handleUpdate} onClose={() => setShowUpdatePrompt(false)} />
-      )}
-      {showUpdateToast && (
-        <UpdateToast onClose={() => setShowUpdateToast(false)} />
-      )}
-    </>
-  );
-}
 
 function UpdatePrompt({ onUpdate, onClose }) {
   return (
@@ -144,6 +37,7 @@ function UpdatePrompt({ onUpdate, onClose }) {
 }
 
 function UpdateToast({ onClose }) {
+  const version = (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_APP_VERSION) || '';
   return (
     <div className="fixed bottom-6 right-6 z-[120]">
       <div className="bg-[#1a1c1e] border-l-4 border-emerald-500 shadow-2xl p-4 flex items-center gap-4 min-w-[300px] animate-in slide-in-from-right-10 duration-500 rounded-lg">
@@ -156,7 +50,7 @@ function UpdateToast({ onClose }) {
         </div>
         <div className="flex-1">
           <p className="text-xs font-black uppercase tracking-widest text-white">App Atualizado</p>
-          <p className="text-[11px] text-zinc-400 mt-0.5">InventoryOS v{process.env.NEXT_PUBLIC_APP_VERSION} ativo.</p>
+          <p className="text-[11px] text-zinc-400 mt-0.5">InventoryOS {version && `v${version}`} ativo.</p>
         </div>
         <button onClick={onClose} className="p-1 text-zinc-500 hover:text-white transition-colors">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
@@ -165,5 +59,91 @@ function UpdateToast({ onClose }) {
         </button>
       </div>
     </div>
+  );
+}
+
+export default function ServiceWorkerUpdater() {
+  const [isOffline, setIsOffline] = useState(() => {
+    if (typeof navigator !== "undefined") return !navigator.onLine;
+    return false;
+  });
+  const [showUpdateToast, setShowUpdateToast] = useState(false);
+  const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
+  const [waitingWorker, setWaitingWorker] = useState(null);
+
+  useEffect(() => {
+    const currentVersion = (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_APP_VERSION);
+    if (currentVersion) {
+      const lastVersion = localStorage.getItem("last_notified_version");
+      if (lastVersion && lastVersion !== currentVersion) {
+        setShowUpdateToast(true);
+      }
+      localStorage.setItem("last_notified_version", currentVersion);
+    }
+    if (showUpdateToast) {
+      const timer = setTimeout(() => setShowUpdateToast(false), 8000);
+      return () => clearTimeout(timer);
+    }
+  }, [showUpdateToast]);
+
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.ready.then((registration) => {
+        if (registration.waiting) {
+          setWaitingWorker(registration.waiting);
+          setShowUpdatePrompt(true);
+        }
+        registration.addEventListener("updatefound", () => {
+          const newWorker = registration.installing;
+          if (newWorker) {
+            newWorker.addEventListener("statechange", () => {
+              if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+                setWaitingWorker(newWorker);
+                setShowUpdatePrompt(true);
+              }
+            });
+          }
+        });
+      });
+
+      const handleControllerChange = () => {
+        if (navigator.serviceWorker.controller) {
+          window.location.reload();
+        }
+      };
+      navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange);
+      const handleOffline = () => setIsOffline(true);
+      const handleOnline = () => setIsOffline(false);
+      window.addEventListener("offline", handleOffline);
+      window.addEventListener("online", handleOnline);
+      return () => {
+        navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange);
+        window.removeEventListener("offline", handleOffline);
+        window.removeEventListener("online", handleOnline);
+      };
+    }
+  }, []);
+
+  const handleUpdate = () => {
+    if (waitingWorker) {
+      waitingWorker.postMessage({ type: "SKIP_WAITING" });
+      setShowUpdatePrompt(false);
+    }
+  };
+
+  return (
+    <>
+      {isOffline && (
+        <div className="fixed top-0 left-0 w-full bg-red-600 text-white text-[10px] font-black uppercase tracking-widest py-1.5 text-center z-[9999]" role="status" aria-live="polite">
+          SEM CONEXÃO — MODO OFFLINE
+        </div>
+      )}
+      {showUpdatePrompt && (
+        <UpdatePrompt onUpdate={handleUpdate} onClose={() => setShowUpdatePrompt(false)} />
+      )}
+      {showUpdateToast && (
+        <UpdateToast onClose={() => setShowUpdateToast(false)} />
+      )}
+    </>
   );
 }
