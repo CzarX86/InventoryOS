@@ -83,9 +83,14 @@ export default function Dashboard() {
           <h1 className="text-4xl font-black uppercase tracking-tight text-white mb-2">
             Inventory<br />OS
           </h1>
-          <p className="text-base text-zinc-300 mb-10 leading-relaxed">
+          <p className="text-base text-zinc-300 mb-1 leading-relaxed">
             Gestão de estoque com extração inteligente por IA.
           </p>
+          {process.env.NEXT_PUBLIC_APP_VERSION && (
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-10">
+              Versão {process.env.NEXT_PUBLIC_APP_VERSION}
+            </p>
+          )}
           <div className="h-px bg-white/[0.08] mb-8" />
           <button
             onClick={login}

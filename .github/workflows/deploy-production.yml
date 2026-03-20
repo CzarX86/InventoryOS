@@ -59,6 +59,11 @@ jobs:
       - name: Run tests
         run: pnpm exec jest --runInBand
 
+      - name: Set build version
+        run: |
+          VERSION=$(jq -r .version package.json)
+          echo "NEXT_PUBLIC_APP_VERSION=${VERSION}.${{ github.run_number }}" >> $GITHUB_ENV
+
       - name: Build static app
         run: pnpm build
 
