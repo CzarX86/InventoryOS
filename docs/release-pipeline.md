@@ -1,52 +1,112 @@
 # Release Pipeline
 
-## What Exists
+## Ambientes Firebase
 
-- `CI` runs tests and builds on pull requests to `main` and pushes to `main` / `codex/**`.
-- `CI` also runs ESLint on changed app files so new lint regressions are caught without blocking on unrelated legacy issues.
-- `Deploy Staging` runs automatically after a successful `CI` workflow and deploys to the staging Firebase project.
-- `Deploy Production` is manual only and should be protected by the GitHub `production` environment approval rule.
-- `CODEOWNERS` routes app, workflow, and docs reviews to `@CzarX86`.
+| Ambiente   | Projeto Firebase    | URL                                    |
+|------------|---------------------|----------------------------------------|
+| Staging    | `inventoryos-effd5` | https://inventoryos-effd5.web.app      |
+| Production | `inventory-os-app`  | https://inventory-os-app.web.app       |
+
+A configuração dos projetos está em [app/.firebaserc](../app/.firebaserc).
+
+## Fluxo de Deploy
+
+1. Abra ou atualize um PR para `main`.
+2. Aguarde os checks `Test`, `Lint Changed Files` e `Build` passarem.
+3. Após o merge, o `Deploy Staging` dispara automaticamente e publica no projeto Firebase de staging.
+4. Teste manualmente a URL de staging exibida no resumo do workflow.
+5. Quando validado, execute `Deploy Production` manualmente via GitHub Actions e aprove o environment `production` quando solicitado.
+
+## Workflows
+
+| Workflow | Trigger | Ambiente |
+|---|---|---|
+| `CI` | push/PR em `main` e `codex/**` | — |
+| `Deploy Staging` | após CI com sucesso em `main` | `staging` |
+| `Deploy Production` | manual (`workflow_dispatch`) | `production` |
+
+O CI roda ESLint apenas nos arquivos alterados para não bloquear em dívida técnica de lint legado.
 
 ## GitHub Environments
 
-Create these environments in GitHub:
+Crie dois environments no repositório: `staging` e `production`.
 
-- `staging`
-- `production`
+### Variáveis (em cada environment)
 
-Add these environment variables to both environments:
+| Variável | Descrição |
+|---|---|
+| `NEXT_PUBLIC_FIREBASE_API_KEY` | API key do projeto Firebase |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Auth domain |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | ID do projeto |
+| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | Storage bucket |
+| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Sender ID para FCM |
+| `NEXT_PUBLIC_FIREBASE_APP_ID` | App ID |
+| `NEXT_PUBLIC_FIREBASE_VAPID_KEY` | Chave VAPID para push notifications |
 
-- `NEXT_PUBLIC_FIREBASE_API_KEY`
-- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
-- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
-- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
-- `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
-- `NEXT_PUBLIC_FIREBASE_APP_ID`
+### Secrets (em cada environment)
 
-Add these secrets to both environments:
+| Secret | Descrição |
+|---|---|
+| `FIREBASE_SERVICE_ACCOUNT` | JSON completo da service account com permissão para deploy de Hosting, Firestore, Storage e Functions |
+| `NEXT_PUBLIC_GEMINI_API_KEY` | API key do Gemini |
 
-- `NEXT_PUBLIC_GEMINI_API_KEY`
-- `FIREBASE_SERVICE_ACCOUNT`
+## Configuração inicial do GCP (uma vez por projeto Firebase)
 
-`FIREBASE_SERVICE_ACCOUNT` should contain the full JSON credential for a service account that can deploy Hosting, Firestore, and Storage rules to that target Firebase project.
+Ao configurar um novo projeto Firebase para deploy de Cloud Functions Gen 2, é necessário:
 
-## Expected Flow
+### 1. Habilitar APIs manualmente no GCP Console
 
-1. Open or update a PR to `main`.
-2. Wait for `Test`, `Lint Changed Files`, and `Build` to pass.
-3. Let `Deploy Staging` publish the same commit to the staging Firebase project.
-4. Manually test the staging URL shown in the workflow summary.
-5. Run `Deploy Production` from GitHub Actions and approve the `production` environment when prompted.
+As APIs abaixo não são habilitadas automaticamente pela service account de deploy:
+
+- [Cloud Billing API](https://console.developers.google.com/apis/api/cloudbilling.googleapis.com/overview)
+- [Eventarc API](https://console.cloud.google.com/apis/library/eventarc.googleapis.com)
+- [Firebase Extensions API](https://console.cloud.google.com/apis/library/firebaseextensions.googleapis.com)
+
+### 2. Conceder permissões IAM
+
+Execute os comandos abaixo substituindo `PROJECT_ID` e `PROJECT_NUMBER` pelos valores do projeto:
+
+```bash
+# Permite que o Pub/Sub crie tokens de autenticação
+gcloud projects add-iam-policy-binding PROJECT_ID \
+  --member=serviceAccount:service-PROJECT_NUMBER@gcp-sa-pubsub.iam.gserviceaccount.com \
+  --role=roles/iam.serviceAccountTokenCreator \
+  --condition=None
+
+# Permite que o Compute invocar serviços Cloud Run
+gcloud projects add-iam-policy-binding PROJECT_ID \
+  --member=serviceAccount:PROJECT_NUMBER-compute@developer.gserviceaccount.com \
+  --role=roles/run.invoker \
+  --condition=None
+
+# Permite que o Compute receber eventos do Eventarc
+gcloud projects add-iam-policy-binding PROJECT_ID \
+  --member=serviceAccount:PROJECT_NUMBER-compute@developer.gserviceaccount.com \
+  --role=roles/eventarc.eventReceiver \
+  --condition=None
+
+# Permite que a service account de deploy aja como a Compute SA (necessário para Functions Gen 2)
+gcloud iam service-accounts add-iam-policy-binding \
+  PROJECT_NUMBER-compute@developer.gserviceaccount.com \
+  --member=serviceAccount:firebase-adminsdk-fbsvc@PROJECT_ID.iam.gserviceaccount.com \
+  --role=roles/iam.serviceAccountUser \
+  --project=PROJECT_ID
+```
+
+Para o projeto staging (`inventoryos-effd5`, número `836596473888`) esses passos já foram executados.
+
+### 3. Flag `--force` no deploy
+
+O comando `firebase deploy` inclui `--force` para que o CLI configure automaticamente a cleanup policy do Artifact Registry sem solicitar confirmação interativa. Sem essa flag o deploy falha em ambiente não-interativo (CI) mesmo com as Functions deployadas com sucesso.
 
 ## Branch Protection
 
-Once the repository is public, enable branch protection on `main` with:
+Configurações recomendadas para `main`:
 
-- 1 required approving review
-- stale review dismissal
-- required checks `Test`, `Lint Changed Files`, and `Build`
-- require branch to be up to date before merge
-- block direct pushes to `main`
+- 1 review aprovado obrigatório
+- Dismiss de reviews obsoletos ao fazer push
+- Checks obrigatórios: `Test`, `Lint Changed Files`, `Build`
+- Branch deve estar atualizada antes do merge
+- Bloquear push direto para `main`
 
-If the repository remains private, GitHub branch protection still requires the appropriate paid plan.
+> Se o repositório for privado, branch protection com required checks exige plano pago no GitHub.
