@@ -1,6 +1,6 @@
 "use client";
 /* global window, localStorage, navigator, process, document, confirm, caches */
-import { Zap, Clock, LogOut, Check, Share2, ToggleLeft, ToggleRight, RefreshCw } from "lucide-react";
+import { Zap, Clock, LogOut, Check, RefreshCw } from "lucide-react";
 import useAuth from "@/hooks/useAuth";
 
 const WORKFLOWS = [
@@ -60,30 +60,6 @@ export default function SettingsView() {
             </button>
           );
         })}
-      </div>
-
-      {/* Sharing Preferences */}
-      <div className="border-b border-white/[0.07]">
-        <div className="px-4 md:px-6 py-4 border-b border-white/[0.07]">
-          <p className="text-base font-black uppercase tracking-widest text-zinc-300">Preferências de Compartilhamento</p>
-        </div>
-        <button
-          onClick={() => updateSettings({ sharePriceByDefault: !user?.sharePriceByDefault })}
-          className="w-full flex items-center justify-between px-4 md:px-6 py-5 border-b border-white/[0.07] hover:bg-white/[0.02] transition-colors"
-        >
-          <div className="flex items-center gap-4">
-            <div className={`shrink-0 ${user?.sharePriceByDefault ? "text-white" : "text-zinc-500"}`}>
-              <Share2 size={16} />
-            </div>
-            <div className="text-left">
-              <p className="text-base font-bold uppercase tracking-wide text-white">Incluir Preço ao Compartilhar</p>
-              <p className="text-sm text-zinc-400 mt-0.5">O preço de venda será incluído por padrão no texto de compartilhamento.</p>
-            </div>
-          </div>
-          <div className={user?.sharePriceByDefault ? "text-white" : "text-zinc-600"}>
-            {user?.sharePriceByDefault ? <ToggleRight size={24} /> : <ToggleLeft size={24} />}
-          </div>
-        </button>
       </div>
 
       {/* Profile */}
