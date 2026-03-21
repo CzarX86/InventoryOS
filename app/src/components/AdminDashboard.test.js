@@ -88,9 +88,11 @@ jest.mock("firebase/firestore", () => ({
 
 describe("AdminDashboard", () => {
   it("renders token usage and reversible activity for admins", async () => {
-    render(<AdminDashboard items={[{ id: "item-123", status: "IN STOCK", estimatedMarketValue: 10, sellingPrice: 20 }]} user={{ uid: "admin-1", email: "admin@example.com" }} />);
+    render(<AdminDashboard items={[{ id: "item-123", status: "IN STOCK" }, { id: "item-456", status: "SOLD" }]} user={{ uid: "admin-1", email: "admin@example.com" }} />);
 
     expect(await screen.findByText("Token Usage")).toBeInTheDocument();
+    expect(screen.getByText("Itens em Estoque")).toBeInTheDocument();
+    expect(screen.getByText("Itens Vendidos")).toBeInTheDocument();
     expect(screen.getByText("42 tokens")).toBeInTheDocument();
     expect(screen.getByText("Activity History")).toBeInTheDocument();
     expect(screen.getByText("Support Inbox")).toBeInTheDocument();

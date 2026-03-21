@@ -27,7 +27,6 @@ export default function useAuth() {
             email: firebaseUser.email,
             role: 'user', 
             aiWorkflow: 'real-time',
-            sharePriceByDefault: false,
             createdAt: new Date().toISOString()
           };
           await setDoc(userRef, initialData);

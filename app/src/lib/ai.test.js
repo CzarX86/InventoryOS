@@ -46,7 +46,7 @@ describe("AI extraction helpers", () => {
       calls: [
         {
           model: "gemini-2.5-flash",
-          source: "search",
+          source: "direct",
           step: "generateContent",
           usage: {
             promptTokenCount: 1,
@@ -57,7 +57,7 @@ describe("AI extraction helpers", () => {
         },
         {
           model: "gemini-2.5-flash-lite",
-          source: "search",
+          source: "direct",
           step: "generateContent",
           usage: {
             promptTokenCount: 4,

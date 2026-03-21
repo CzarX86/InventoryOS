@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { X, Loader2, Camera, Check, Sparkles, RotateCcw, TrendingUp, Mic, Square, Play } from "lucide-react";
+import { X, Loader2, Camera, Check, Sparkles, Mic, Square } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { db, storage } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
@@ -25,8 +25,7 @@ const STATUS_OPTIONS = ["IN STOCK", "SOLD", "REPAIR", "RESERVED"];
 
 const EMPTY_FORM = {
   type: "", brand: "", model: "", partNumber: "",
-  specifications: "", sellingPrice: "", estimatedMarketValue: "",
-  marketJustification: "", status: "IN STOCK", audioUrl: "", productImageUrl: "",
+  specifications: "", status: "IN STOCK", audioUrl: "", productImageUrl: "",
 };
 
 export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null }) {
@@ -110,11 +109,10 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
         ...Object.keys(suggestions).reduce((acc, key) => {
           // Robust mapping for common field variations
           let normalizedKey = key.toLowerCase();
-          if (normalizedKey.includes('spec') || normalizedKey.includes('technical')) normalizedKey = 'specifications';
-          if (normalizedKey.includes('brand') || normalizedKey.includes('manufacturer')) normalizedKey = 'brand';
-          if (normalizedKey.includes('price')) normalizedKey = 'estimatedMarketValue';
+          if (normalizedKey.includes("spec") || normalizedKey.includes("technical")) normalizedKey = "specifications";
+          if (normalizedKey.includes("brand") || normalizedKey.includes("manufacturer")) normalizedKey = "brand";
           
-          const validFields = ['type', 'brand', 'model', 'partNumber', 'specifications', 'estimatedMarketValue', 'marketJustification'];
+          const validFields = ["type", "brand", "model", "partNumber", "specifications"];
           
           if (validFields.includes(normalizedKey) && suggestions[key] !== null) {
             acc[normalizedKey] = suggestions[key].toString().toUpperCase();
@@ -265,14 +263,12 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
         ...formData,
         audioUrl: finalAudioUrl,
         productImageUrl: finalProductImageUrl,
-        needsMarketResearch: user?.aiWorkflow === "background" && !formData.estimatedMarketValue,
         updatedAt: new Date().toISOString(),
       };
       const data = {
         ...formData,
         audioUrl: finalAudioUrl,
         productImageUrl: finalProductImageUrl,
-        needsMarketResearch: user?.aiWorkflow === "background" && !formData.estimatedMarketValue,
         updatedAt: serverTimestamp(),
       };
       
@@ -644,8 +640,6 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                       { id: "brand",                label: "Fabricante / Marca",    placeholder: "Ex: Siemens, WEG" },
                       { id: "model",                label: "Modelo",                placeholder: "Ex: CFW11" },
                       { id: "partNumber",           label: "Part Number",           placeholder: "Código de identificação", mono: true },
-                      { id: "estimatedMarketValue", label: "Valor de Mercado",      placeholder: "R$", type: "number" },
-                      { id: "sellingPrice",         label: "Preço de Venda",        placeholder: "R$", type: "number" },
                     ].map(field => (
                       <div key={field.id} className="py-3 md:odd:pr-4 md:even:pl-4 md:odd:border-r md:odd:border-white/[0.06]">
                         <div className="flex items-center justify-between mb-1">
@@ -667,17 +661,6 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                     ))}
                   </div>
                 </div>
-
-                {/* Market insights */}
-                {formData.marketJustification && (
-                  <div className="flex gap-3 px-5 md:px-6 py-4 border-b border-white/[0.08]">
-                    <TrendingUp size={13} className="text-zinc-300 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-base font-black uppercase tracking-widest text-zinc-300 mb-1">Insights de Mercado</p>
-                      <p className="text-base text-zinc-300 leading-relaxed italic">&quot;{formData.marketJustification}&quot;</p>
-                    </div>
-                  </div>
-                )}
 
                 {/* Specs */}
                 <div className="px-5 md:px-6 py-4 border-b border-white/[0.08]">

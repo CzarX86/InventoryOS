@@ -111,7 +111,7 @@ async function callWithFallback(prompt, visualData = null, useSearch = false) {
   throw lastError || new Error("All AI models failed");
 }
 
-export async function extractFromLabel(base64Image, lite = false) {
+export async function extractFromLabel(base64Image) {
   // Resize to save ~50-70% tokens on high-res photos
   const optimizedImage = await resizeImage(base64Image);
   
@@ -122,10 +122,6 @@ export async function extractFromLabel(base64Image, lite = false) {
     - model: (Série/Nome principal do modelo)
     - partNumber: (Código alfanumérico específico)
     - specifications: (CRÍTICO: Extraia TODAS as potências, tensões, correntes, frequências, fases, IP, etc. Concatene em uma string.)
-    ${!lite ? `
-    - estimatedMarketValue: (Estimativa numérica realista do preço de mercado para este item usado/semi-novo em BRL/R$. Use ferramentas de busca se necessário.)
-    - marketJustification: (Breve justificativa baseada em referências atuais.)
-    ` : ''}
     
     IMPORTANTE: Retorne APENAS o JSON bruto. Use null para campos não encontrados.
   `;
@@ -139,7 +135,7 @@ export async function extractFromLabel(base64Image, lite = false) {
 
   try {
     // Image + Search Grounding cannot be combined in the same Gemini API call.
-    // Always extract from image without search; model uses internal knowledge for price estimation.
+    // Always extract from image without search for consistent JSON extraction.
     return await callWithFallback(prompt, imageData, false);
   } catch (e) {
     console.error("AI Label Extraction failed after all attempts", e);
@@ -175,7 +171,7 @@ export async function extractFromAudio(base64Audio, mimeType = "audio/webm") {
   }
 }
 
-export async function extractRegistrationFromAudio(base64Audio, mimeType = "audio/webm", lite = false) {
+export async function extractRegistrationFromAudio(base64Audio, mimeType = "audio/webm") {
   const prompt = `
     O usuário está ditando informações de um equipamento elétrico/industrial.
     Sua tarefa é transcrever e extrair as informações EXATAS ditadas no áudio e estruturá-las no formato JSON abaixo.
@@ -187,10 +183,6 @@ export async function extractRegistrationFromAudio(base64Audio, mimeType = "audi
     - model: (Modelo do equipamento)
     - partNumber: (Part number / código do produto)
     - specifications: (Qualquer outra especificação citada, como potência, tensão, estado, etc.)
-    ${!lite ? `
-    - estimatedMarketValue: (Estimativa numérica de preço secundário em BRL se possível buscar baseado no áudio, senão null)
-    - marketJustification: (Justificativa)
-    ` : ''}
     
     Apenas retorne o JSON puro e válido, e certifique-se de ser EXTREMAMENTE FIEL ao áudio original, retornando null as chaves que faltarem.
   `;
@@ -203,7 +195,7 @@ export async function extractRegistrationFromAudio(base64Audio, mimeType = "audi
   };
 
   try {
-    return await callWithFallback(prompt, audioData, !lite);
+    return await callWithFallback(prompt, audioData, false);
   } catch (e) {
     console.error("Audio Registration Extraction failed", e);
     e.errorContext = "audio-registration";

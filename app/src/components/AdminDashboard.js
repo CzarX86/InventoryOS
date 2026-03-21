@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { db } from "@/lib/firebase";
 import { collection, query, orderBy, limit, onSnapshot, doc } from "firebase/firestore";
-import { Activity, Shield, Cpu, TrendingUp, DollarSign, Loader2, Undo2, Bug, Copy, Bell } from "lucide-react";
+import { Loader2, Undo2, Bug, Copy, Bell } from "lucide-react";
 import { isActivityUndone, undoActivityEvent } from "@/lib/audit";
 import { updateErrorStatus } from "@/lib/errorReporting";
 import AdminPushRegistration from "@/components/AdminPushRegistration";
@@ -51,15 +51,11 @@ export default function AdminDashboard({ items = [], user = null }) {
     );
   }, [activityLog]);
 
-  const financials = useMemo(() => {
-    const totalEstimatedValue = items
-      .filter(i => i.status === "IN STOCK")
-      .reduce((a, i) => a + (parseFloat(i.estimatedMarketValue) || 0), 0);
-    const grossProfit = items
-      .filter(i => i.status === "SOLD")
-      .reduce((a, i) => a + ((parseFloat(i.sellingPrice) || 0) - (parseFloat(i.estimatedMarketValue) || 0)), 0);
-    return { totalEstimatedValue, grossProfit };
-  }, [items]);
+  const inventoryStats = useMemo(() => items.reduce((acc, item) => {
+    if (item.status === "IN STOCK") acc.inStock += 1;
+    if (item.status === "SOLD") acc.sold += 1;
+    return acc;
+  }, { inStock: 0, sold: 0 }), [items]);
 
   const handleUndo = async (activity) => {
     if (!user || !activity) return;
@@ -123,16 +119,12 @@ export default function AdminDashboard({ items = [], user = null }) {
 
       <div className="flex border-b border-white/[0.07]">
         <div className="flex-1 px-4 md:px-6 py-5 border-r border-white/[0.07]">
-          <p className="text-base font-bold uppercase tracking-widest text-zinc-300 mb-1">Valor em Estoque</p>
-          <p className="text-2xl font-black text-white">
-            R$ {financials.totalEstimatedValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-          </p>
+          <p className="text-base font-bold uppercase tracking-widest text-zinc-300 mb-1">Itens em Estoque</p>
+          <p className="text-2xl font-black text-white">{inventoryStats.inStock}</p>
         </div>
         <div className="flex-1 px-4 md:px-6 py-5">
-          <p className="text-base font-bold uppercase tracking-widest text-zinc-300 mb-1">Lucro Bruto</p>
-          <p className="text-2xl font-black text-white">
-            R$ {financials.grossProfit.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-          </p>
+          <p className="text-base font-bold uppercase tracking-widest text-zinc-300 mb-1">Itens Vendidos</p>
+          <p className="text-2xl font-black text-white">{inventoryStats.sold}</p>
         </div>
       </div>
 
