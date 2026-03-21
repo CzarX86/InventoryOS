@@ -11,7 +11,7 @@ function DetailField({ icon: Icon, label, value, mono = false }) {
         <span className="text-xs font-black uppercase tracking-widest text-zinc-500">{label}</span>
       </div>
       <p className={`text-base text-white ${mono ? "font-mono" : "font-medium"}`}>
-        {value || <span className="text-zinc-700 italic">Nao informado</span>}
+        {value || <span className="text-zinc-700 italic">Não informado</span>}
       </p>
     </div>
   );

@@ -51,10 +51,11 @@ export default function AdminDashboard({ items = [], user = null }) {
     );
   }, [activityLog]);
 
-  const inventoryStats = useMemo(() => ({
-    inStock: items.filter(item => item.status === "IN STOCK").length,
-    sold: items.filter(item => item.status === "SOLD").length,
-  }), [items]);
+  const inventoryStats = useMemo(() => items.reduce((acc, item) => {
+    if (item.status === "IN STOCK") acc.inStock += 1;
+    if (item.status === "SOLD") acc.sold += 1;
+    return acc;
+  }, { inStock: 0, sold: 0 }), [items]);
 
   const handleUndo = async (activity) => {
     if (!user || !activity) return;
