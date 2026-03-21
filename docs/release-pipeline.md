@@ -12,10 +12,11 @@ A configuração dos projetos está em [app/.firebaserc](../app/.firebaserc).
 ## Fluxo de Deploy
 
 1. Abra ou atualize um PR para `main`.
-2. Aguarde os checks `Test`, `Lint Changed Files` e `Build` passarem.
-3. Após o merge, o `Deploy Staging` dispara automaticamente e publica no projeto Firebase de staging.
-4. Teste manualmente a URL de staging exibida no resumo do workflow.
-5. Quando validado, execute `Deploy Production` manualmente via GitHub Actions e aprove o environment `production` quando solicitado.
+2. Rode a validação local antes do push para reduzir falhas evitáveis no CI e no staging.
+3. Aguarde os checks `Test`, `Lint Changed Files` e `Build` passarem.
+4. Após o merge, o `Deploy Staging` dispara automaticamente e publica no projeto Firebase de staging.
+5. Teste manualmente a URL de staging exibida no resumo do workflow.
+6. Quando validado, execute `Deploy Production` manualmente via GitHub Actions e aprove o environment `production` quando solicitado.
 
 ## Workflows
 
@@ -26,6 +27,29 @@ A configuração dos projetos está em [app/.firebaserc](../app/.firebaserc).
 | `Deploy Production` | manual (`workflow_dispatch`) | `production` |
 
 O CI roda ESLint apenas nos arquivos alterados para não bloquear em dívida técnica de lint legado.
+
+## Validação Local Recomendada
+
+No diretório [app/package.json](../app/package.json) agora existem comandos locais para antecipar o gate do CI:
+
+```bash
+cd app
+pnpm validate:changed  # lint nos arquivos alterados + testes relacionados
+pnpm validate:local    # lint nos arquivos alterados + Jest completo + build
+```
+
+O comando `pnpm validate:local` replica o gate essencial do CI antes do push e é executado automaticamente pelo hook versionado `.githooks/pre-push`.
+
+### Hook local
+
+O `pnpm install` passa a configurar `core.hooksPath=.githooks` automaticamente quando o repositório está em um clone local comum. Se necessário, a instalação manual do hook pode ser refeita com:
+
+```bash
+cd app
+pnpm hooks:install
+```
+
+Se alguém já usa um `core.hooksPath` customizado, o script não sobrescreve a configuração existente.
 
 ## GitHub Environments
 

@@ -102,6 +102,12 @@ jobs:
       - name: Deploy to Firebase staging
         run: firebase deploy --project "$NEXT_PUBLIC_FIREBASE_PROJECT_ID" --only hosting,firestore,storage,functions --non-interactive --force
 
+      - name: Run AI Smoke Test
+        shell: bash
+        env:
+          NEXT_PUBLIC_GEMINI_API_KEY: ${{ secrets.NEXT_PUBLIC_GEMINI_API_KEY }}
+        run: node scripts/smoke-test-ai.js "https://inventoryos-effd5.web.app/"
+
       - name: Publish staging URL
         run: |
           {
