@@ -18,4 +18,5 @@ Recommended settings for `main`:
 Notes:
 
 - This repo currently has unrelated legacy lint issues, so the CI gate runs ESLint only on changed app files.
+- Local clones should run `pnpm validate:local` before push; the versioned `.githooks/pre-push` hook automates this for standard setups.
 - When the legacy lint debt is cleaned up, replace this with a full-repo lint gate.
