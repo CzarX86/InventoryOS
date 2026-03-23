@@ -185,6 +185,31 @@ function createStyleProfileRecord(payload = {}, ownershipContext = {}) {
   }, ownershipContext);
 }
 
+const { getFirestore, Timestamp } = require("firebase-admin/firestore");
+
+async function saveAiRun(record) {
+  const db = getFirestore();
+  const docRef = db.collection(AI_RUN_COLLECTIONS.aiRuns).doc();
+  const data = {
+    ...record,
+    id: docRef.id,
+    createdAt: Timestamp.now(),
+  };
+  await docRef.set(data);
+  return data;
+}
+
+async function updateAiRun(id, updates) {
+  const db = getFirestore();
+  const docRef = db.collection(AI_RUN_COLLECTIONS.aiRuns).doc(id);
+  const data = {
+    ...updates,
+    updatedAt: Timestamp.now(),
+  };
+  await docRef.update(data);
+  return data;
+}
+
 module.exports = {
   AI_RUN_COLLECTIONS,
   AI_RUN_STATUSES,
@@ -193,4 +218,6 @@ module.exports = {
   createPromptTemplateRecord,
   createStyleProfileRecord,
   estimateAiRunCost,
+  saveAiRun,
+  updateAiRun,
 };

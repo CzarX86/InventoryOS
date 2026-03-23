@@ -356,7 +356,7 @@ exports.notifyAdminOnSupportTicket = onDocumentCreated("support_tickets/{ticketI
  */
 exports.onWhatsappMessageCreated = onDocumentCreated({
   document: "whatsapp_messages/{messageId}",
-  secrets: ["GEMINI_API_KEY"]
+  secrets: ["GEMINI_API_KEY", "DEEPSEEK_API_KEY"]
 }, async (event) => {
   const messageId = event.params.messageId;
   const messageData = event.data?.data();
@@ -366,42 +366,32 @@ exports.onWhatsappMessageCreated = onDocumentCreated({
     return;
   }
 
-  const { GoogleGenerativeAI } = require("@google/generative-ai");
   const { WHATSAPP_TRANSACTION_EXTRACTION_PROMPT } = require("./whatsappTransactionPrompt");
   const { WHATSAPP_COLLECTIONS, createWhatsappExtractedTransactionRecord } = require("./whatsappDomain");
-  const { createAiRunRecord } = require("./aiRuns");
-
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    logger.error("GEMINI_API_KEY not configured");
-    return;
-  }
+  const { planAiTask, executeAiTask } = require("./aiTaskPlanner");
 
   const db = getFirestore();
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
   try {
-    // 1. Create AI Run Record (Planning/Tracking)
-    const aiRunRef = db.collection("ai_runs").doc();
-    const aiRunRecord = createAiRunRecord({
-      taskType: "whatsapp_transaction_extraction",
-      targetType: "whatsapp_message",
-      targetId: messageId,
-      model: "gemini-1.5-flash",
-      status: "running",
-      metadata: { text: messageData.text }
-    });
-    await aiRunRef.set(aiRunRecord);
+    // 1. Plan AI Task (Planning/Tracking)
+    const plan = await planAiTask(
+      "whatsapp_extraction", 
+      messageId, 
+      { 
+        targetType: "whatsapp_message",
+        metadata: { text: messageData.text } 
+      }
+    );
 
     // 2. Execute AI
     const prompt = WHATSAPP_TRANSACTION_EXTRACTION_PROMPT.replace("{{messageText}}", messageData.text);
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
-    
-    // Clean response text if it has markdown code blocks
-    const jsonStr = responseText.replace(/```json/g, "").replace(/```/g, "").trim();
-    const extractedData = JSON.parse(jsonStr);
+    const runResult = await executeAiTask(plan, prompt);
+
+    if (runResult.status !== "completed") {
+      throw new Error(runResult.errorMessage || "AI Execution Failed");
+    }
+
+    const extractedData = runResult.output;
 
     // 3. Save Extracted Transaction
     const extractionRef = db.collection(WHATSAPP_COLLECTIONS.whatsappExtractedTransactions).doc();
@@ -414,21 +404,18 @@ exports.onWhatsappMessageCreated = onDocumentCreated({
       confidence: extractedData.confidence,
       summary: extractedData.summary,
       lineage: {
-        aiRunId: aiRunRef.id,
-        model: "gemini-1.5-flash"
+        aiRunId: runResult.runId,
+        model: runResult.model
       }
     });
+
     await extractionRef.set(extractionRecord);
 
-    // 4. Update Message and AI Run
+    // 4. Update Message
     await db.collection("whatsapp_messages").doc(messageId).update({
       extracted: true,
-      extractionId: extractionRef.id
-    });
-
-    await aiRunRef.update({
-      status: "completed",
-      completedAt: FieldValue.serverTimestamp()
+      extractionId: extractionRef.id,
+      updatedAt: FieldValue.serverTimestamp()
     });
 
     logger.info("WhatsApp transaction extracted successfully", { messageId, extractionId: extractionRef.id });
@@ -437,7 +424,8 @@ exports.onWhatsappMessageCreated = onDocumentCreated({
     // Update status to failed
     await db.collection("whatsapp_messages").doc(messageId).update({
       extracted: "failed",
-      extractionError: error.message
+      extractionError: error.message,
+      updatedAt: FieldValue.serverTimestamp()
     });
   }
 });
