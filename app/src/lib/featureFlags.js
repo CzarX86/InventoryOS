@@ -10,7 +10,7 @@ export const EXPANSION_FEATURE_FLAGS = [
 
 export const DEFAULT_FEATURE_FLAGS = Object.freeze({
   contactReviewQueue: false,
-  whatsappIngestion: false,
+  whatsappIngestion: true,
   actionInbox: false,
   hardwareIntelligence: false,
   txtImport: false,

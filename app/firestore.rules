@@ -112,6 +112,16 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin() || canReadOwnedResource();
     }
 
+    match /whatsapp_messages/{messageId} {
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateOwnedResource();
+    }
+
+    match /whatsapp_extracted_transactions/{transactionId} {
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateOwnedResource();
+    }
+
     match /history_backfill_jobs/{jobId} {
       allow create: if canCreateOwnedResource();
       allow read, update, delete: if isAdmin() || canReadOwnedResource();

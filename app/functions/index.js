@@ -59,7 +59,9 @@ async function evolutionProxy(method, path, body = null) {
 /**
  * Proxy: List all instances
  */
-exports.listWhatsappInstances = onCall(async (request) => {
+exports.listWhatsappInstances = onCall({
+  secrets: ["EVOLUTION_API_URL", "EVOLUTION_API_KEY"],
+}, async (request) => {
   await ensureAdmin(request.auth);
   return await evolutionProxy("GET", "/instance/fetchInstances");
 });
@@ -67,7 +69,9 @@ exports.listWhatsappInstances = onCall(async (request) => {
 /**
  * Proxy: Create a new instance
  */
-exports.createWhatsappInstance = onCall(async (request) => {
+exports.createWhatsappInstance = onCall({
+  secrets: ["EVOLUTION_API_URL", "EVOLUTION_API_KEY"],
+}, async (request) => {
   await ensureAdmin(request.auth);
   const { instanceName } = request.data;
   if (!instanceName) {
@@ -78,13 +82,16 @@ exports.createWhatsappInstance = onCall(async (request) => {
     instanceName,
     token: crypto.randomBytes(16).toString("hex"),
     qrcode: true,
+    integration: "WHATSAPP-BAILEYS",
   });
 });
 
 /**
  * Proxy: Get QR Code
  */
-exports.getWhatsappQrCode = onCall(async (request) => {
+exports.getWhatsappQrCode = onCall({
+  secrets: ["EVOLUTION_API_URL", "EVOLUTION_API_KEY"],
+}, async (request) => {
   await ensureAdmin(request.auth);
   const { instanceName } = request.data;
   return await evolutionProxy("GET", `/instance/connect/${instanceName}`);
@@ -93,7 +100,9 @@ exports.getWhatsappQrCode = onCall(async (request) => {
 /**
  * Proxy: Logout instance
  */
-exports.logoutWhatsappInstance = onCall(async (request) => {
+exports.logoutWhatsappInstance = onCall({
+  secrets: ["EVOLUTION_API_URL", "EVOLUTION_API_KEY"],
+}, async (request) => {
   await ensureAdmin(request.auth);
   const { instanceName } = request.data;
   return await evolutionProxy("DELETE", `/instance/logout/${instanceName}`);
@@ -102,7 +111,9 @@ exports.logoutWhatsappInstance = onCall(async (request) => {
 /**
  * Proxy: Delete instance
  */
-exports.deleteWhatsappInstance = onCall(async (request) => {
+exports.deleteWhatsappInstance = onCall({
+  secrets: ["EVOLUTION_API_URL", "EVOLUTION_API_KEY"],
+}, async (request) => {
   await ensureAdmin(request.auth);
   const { instanceName } = request.data;
   return await evolutionProxy("DELETE", `/instance/delete/${instanceName}`);
@@ -111,16 +122,20 @@ exports.deleteWhatsappInstance = onCall(async (request) => {
 /**
  * Proxy: Set Webhook
  */
-exports.setWhatsappWebhook = onCall(async (request) => {
+exports.setWhatsappWebhook = onCall({
+  secrets: ["EVOLUTION_API_URL", "EVOLUTION_API_KEY"],
+}, async (request) => {
   await ensureAdmin(request.auth);
   const { instanceName } = request.data;
-  const webhookUrl = process.env.PUBLIC_WEBHOOK_URL || `https://${process.env.GCLOUD_PROJECT}.web.app/evolutionWebhook`;
+  const webhookUrl = process.env.PUBLIC_WEBHOOK_URL || `https://evolutionwebhook-4itihxxrzq-uc.a.run.app`;
   
   return await evolutionProxy("POST", `/webhook/set/${instanceName}`, {
-    url: webhookUrl,
-    enabled: true,
-    webhook_by_events: true,
-    events: ["MESSAGES_UPSERT", "QRCODE_UPDATED", "CONNECTION_UPDATE"],
+    webhook: {
+      url: webhookUrl,
+      enabled: true,
+      webhook_by_events: true,
+      events: ["MESSAGES_UPSERT", "QRCODE_UPDATED", "CONNECTION_UPDATE"],
+    }
   });
 });
 
@@ -146,7 +161,9 @@ function verifySignature(rawBody, signature, secret) {
 /**
  * Webhook endpoint for Evolution API.
  */
-exports.evolutionWebhook = onRequest(async (req, res) => {
+exports.evolutionWebhook = onRequest({
+  secrets: ["EVOLUTION_WEBHOOK_SECRET"],
+}, async (req, res) => {
   const secret = process.env.EVOLUTION_WEBHOOK_SECRET;
   const signature = req.headers["x-hub-signature-256"] || req.headers["x-evolution-signature"];
   

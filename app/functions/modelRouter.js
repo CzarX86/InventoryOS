@@ -2,18 +2,18 @@
  * Logic to route tasks to the most appropriate model (CommonJS version for Functions).
  */
 const MODEL_POLICIES = {
-  CHEAP: "deepseek-chat",
-  BALANCED: "gemini-1.5-flash", 
+  LITE: "gemini-1.5-flash",
+  BALANCED: "gemini-2.0-flash", 
   SRE: "gemini-flash-thinking-latest", 
   DEEPSEEK: "deepseek-chat", 
 };
 
 const TASK_ROUTING = {
-  extract_contact: MODEL_POLICIES.CHEAP,
-  summarize_thread: MODEL_POLICIES.BALANCED,
+  extract_contact: MODEL_POLICIES.LITE,
+  summarize_thread: MODEL_POLICIES.LITE,
   rfq_analysis: MODEL_POLICIES.BALANCED,
   complex_reasoning: MODEL_POLICIES.SRE,
-  whatsapp_extraction: MODEL_POLICIES.CHEAP, // Routing WhatsApp to DeepSeek for cost efficiency
+  whatsapp_extraction: MODEL_POLICIES.LITE, // Routing to high-speed Flash model
   default: MODEL_POLICIES.BALANCED,
 };
 

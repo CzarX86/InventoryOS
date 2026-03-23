@@ -223,7 +223,7 @@ export default function WhatsappInstanceManager() {
                               <>
                                 <img src={qrCode} alt="WhatsApp QR Code" className="h-48 w-48" />
                                 <p className="text-[10px] font-black uppercase tracking-widest text-zinc-900 mt-4 text-center">
-                                  Escaneie no WhatsApp > Aparelhos Conectados
+                                  Escaneie no WhatsApp {" > "} Aparelhos Conectados
                                 </p>
                               </>
                             )}
