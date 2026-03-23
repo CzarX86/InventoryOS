@@ -16,7 +16,7 @@ import useInventory from "@/hooks/useInventory";
 import { buildActivityEvent, logInventoryActivity } from "@/lib/audit";
 import { escalateErrorReport, recordAppError, toUserFacingError } from "@/lib/errorReporting";
 import { db } from "@/lib/firebase";
-import { getBrandLogo } from "@/lib/utils";
+import { getBrandMeta } from "@/lib/utils";
 
 const STATUS_CONFIG = {
   "IN STOCK":  { cls: "text-emerald-400",  dot: "bg-emerald-400" },
@@ -493,20 +493,28 @@ export default function Dashboard() {
 }
 
 function InventoryContent({ items, filteredItems, stats, loading, searchQuery, activeMenuId, setActiveMenuId, onEdit, onDelete, onView = () => {}, onShare = () => {} }) {
-  const [selectedCategory, setSelectedCategory] = useState("Todos");
+  const [selectedBrandKey, setSelectedBrandKey] = useState(null);
 
-  const uniqueCategories = useMemo(() => {
-    const cats = items.map(i => i.type || "Geral");
-    return ["Todos", ...Array.from(new Set(cats)).sort()];
+  const availableBrands = useMemo(() => {
+    const brands = new Map();
+
+    items.forEach((item) => {
+      const brandMeta = getBrandMeta(item.brand || "Sem marca");
+      if (!brands.has(brandMeta.key)) {
+        brands.set(brandMeta.key, brandMeta);
+      }
+    });
+
+    return Array.from(brands.values()).sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
   }, [items]);
 
   const displayItems = useMemo(() => {
     let filtered = filteredItems;
-    if (selectedCategory !== "Todos") {
-      filtered = filtered.filter(i => (i.type || "Geral") === selectedCategory);
+    if (selectedBrandKey) {
+      filtered = filtered.filter(i => getBrandMeta(i.brand || "Sem marca").key === selectedBrandKey);
     }
     return filtered;
-  }, [filteredItems, selectedCategory]);
+  }, [filteredItems, selectedBrandKey]);
 
   if (loading && items.length === 0) {
     return (
@@ -543,21 +551,44 @@ function InventoryContent({ items, filteredItems, stats, loading, searchQuery, a
         ))}
       </div>
 
-      {/* Category Pills */}
+      {/* Brand Filters */}
       <div className="flex items-center gap-2 px-4 md:px-6 py-4 overflow-x-auto border-b border-white/[0.07] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
-        {uniqueCategories.map(cat => (
+        {availableBrands.map((brand) => {
+          const isSelected = selectedBrandKey === brand.key;
+          const isDimmed = selectedBrandKey && !isSelected;
+
+          return (
           <button
-            key={cat}
-            onClick={() => setSelectedCategory(cat)}
-            className={`shrink-0 px-4 py-2 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-[0.15em] transition-all ${
-              selectedCategory === cat
-                ? "bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.3)]"
-                : "bg-white/[0.03] text-zinc-400 border border-white/[0.05] hover:bg-white/[0.08] hover:text-white"
+            key={brand.key}
+            onClick={() => setSelectedBrandKey(isSelected ? null : brand.key)}
+            className={`shrink-0 flex items-center justify-center min-w-16 h-12 px-3 rounded-2xl border transition-all ${
+              isSelected
+                ? "bg-white/[0.08] border-white/[0.18] shadow-[0_0_22px_rgba(255,255,255,0.12)]"
+                : "bg-white/[0.03] border-white/[0.05] hover:bg-white/[0.08]"
             }`}
+            aria-pressed={isSelected}
+            aria-label={`Filtrar por ${brand.label}`}
           >
-            {cat}
+            {brand.logo ? (
+              <img
+                src={brand.logo}
+                alt={brand.label}
+                className={`h-6 w-auto object-contain transition-all ${
+                  isDimmed ? "grayscale opacity-45" : "grayscale-0 opacity-100"
+                }`}
+              />
+            ) : (
+              <span
+                className={`text-[10px] sm:text-xs font-black uppercase tracking-[0.15em] transition-colors ${
+                  isDimmed ? "text-zinc-600" : isSelected ? "text-white" : "text-zinc-300"
+                }`}
+              >
+                {brand.label}
+              </span>
+            )}
           </button>
-        ))}
+          );
+        })}
       </div>
 
       {/* Items */}
@@ -601,6 +632,7 @@ function ItemRow({ item, idx, isMenuOpen, onMenuToggle, onEdit, onDelete, onView
   const status = STATUS_CONFIG[item.status] || STATUS_CONFIG["SOLD"];
   const x = useMotionValue(0);
   const controls = useAnimation();
+  const brandMeta = getBrandMeta(item.brand || "Sem marca");
 
   // Delete (swipe left): revealed on the right
   const deleteOpacity = useTransform(x, [-80, -40, 0], [1, 0.6, 0]);
@@ -690,10 +722,11 @@ function ItemRow({ item, idx, isMenuOpen, onMenuToggle, onEdit, onDelete, onView
               )}
             </div>
             <div className="flex items-center gap-1.5 text-base text-zinc-400">
-              {getBrandLogo(item.brand) && (
-                <img src={getBrandLogo(item.brand)} alt={item.brand} className="h-3.5 object-contain grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all" />
+              {brandMeta.logo ? (
+                <img src={brandMeta.logo} alt={brandMeta.label} className="h-4 w-auto object-contain shrink-0" />
+              ) : (
+                <span className="font-medium text-zinc-300 truncate">{brandMeta.label}</span>
               )}
-              <span className="font-medium text-zinc-300">{item.brand}</span>
               {item.partNumber && (
                 <>
                   <span className="text-zinc-600">·</span>
