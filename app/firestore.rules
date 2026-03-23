@@ -200,5 +200,30 @@ service cloud.firestore {
       allow create: if canCreateOwnedResource();
       allow read, update, delete: if isAdmin() || canReadOwnedResource();
     }
+
+    match /catalog_items/{itemId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /inventory_items/{itemId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /installed_base/{itemId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /maintenance_rules/{ruleId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /item_relationships/{relationshipId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
   }
 }
