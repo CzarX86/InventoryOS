@@ -15,9 +15,11 @@ export default function useFeatureFlags(user = null) {
 
   useEffect(() => {
     if (!userId || !db) {
+      /* eslint-disable react-hooks/set-state-in-effect */
       setFlags(DEFAULT_FEATURE_FLAGS);
       setLoading(false);
       setError(null);
+      /* eslint-enable react-hooks/set-state-in-effect */
       return undefined;
     }
 
