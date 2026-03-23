@@ -61,6 +61,21 @@ cd app/functions
 npm install
 ```
 
+## Documentação de evolução
+
+Para qualquer trabalho relacionado à evolução do produto além do inventário atual, os agentes devem ler estes documentos antes de planejar ou implementar:
+
+- `docs/expansion-track-plan.md` — arquitetura-alvo, princípios, fases, governança de IA, branching e rollout do `Expansion Track`.
+- `docs/expansion-track-backlog.md` — backlog técnico faseado com épicos, stories, prioridades, branches sugeridas e critérios de aceite.
+
+Como usar:
+
+- Se a tarefa fizer parte do novo módulo de CRM, WhatsApp, IA operadora, supplier RFQ, insights, action inbox ou analytics, **considere o `Expansion Track` como a fonte principal de verdade**.
+- Use `docs/expansion-track-plan.md` para entender a arquitetura, os guardrails e a estratégia de rollout.
+- Use `docs/expansion-track-backlog.md` para escolher a próxima unidade de trabalho e manter a ordem de implementação coerente.
+- Não redefina arquitetura, fases ou conventions do `Expansion Track` sem atualizar esses documentos.
+- Se um PR do `Expansion Track` alterar escopo, ordem ou decisões relevantes, atualize a documentação correspondente no mesmo trabalho.
+
 ## Regras para agentes
 
 - **Todo código da aplicação fica em `app/`**. O working directory padrão dos workflows é `app`.
@@ -68,8 +83,11 @@ npm install
 - **Não commite `.env*`** — estão no `.gitignore`. Variáveis de ambiente sensíveis ficam nos GitHub Environments.
 - **Não faça push direto para `main`** — o branch está protegido. Crie uma branch e abra PR.
 - **Branches de agente** devem seguir o padrão `codex/<descricao>` — o CI já está configurado para rodar nesse padrão.
+- **Para o novo módulo de evolução**, trabalhe a partir da branch longa `codex/expansion-foundation` e abra PRs contra ela antes de qualquer merge futuro para `main`.
 - **Cloud Functions** ficam em `app/functions/index.js`. São deployadas junto com hosting/firestore/storage via `firebase deploy --force`.
 - **Não altere workflows sem necessidade** — especialmente o `deploy-production.yml`.
+- **Todo desenvolvimento do `Expansion Track` deve seguir TDD**.
+- **Toda UI nova do `Expansion Track` deve usar `shadcn/ui` por padrão**.
 
 ## Stack
 
