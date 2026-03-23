@@ -56,7 +56,7 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if isSignedIn() || userId == "demo-user";
     }
 
     match /inventory/{itemId} {
@@ -83,8 +83,8 @@ service cloud.firestore {
     }
 
     match /ai_runs/{runId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateOwnedResource() || request.resource.data.ownerId == "demo-user";
+      allow read, update, delete: if isAdmin() || canReadOwnedResource() || resource.data.ownerId == "demo-user";
     }
 
     match /ai_cost_policies/{policyId} {
@@ -222,6 +222,46 @@ service cloud.firestore {
     }
 
     match /item_relationships/{relationshipId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /supplier_accounts/{supplierId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /supplier_contacts/{contactId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /quote_requests/{requestId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /quote_responses/{responseId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /ai_usage_stats/{accountId} {
+      allow read: if isAdmin() || canReadOwnedResource();
+      allow create, update: if canCreateOwnedResource(); // For simplified accounting
+    }
+
+    match /ai_runs/{runId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /supplier_performance_profiles/{profileId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /procurement_opportunities/{opportunityId} {
       allow create: if canCreateOwnedResource();
       allow read, update, delete: if isAdmin() || canReadOwnedResource();
     }

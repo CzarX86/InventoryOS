@@ -3,6 +3,7 @@ import { applyOwnershipContext } from "@/lib/ownership";
 export const WHATSAPP_COLLECTIONS = Object.freeze({
   whatsappInstances: "whatsapp_instances",
   whatsappWebhookEvents: "whatsapp_webhook_events",
+  whatsappExtractedTransactions: "whatsapp_extracted_transactions",
   historyBackfillJobs: "history_backfill_jobs",
   txtImportJobs: "txt_import_jobs",
   messageDispatchJobs: "message_dispatch_jobs",
@@ -244,5 +245,54 @@ export function createMessageDispatchJobRecord(payload = {}, ownershipContext = 
     requiresApproval: payload.requiresApproval ?? true,
     estimatedCostUsd: payload.estimatedCostUsd ?? null,
     metadata: payload.metadata || {},
+  }, ownershipContext);
+}
+
+/**
+ * Normalizes a raw Evolution API payload into a standard message object.
+ * Used for processing events and displaying messages in the UI.
+ */
+export function normalizeWhatsappMessage(payload) {
+  if (!payload || payload.event !== "messages.upsert") return null;
+
+  const data = payload.data;
+  const message = data.message;
+  if (!message) return null;
+
+  // Extract text from various message structures
+  const text = message.conversation || 
+               message.extendedTextMessage?.text || 
+               message.imageMessage?.caption || 
+               "";
+
+  if (!text && !message.imageMessage) return null;
+
+  return {
+    providerMessageId: data.key.id,
+    remoteJid: data.key.remoteJid,
+    pushName: data.pushName || "Desconhecido",
+    text,
+    timestamp: data.messageTimestamp ? new Date(data.messageTimestamp * 1000).toISOString() : new Date().toISOString(),
+    fromMe: data.key.fromMe || false,
+    type: message.imageMessage ? "image" : "text",
+    lineage: {
+      rawSourceEventId: payload.eventId || null,
+    },
+  };
+}
+
+export function createWhatsappExtractedTransactionRecord(payload = {}, ownershipContext = {}) {
+  return buildBaseRecord("whatsapp_extracted_transaction", {
+    accountId: payload.accountId || ownershipContext?.defaultAccountId || null,
+    messageId: payload.messageId || null,
+    remoteJid: payload.remoteJid || null,
+    operation: payload.operation || "UNKNOWN",
+    items: payload.items || [],
+    grandTotal: payload.grandTotal || 0,
+    confidence: payload.confidence || 0,
+    summary: payload.summary || null,
+    status: payload.status || "pending",
+    lineage: payload.lineage || {},
+    occurredAt: normalizeIsoString(payload.occurredAt) || new Date().toISOString(),
   }, ownershipContext);
 }

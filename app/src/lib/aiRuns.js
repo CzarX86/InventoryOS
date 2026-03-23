@@ -7,6 +7,100 @@ export const AI_RUN_COLLECTIONS = Object.freeze({
   styleProfiles: "style_profiles",
 });
 
+import { db } from "./firebase";
+import { 
+  collection, 
+  doc, 
+  setDoc, 
+  updateDoc, 
+  serverTimestamp, 
+  increment 
+} from "firebase/firestore";
+
+export const AI_RUNS_COLLECTION = "ai_runs";
+export const AI_STATS_COLLECTION = "ai_usage_stats";
+
+/**
+ * Saves a planned AI run to Firestore.
+ */
+export async function saveAiRun(runRecord) {
+  if (!db) return runRecord;
+  
+  const runRef = doc(collection(db, AI_RUNS_COLLECTION));
+  const recordWithId = { 
+    ...runRecord, 
+    id: runRef.id,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+  
+  await setDoc(runRef, recordWithId);
+  return recordWithId;
+}
+
+/**
+ * Updates an AI run (e.g. after execution).
+ */
+export async function updateAiRun(runId, updates) {
+  if (!db) return;
+  
+  const runRef = doc(db, AI_RUNS_COLLECTION, runId);
+  
+  let finalUpdates = {
+    ...updates,
+    updatedAt: serverTimestamp(),
+  };
+
+  // Auto-calculate cost if usage and model are provided
+  if (updates.actualUsage && updates.model) {
+    const { getModelPricing } = await import("./modelRouter");
+    const pricing = getModelPricing(updates.model);
+    const costDetails = estimateAiRunCost({
+      estimatedInputTokens: updates.actualUsage.promptTokenCount,
+      estimatedOutputTokens: updates.actualUsage.candidatesTokenCount,
+      estimatedCachedTokens: updates.actualUsage.cachedContentTokenCount,
+      pricing
+    });
+    
+    finalUpdates.actualCostUsd = costDetails.estimatedCostUsd;
+    finalUpdates.actualPromptTokenCount = costDetails.estimatedInputTokens;
+    finalUpdates.actualCandidatesTokenCount = costDetails.estimatedOutputTokens;
+    finalUpdates.actualTotalTokenCount = costDetails.estimatedTotalTokens;
+  }
+  
+  await updateDoc(runRef, finalUpdates);
+  
+  // If completed, update aggregate stats
+  if (updates.status === "completed" && updates.actualUsage) {
+    await updateAiStats(updates.ownerId || updates.accountId, updates.actualUsage, updates.model, finalUpdates.actualCostUsd);
+  }
+}
+
+/**
+ * Updates aggregate usage statistics for an account.
+ */
+async function updateAiStats(accountId, usage, modelName = "unknown", costUsd = 0) {
+  if (!db || !accountId) return;
+  
+  const statsRef = doc(db, AI_STATS_COLLECTION, accountId);
+  const safeModelName = modelName.replace(/\./g, "_"); // Firestore keys shouldn't have dots
+  
+  const statsUpdates = {
+    totalTokens: increment(usage.totalTokenCount || 0),
+    totalInputTokens: increment(usage.promptTokenCount || 0),
+    totalOutputTokens: increment(usage.candidatesTokenCount || 0),
+    totalCostUsd: increment(costUsd || 0),
+    lastUpdatedAt: serverTimestamp(),
+  };
+
+  // Add per-model stats
+  statsUpdates[`models.${safeModelName}.tokens`] = increment(usage.totalTokenCount || 0);
+  statsUpdates[`models.${safeModelName}.costUsd`] = increment(costUsd || 0);
+  statsUpdates[`models.${safeModelName}.calls`] = increment(1);
+
+  await setDoc(statsRef, statsUpdates, { merge: true });
+}
+
 export const AI_RUN_STATUSES = Object.freeze([
   "pending_approval",
   "approved",

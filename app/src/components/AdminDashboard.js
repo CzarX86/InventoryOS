@@ -6,7 +6,8 @@ import { isActivityUndone, undoActivityEvent } from "@/lib/audit";
 import { updateErrorStatus } from "@/lib/errorReporting";
 import AdminPushRegistration from "@/components/AdminPushRegistration";
 import useFeatureFlags from "@/hooks/useFeatureFlags";
-import { EXPANSION_FEATURE_FLAGS } from "@/lib/featureFlags";
+import { EXPANSION_FEATURE_FLAGS, isFeatureEnabled } from "@/lib/featureFlags";
+import WhatsappInstanceManager from "@/components/WhatsappInstanceManager";
 
 function extractTimestampValue(value) {
   if (!value) return 0;
@@ -230,6 +231,18 @@ export default function AdminDashboard({ items = [], user = null }) {
           );
         })}
       </div>
+
+      {/* WhatsApp Management */}
+      {isFeatureEnabled(flags, "whatsappIngestion") && (
+        <>
+          <div className="px-4 md:px-6 pt-6 pb-2">
+            <h2 className="text-base font-black uppercase tracking-widest text-zinc-200">WhatsApp Connectivity</h2>
+          </div>
+          <div className="border-t border-white/[0.07]">
+            <WhatsappInstanceManager />
+          </div>
+        </>
+      )}
 
       {/* Token usage */}
       <div className="px-4 md:px-6 pt-6 pb-2">
