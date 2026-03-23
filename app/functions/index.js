@@ -354,7 +354,10 @@ exports.notifyAdminOnSupportTicket = onDocumentCreated("support_tickets/{ticketI
 /**
  * Trigger to automatically extract transactions from incoming WhatsApp messages.
  */
-exports.onWhatsappMessageCreated = onDocumentCreated("whatsapp_messages/{messageId}", async (event) => {
+exports.onWhatsappMessageCreated = onDocumentCreated({
+  document: "whatsapp_messages/{messageId}",
+  secrets: ["GEMINI_API_KEY"]
+}, async (event) => {
   const messageId = event.params.messageId;
   const messageData = event.data?.data();
 
