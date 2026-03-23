@@ -79,10 +79,20 @@ function getChangedAppCodeFiles() {
 
 function runCommand(command, args, label) {
   console.log(`\n> ${label}`);
+  const nextEnv = { ...process.env };
+
+  if (command === "pnpm" && args.includes("jest")) {
+    const existingNodeOptions = process.env.NODE_OPTIONS || "";
+    const heapOption = "--max-old-space-size=4096";
+    nextEnv.NODE_OPTIONS = existingNodeOptions.includes(heapOption)
+      ? existingNodeOptions
+      : `${existingNodeOptions} ${heapOption}`.trim();
+  }
+
   const result = spawnSync(command, args, {
     cwd: appDir,
     stdio: "inherit",
-    env: process.env,
+    env: nextEnv,
   });
 
   if (result.status !== 0) {
