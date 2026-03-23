@@ -82,6 +82,26 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin();
     }
 
+    match /ai_runs/{runId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /ai_cost_policies/{policyId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /prompt_templates/{templateId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /style_profiles/{profileId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
     match /activity_log/{eventId} {
       allow create: if isSignedIn() && request.resource.data.actorId == request.auth.uid;
       allow read, update, delete: if isAdmin();

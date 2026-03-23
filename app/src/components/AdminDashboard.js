@@ -8,6 +8,44 @@ import AdminPushRegistration from "@/components/AdminPushRegistration";
 import useFeatureFlags from "@/hooks/useFeatureFlags";
 import { EXPANSION_FEATURE_FLAGS } from "@/lib/featureFlags";
 
+function extractTimestampValue(value) {
+  if (!value) return 0;
+  if (typeof value?.toDate === "function") return value.toDate().getTime();
+  if (value instanceof Date) return value.getTime();
+  return 0;
+}
+
+function normalizeAiUsageEntry(entry) {
+  const totalTokenCount =
+    entry.actualTotalTokenCount ??
+    entry.totalTokenCount ??
+    entry.estimatedTotalTokens ??
+    0;
+  const callCount = entry.usageCalls?.length ?? entry.calls?.length ?? 0;
+  const costUsd = entry.actualCostUsd ?? entry.estimatedCostUsd ?? null;
+
+  return {
+    ...entry,
+    totalTokenCount,
+    callCount,
+    costUsd,
+    sortTimestamp: extractTimestampValue(entry.createdAt),
+  };
+}
+
+function mergeAiUsageEntries(...entryGroups) {
+  return entryGroups
+    .flat()
+    .map(normalizeAiUsageEntry)
+    .sort((left, right) => right.sortTimestamp - left.sortTimestamp)
+    .slice(0, 12);
+}
+
+function formatUsdCost(value) {
+  if (value == null || Number.isNaN(Number(value))) return null;
+  return `US$ ${Number(value).toFixed(4)}`;
+}
+
 export default function AdminDashboard({ items = [], user = null }) {
   const [telemetry, setTelemetry] = useState([]);
   const [systemHealth, setSystemHealth] = useState(null);
@@ -21,6 +59,11 @@ export default function AdminDashboard({ items = [], user = null }) {
 
   useEffect(() => {
     if (!db) return;
+    let aiRuns = [];
+    let legacyTaskUsage = [];
+    const syncAiUsage = () => {
+      setTokenUsage(mergeAiUsageEntries(aiRuns, legacyTaskUsage));
+    };
     const q = query(collection(db, "telemetry"), orderBy("timestamp", "desc"), limit(10));
     const unsubTele = onSnapshot(q, snap =>
       setTelemetry(snap.docs.map(d => ({ id: d.id, ...d.data() })))
@@ -29,9 +72,19 @@ export default function AdminDashboard({ items = [], user = null }) {
       setSystemHealth(d.data());
       setLoading(false);
     });
+    const unsubAiRuns = onSnapshot(
+      query(collection(db, "ai_runs"), orderBy("createdAt", "desc"), limit(12)),
+      snap => {
+        aiRuns = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        syncAiUsage();
+      }
+    );
     const unsubTokenUsage = onSnapshot(
       query(collection(db, "task_ai_usage"), orderBy("createdAt", "desc"), limit(12)),
-      snap => setTokenUsage(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      snap => {
+        legacyTaskUsage = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        syncAiUsage();
+      }
     );
     const unsubActivity = onSnapshot(
       query(collection(db, "activity_log"), orderBy("createdAt", "desc"), limit(16)),
@@ -41,7 +94,7 @@ export default function AdminDashboard({ items = [], user = null }) {
       query(collection(db, "error_reports"), orderBy("createdAt", "desc"), limit(20)),
       snap => setErrorReports(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     );
-    return () => { unsubTele(); unsubHealth(); unsubTokenUsage(); unsubActivity(); unsubErrors(); };
+    return () => { unsubTele(); unsubHealth(); unsubAiRuns(); unsubTokenUsage(); unsubActivity(); unsubErrors(); };
   }, []);
 
   const undoneActivityIds = useMemo(() => {
@@ -206,8 +259,15 @@ export default function AdminDashboard({ items = [], user = null }) {
               </div>
               <div className="md:ml-auto flex items-center gap-4 text-base text-zinc-200">
                 <span>{task.totalTokenCount ?? 0} tokens</span>
-                <span>{task.calls?.length ?? 0} calls</span>
-                <span>{task.itemId ? `Item ${task.itemId.slice(0, 8)}…` : "Sem item"}</span>
+                <span>{task.callCount ?? 0} calls</span>
+                <span>{task.costUsd != null ? formatUsdCost(task.costUsd) : "Sem custo"}</span>
+                <span>
+                  {task.itemId
+                    ? `Item ${task.itemId.slice(0, 8)}…`
+                    : task.targetId
+                      ? `${task.targetType || "Target"} ${task.targetId.slice(0, 8)}…`
+                      : "Sem alvo"}
+                </span>
               </div>
             </div>
           ))

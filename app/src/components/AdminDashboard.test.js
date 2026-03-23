@@ -30,6 +30,27 @@ jest.mock("firebase/firestore", () => ({
     if (ref.collectionName === "telemetry") {
       cb({ docs: [] });
     }
+    if (ref.collectionName === "ai_runs") {
+      cb({
+        docs: [
+          {
+            id: "ai-run-1",
+            data: () => ({
+              taskId: "ai-run-1",
+              taskType: "contact_digest",
+              provider: "deepseek",
+              model: "deepseek-chat",
+              totalTokenCount: 1080,
+              estimatedCostUsd: 0.0142,
+              usageCalls: [{}, {}, {}],
+              targetType: "conversation",
+              targetId: "conv-123",
+              createdAt: { toDate: () => new Date("2026-01-02T10:00:00Z") },
+            }),
+          },
+        ],
+      });
+    }
     if (ref.collectionName === "task_ai_usage") {
       cb({
         docs: [
@@ -112,6 +133,8 @@ describe("AdminDashboard", () => {
     expect(screen.getAllByText("Disabled").length).toBeGreaterThan(0);
     expect(screen.getByText("Itens em Estoque")).toBeInTheDocument();
     expect(screen.getByText("Itens Vendidos")).toBeInTheDocument();
+    expect(screen.getByText("1080 tokens")).toBeInTheDocument();
+    expect(screen.getByText("US$ 0.0142")).toBeInTheDocument();
     expect(screen.getByText("42 tokens")).toBeInTheDocument();
     expect(screen.getByText("Activity History")).toBeInTheDocument();
     expect(screen.getByText("Support Inbox")).toBeInTheDocument();
