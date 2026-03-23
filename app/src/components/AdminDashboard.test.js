@@ -1,6 +1,21 @@
 import { render, screen } from "@testing-library/react";
 import AdminDashboard from "./AdminDashboard";
 
+jest.mock("@/hooks/useFeatureFlags", () => jest.fn(() => ({
+  flags: {
+    contactReviewQueue: true,
+    whatsappIngestion: false,
+    actionInbox: false,
+    hardwareIntelligence: false,
+    txtImport: false,
+    supplierRfq: false,
+    semiAutonomousAi: false,
+  },
+  enabledCount: 1,
+  loading: false,
+  error: null,
+})));
+
 jest.mock("@/lib/firebase", () => ({
   db: {},
 }));
@@ -91,6 +106,10 @@ describe("AdminDashboard", () => {
     render(<AdminDashboard items={[{ id: "item-123", status: "IN STOCK" }, { id: "item-456", status: "SOLD" }]} user={{ uid: "admin-1", email: "admin@example.com" }} />);
 
     expect(await screen.findByText("Token Usage")).toBeInTheDocument();
+    expect(screen.getByText("Expansion Flags")).toBeInTheDocument();
+    expect(screen.getByText(/1 de 7 flags habilitadas/i)).toBeInTheDocument();
+    expect(screen.getByText("contactReviewQueue")).toBeInTheDocument();
+    expect(screen.getAllByText("Disabled").length).toBeGreaterThan(0);
     expect(screen.getByText("Itens em Estoque")).toBeInTheDocument();
     expect(screen.getByText("Itens Vendidos")).toBeInTheDocument();
     expect(screen.getByText("42 tokens")).toBeInTheDocument();

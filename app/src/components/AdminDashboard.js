@@ -5,6 +5,8 @@ import { Loader2, Undo2, Bug, Copy, Bell } from "lucide-react";
 import { isActivityUndone, undoActivityEvent } from "@/lib/audit";
 import { updateErrorStatus } from "@/lib/errorReporting";
 import AdminPushRegistration from "@/components/AdminPushRegistration";
+import useFeatureFlags from "@/hooks/useFeatureFlags";
+import { EXPANSION_FEATURE_FLAGS } from "@/lib/featureFlags";
 
 export default function AdminDashboard({ items = [], user = null }) {
   const [telemetry, setTelemetry] = useState([]);
@@ -15,6 +17,7 @@ export default function AdminDashboard({ items = [], user = null }) {
   const [undoingId, setUndoingId] = useState(null);
   const [updatingErrorId, setUpdatingErrorId] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { flags, enabledCount } = useFeatureFlags(user);
 
   useEffect(() => {
     if (!db) return;
@@ -143,6 +146,36 @@ export default function AdminDashboard({ items = [], user = null }) {
             <p className="text-xl font-black text-white">{value}</p>
           </div>
         ))}
+      </div>
+
+      {/* Expansion flags */}
+      <div className="px-4 md:px-6 pt-6 pb-2">
+        <h2 className="text-base font-black uppercase tracking-widest text-zinc-200">Expansion Flags</h2>
+        <p className="text-sm text-zinc-400 mt-1">
+          {enabledCount} de {EXPANSION_FEATURE_FLAGS.length} flags habilitadas no expansion track.
+        </p>
+      </div>
+      <div className="border-t border-white/[0.07]">
+        {EXPANSION_FEATURE_FLAGS.map((flag) => {
+          const enabled = Boolean(flags?.[flag]);
+          return (
+            <div
+              key={flag}
+              className="flex items-center justify-between gap-4 px-4 md:px-6 py-3 border-b border-white/[0.06] hover:bg-white/[0.02] transition-colors"
+            >
+              <span className="text-xs md:text-sm font-black uppercase tracking-[0.18em] text-zinc-300">
+                {flag}
+              </span>
+              <span
+                className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${
+                  enabled ? "bg-emerald-500/15 text-emerald-300" : "bg-zinc-500/15 text-zinc-400"
+                }`}
+              >
+                {enabled ? "Enabled" : "Disabled"}
+              </span>
+            </div>
+          );
+        })}
       </div>
 
       {/* Token usage */}
