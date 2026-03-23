@@ -21,6 +21,40 @@ service cloud.firestore {
         ]);
     }
 
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function requestOwnerId() {
+      return request.resource.data.ownerId;
+    }
+
+    function requestAccountId() {
+      return request.resource.data.accountId;
+    }
+
+    function resourceOwnerId() {
+      return resource.data.ownerId;
+    }
+
+    function resourceAccountId() {
+      return resource.data.accountId;
+    }
+
+    function matchesOwnBoundary(ownerId, accountId) {
+      return isSignedIn() &&
+        ownerId == request.auth.uid &&
+        accountId == userDoc().defaultAccountId;
+    }
+
+    function canCreateOwnedResource() {
+      return matchesOwnBoundary(requestOwnerId(), requestAccountId());
+    }
+
+    function canReadOwnedResource() {
+      return matchesOwnBoundary(resourceOwnerId(), resourceAccountId());
+    }
+
     match /users/{userId} {
       allow read, write: if isSignedIn();
     }
@@ -70,6 +104,56 @@ service cloud.firestore {
       allow create, update: if isAdmin() && request.resource.data.userId == request.auth.uid;
       allow delete: if isAdmin() && resource.data.userId == request.auth.uid;
       allow read: if isAdmin();
+    }
+
+    match /accounts/{accountId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /contacts/{contactId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /contact_channels/{channelId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /conversations/{conversationId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /messages/{messageId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /opportunities/{opportunityId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /contracts/{contractId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /crm_events/{eventId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /tasks/{taskId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /interests/{interestId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
     }
   }
 }
