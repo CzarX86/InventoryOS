@@ -153,12 +153,16 @@ export default function WhatsappInstanceManager() {
           </div>
         ) : (
           instances.map((inst) => {
-            const isConnected = inst.instance.status === "open";
-            const isActionLoading = actionLoading === inst.instance.instanceName;
+            const instanceData = inst?.instance;
+            if (!instanceData) return null;
+
+            const instanceName = instanceData.instanceName;
+            const isConnected = instanceData.status === "open";
+            const isActionLoading = actionLoading === instanceName;
 
             return (
               <div 
-                key={inst.instance.instanceName}
+                key={instanceName}
                 className="group relative flex flex-col bg-zinc-950 border border-white/5 hover:border-white/10 transition-all overflow-hidden"
               >
                 {/* Status Bar */}
@@ -171,7 +175,7 @@ export default function WhatsappInstanceManager() {
                         <Smartphone size={18} />
                       </div>
                       <div>
-                        <h3 className="text-lg font-black uppercase tracking-tight text-white">{inst.instance.instanceName}</h3>
+                        <h3 className="text-lg font-black uppercase tracking-tight text-white">{instanceName}</h3>
                         <div className="flex items-center gap-2 mt-0.5">
                           {isConnected ? (
                             <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-emerald-400">
@@ -188,7 +192,7 @@ export default function WhatsappInstanceManager() {
 
                     <div className="flex items-center gap-1">
                       <button 
-                        onClick={() => handleSetWebhook(inst.instance.instanceName)}
+                        onClick={() => handleSetWebhook(instanceName)}
                         title="Configurar Webhook"
                         className="p-2 text-zinc-500 hover:text-white hover:bg-white/5 transition-all"
                       >
@@ -201,7 +205,7 @@ export default function WhatsappInstanceManager() {
                         <RefreshCw size={16} className={isActionLoading ? "animate-spin" : ""} />
                       </button>
                       <button 
-                        onClick={() => handleDeleteInstance(inst.instance.instanceName)}
+                        onClick={() => handleDeleteInstance(instanceName)}
                         className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-400/5 transition-all"
                       >
                         <Trash2 size={16} />
@@ -213,7 +217,7 @@ export default function WhatsappInstanceManager() {
                   <div className="flex flex-col gap-3 pt-2">
                     {!isConnected && (
                       <div className="flex flex-col gap-4">
-                        {activeInstance === inst.instance.instanceName && qrCode ? (
+                        {activeInstance === instanceName && qrCode ? (
                           <div className="flex flex-col items-center justify-center p-6 bg-white rounded-xl shadow-2xl shadow-emerald-500/10">
                             {qrCode === "loading" ? (
                               <div className="h-48 w-48 flex items-center justify-center">
@@ -230,7 +234,7 @@ export default function WhatsappInstanceManager() {
                           </div>
                         ) : (
                           <button
-                            onClick={() => handleGetQrCode(inst.instance.instanceName)}
+                            onClick={() => handleGetQrCode(instanceName)}
                             className="w-full bg-emerald-500 text-black py-3 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-emerald-400 transition-all flex items-center justify-center gap-2"
                           >
                             <QrCode size={14} />
@@ -251,7 +255,7 @@ export default function WhatsappInstanceManager() {
                           <span className="text-sm font-bold text-white">Android</span>
                         </div>
                         <button
-                          onClick={() => handleLogoutInstance(inst.instance.instanceName)}
+                          onClick={() => handleLogoutInstance(instanceName)}
                           className="col-span-2 border border-white/10 text-white py-2.5 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/5 transition-all flex items-center justify-center gap-2 mt-2"
                         >
                           <LogOut size={14} />
