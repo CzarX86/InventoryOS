@@ -10,6 +10,7 @@ export default function WhatsappInstanceManager() {
   const [qrCode, setQrCode] = useState(null);
   const [activeInstance, setActiveInstance] = useState(null);
   const [newInstanceName, setNewInstanceName] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   const fetchInstances = useCallback(async () => {
     try {
@@ -49,7 +50,6 @@ export default function WhatsappInstanceManager() {
   };
 
   const handleDeleteInstance = async (instanceName) => {
-    if (!confirm(`Tem certeza que deseja excluir a instância ${instanceName}?`)) return;
     setActionLoading(instanceName);
     try {
       const deleteInstance = httpsCallable(functions, "deleteWhatsappInstance");
@@ -59,6 +59,7 @@ export default function WhatsappInstanceManager() {
         setActiveInstance(null);
         setQrCode(null);
       }
+      setConfirmDelete(null);
     } catch (error) {
       console.error("Failed to delete instance:", error);
     } finally {
@@ -193,25 +194,44 @@ export default function WhatsappInstanceManager() {
                     </div>
 
                     <div className="flex items-center gap-1">
-                      <button 
-                        onClick={() => handleSetWebhook(instanceName)}
-                        title="Configurar Webhook"
-                        className="p-2 text-zinc-500 hover:text-white hover:bg-white/5 transition-all"
-                      >
-                        <CheckCircle2 size={16} />
-                      </button>
-                      <button 
-                        onClick={() => fetchInstances()}
-                        className="p-2 text-zinc-500 hover:text-white hover:bg-white/5 transition-all"
-                      >
-                        <RefreshCw size={16} className={isActionLoading ? "animate-spin" : ""} />
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteInstance(instanceName)}
-                        className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-400/5 transition-all"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {confirmDelete === instanceName ? (
+                        <div className="flex items-center gap-2 pr-1">
+                          <button 
+                            onClick={() => handleDeleteInstance(instanceName)}
+                            className="px-3 py-1.5 bg-red-500 text-white text-[9px] font-black uppercase tracking-widest hover:bg-red-600 transition-all rounded-sm shadow-lg shadow-red-500/20"
+                          >
+                            CONFIRMAR EXCLUSÃO
+                          </button>
+                          <button 
+                            onClick={() => setConfirmDelete(null)}
+                            className="p-1.5 text-zinc-500 hover:text-white transition-all"
+                          >
+                            <Plus size={14} className="rotate-45" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <button 
+                            onClick={() => handleSetWebhook(instanceName)}
+                            title="Configurar Webhook"
+                            className="p-2 text-zinc-500 hover:text-white hover:bg-white/5 transition-all"
+                          >
+                            <CheckCircle2 size={16} />
+                          </button>
+                          <button 
+                            onClick={() => fetchInstances()}
+                            className="p-2 text-zinc-500 hover:text-white hover:bg-white/5 transition-all"
+                          >
+                            <RefreshCw size={16} className={isActionLoading ? "animate-spin" : ""} />
+                          </button>
+                          <button 
+                            onClick={() => setConfirmDelete(instanceName)}
+                            className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-400/5 transition-all"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
 
