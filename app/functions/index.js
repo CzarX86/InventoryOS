@@ -67,14 +67,42 @@ exports.listWhatsappInstances = onCall({
   await ensureAdmin(request.auth);
   const result = await evolutionProxy("GET", "/instance/fetchInstances");
   
-  // Isolar instâncias deste projeto (filtrando por prefixo ios_)
-  // Note: Mantemos instâncias que porventura já existam com nomes legados se necessário,
-  // mas aqui vamos filtrar estritamente para garantir isolamento contra Psycho Secretary.
   if (result.status === 200 && Array.isArray(result.data)) {
-    result.data = result.data.filter(inst => {
-      const name = inst?.instance?.instanceName || inst?.name || inst?.instanceName;
-      return name && (name.startsWith(PROJECT_PREFIX) || name.includes("inventory_os"));
-    });
+    // 1. Filtrar e mapear instâncias básicas
+    const instances = result.data
+      .filter(inst => {
+        const name = inst?.instance?.instanceName || inst?.name || inst?.instanceName;
+        return name && (name.startsWith(PROJECT_PREFIX) || name.includes("inventory_os"));
+      })
+      .map(inst => {
+        // Normalizar nome e conexão
+        const name = inst?.instance?.instanceName || inst?.name || inst?.instanceName;
+        const connectionStatus = inst?.instance?.status || inst?.connectionStatus || inst?.status;
+        return { ...inst, name, connectionStatus };
+      });
+
+    // 2. Buscar status detalhado (bateria, plataforma) para instâncias "open"
+    // Faremos isso em paralelo para performance, mas com limite de 5 para segurança
+    const updatedData = await Promise.all(instances.map(async (inst) => {
+      if (inst.connectionStatus === "open") {
+        try {
+          // Evolution API v2: get connectionState for battery/platform
+          const stateResult = await evolutionProxy("GET", `/instance/connectionState/${inst.name}`);
+          if (stateResult.status === 200 && stateResult.data) {
+            return {
+              ...inst,
+              battery: stateResult.data.instance?.batteryLevel ?? stateResult.data.battery ?? null,
+              platform: stateResult.data.instance?.platform ?? stateResult.data.platform ?? null
+            };
+          }
+        } catch (err) {
+          logger.warn("Falha ao buscar status detalhado para instância", { name: inst.name, error: err.message });
+        }
+      }
+      return inst;
+    }));
+
+    result.data = updatedData;
   }
   
   return result;
