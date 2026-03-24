@@ -162,15 +162,24 @@ function parseStructuredText(text, options = {}) {
 async function callWithFallback(prompt, visualData = null, useSearch = false) {
   const models = ["gemini-2.0-flash", "gemini-1.5-flash"];
   let lastError = null;
+  const calls = [];
 
   for (const modelName of models) {
     try {
       const parts = visualData ? [visualData] : [];
       const { output, usage } = await generateStructuredOutput(prompt, modelName, parts, { useSearch, json: true });
       
+      const call = {
+        model: modelName,
+        source: "direct",
+        step: "generateContent",
+        usage,
+      };
+      calls.push(call);
+
       return {
         ...output,
-        tokenUsage: usage,
+        tokenUsage: { ...usage, calls },
         aiModel: modelName,
       };
     } catch (e) {

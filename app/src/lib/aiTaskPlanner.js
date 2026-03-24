@@ -43,6 +43,10 @@ export async function executeAiTask(plan, prompt, parts = [], options = {}) {
     throw new Error("executeAiTask: Invalid plan object or missing plan.id");
   }
 
+  if (plan.requiresApproval && plan.status === "pending_approval") {
+    throw new Error("Cannot execute task: pending approval");
+  }
+
   await updateAiRun(plan.id, { status: "executing" });
   const startTime = new Date().toISOString();
   

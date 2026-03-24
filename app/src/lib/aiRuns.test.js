@@ -1,3 +1,10 @@
+jest.mock("./firebase", () => ({
+  db: {
+    collection: jest.fn(),
+    doc: jest.fn(),
+  },
+}));
+
 import {
   AI_RUN_COLLECTIONS,
   AI_RUN_STATUSES,

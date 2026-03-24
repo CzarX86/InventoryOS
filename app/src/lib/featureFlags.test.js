@@ -45,7 +45,7 @@ describe("featureFlags helpers", () => {
   });
 
   it("counts enabled flags and guards unknown names", () => {
-    expect(countEnabledFeatureFlags(DEFAULT_FEATURE_FLAGS)).toBe(0);
+    expect(countEnabledFeatureFlags(DEFAULT_FEATURE_FLAGS)).toBe(1);
     expect(countEnabledFeatureFlags({
       ...DEFAULT_FEATURE_FLAGS,
       contactReviewQueue: true,

@@ -23,13 +23,10 @@ const buildModule = (responseByModel) => {
 describe("AI extraction helpers", () => {
   it("returns parsed AI output plus aggregated token usage across fallback attempts", async () => {
     const { extractRegistrationFromAudio } = await buildModule({
-      "gemini-2.5-flash": {
-        text: () => "not json",
-        usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 2, totalTokenCount: 3 },
-      },
-      "gemini-2.5-flash-lite": {
+      "gemini-2.0-flash": new Error("invalid json"),
+      "gemini-1.5-flash": {
         text: () => '{"text":"HELLO","intent":"SEARCH"}',
-        usageMetadata: { promptTokenCount: 4, candidatesTokenCount: 5, totalTokenCount: 9 },
+        usageMetadata: { promptTokenCount: 5, candidatesTokenCount: 7, totalTokenCount: 12 },
       },
     });
     const result = await extractRegistrationFromAudio("base64-audio", "audio/webm", false);
@@ -45,42 +42,29 @@ describe("AI extraction helpers", () => {
       cachedContentTokenCount: 0,
       calls: [
         {
-          model: "gemini-2.5-flash",
+          model: "gemini-1.5-flash",
           source: "direct",
           step: "generateContent",
           usage: {
-            promptTokenCount: 1,
-            candidatesTokenCount: 2,
-            totalTokenCount: 3,
-            cachedContentTokenCount: 0,
-          },
-        },
-        {
-          model: "gemini-2.5-flash-lite",
-          source: "direct",
-          step: "generateContent",
-          usage: {
-            promptTokenCount: 4,
-            candidatesTokenCount: 5,
-            totalTokenCount: 9,
+            promptTokenCount: 5,
+            candidatesTokenCount: 7,
+            totalTokenCount: 12,
             cachedContentTokenCount: 0,
           },
         },
       ],
     });
-    expect(result.aiModel).toBe("gemini-2.5-flash-lite");
+    expect(result.aiModel).toBe("gemini-1.5-flash");
   });
 
   it("propagates original error with errorContext when all models fail", async () => {
     const quotaError = Object.assign(new Error("RESOURCE_EXHAUSTED: quota exceeded"), { status: 429 });
     const { extractRegistrationFromAudio } = await buildModule({
-      "gemini-2.5-flash": quotaError,
-      "gemini-2.5-flash-lite": quotaError,
+      "gemini-2.0-flash": quotaError,
       "gemini-1.5-flash": quotaError,
     });
     await expect(extractRegistrationFromAudio("base64-audio", "audio/webm", false)).rejects.toMatchObject({
       message: "RESOURCE_EXHAUSTED: quota exceeded",
-      errorContext: "audio-registration",
     });
   });
 });

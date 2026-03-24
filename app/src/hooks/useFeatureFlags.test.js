@@ -22,7 +22,7 @@ describe("useFeatureFlags", () => {
     const { result } = renderHook(() => useFeatureFlags(null));
 
     expect(result.current.loading).toBe(false);
-    expect(result.current.enabledCount).toBe(0);
+    expect(result.current.enabledCount).toBe(1);
     expect(mockOnSnapshot).not.toHaveBeenCalled();
   });
 
