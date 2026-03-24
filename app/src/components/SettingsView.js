@@ -1,7 +1,10 @@
 "use client";
 /* global window, localStorage, navigator, process, document, confirm, caches */
-import { Zap, Clock, LogOut, Check, RefreshCw } from "lucide-react";
+import { Zap, Clock, LogOut, Check, RefreshCw, MessageSquare } from "lucide-react";
 import useAuth from "@/hooks/useAuth";
+import useFeatureFlags from "@/hooks/useFeatureFlags";
+import { isFeatureEnabled } from "@/lib/featureFlags";
+import WhatsappInstanceManager from "@/components/WhatsappInstanceManager";
 
 const WORKFLOWS = [
   {
@@ -20,15 +23,29 @@ const WORKFLOWS = [
 
 export default function SettingsView() {
   const { user, isAdmin, updateSettings, logout } = useAuth();
+  const { flags } = useFeatureFlags(user);
 
   return (
-    <div>
+    <div className="pb-20">
       {/* Title */}
       <div className="px-4 md:px-6 pt-8 pb-6 border-b border-white/[0.07]">
         <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tight text-white leading-none">
           Config.
         </h1>
       </div>
+
+      {/* WhatsApp Connectivity */}
+      {isFeatureEnabled(flags, "whatsappIngestion") && (
+        <div className="border-b border-white/[0.07]">
+          <div className="px-4 md:px-6 py-4 border-b border-white/[0.07] flex items-center gap-2">
+            <MessageSquare size={14} className="text-zinc-400" />
+            <p className="text-base font-black uppercase tracking-widest text-zinc-300">Conectividade WhatsApp</p>
+          </div>
+          <div className="bg-white/[0.01]">
+            <WhatsappInstanceManager />
+          </div>
+        </div>
+      )}
 
       {/* AI Workflow */}
       <div className="border-b border-white/[0.07]">

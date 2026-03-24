@@ -31,7 +31,9 @@ function normalizeFlagValue(value) {
 
 export function normalizeFeatureFlags(rawFlags = {}) {
   return EXPANSION_FEATURE_FLAGS.reduce((acc, flag) => {
-    acc[flag] = normalizeFlagValue(rawFlags?.[flag]);
+    if (Object.prototype.hasOwnProperty.call(rawFlags || {}, flag)) {
+      acc[flag] = normalizeFlagValue(rawFlags[flag]);
+    }
     return acc;
   }, { ...DEFAULT_FEATURE_FLAGS });
 }
