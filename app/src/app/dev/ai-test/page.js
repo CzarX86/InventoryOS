@@ -9,6 +9,7 @@ export default function AiTestPage() {
   const [logs, setLogs] = useState([]);
   const [status, setStatus] = useState("idle");
   const [user, setUser] = useState(null);
+  const addLog = (msg) => setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
 
   useEffect(() => {
     return onAuthStateChanged(auth, (u) => {
@@ -16,8 +17,6 @@ export default function AiTestPage() {
       if (u) addLog(`Authenticated as: ${u.uid}`);
     });
   }, []);
-
-  const addLog = (msg) => setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
 
   const loginAsDemo = async () => {
     setStatus("logging_in");
