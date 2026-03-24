@@ -1,3 +1,10 @@
+import { clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs) {
+  return twMerge(clsx(inputs));
+}
+
 export const getBrandLogo = (brand) => {
   if (!brand) return null;
   const b = brand.toLowerCase();

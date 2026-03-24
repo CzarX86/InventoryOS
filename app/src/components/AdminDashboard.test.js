@@ -1,6 +1,21 @@
 import { render, screen } from "@testing-library/react";
 import AdminDashboard from "./AdminDashboard";
 
+jest.mock("@/hooks/useFeatureFlags", () => jest.fn(() => ({
+  flags: {
+    contactReviewQueue: true,
+    whatsappIngestion: false,
+    actionInbox: false,
+    hardwareIntelligence: false,
+    txtImport: false,
+    supplierRfq: false,
+    semiAutonomousAi: false,
+  },
+  enabledCount: 1,
+  loading: false,
+  error: null,
+})));
+
 jest.mock("@/lib/firebase", () => ({
   db: {},
 }));
@@ -14,6 +29,27 @@ jest.mock("firebase/firestore", () => ({
   onSnapshot: jest.fn((ref, cb) => {
     if (ref.collectionName === "telemetry") {
       cb({ docs: [] });
+    }
+    if (ref.collectionName === "ai_runs") {
+      cb({
+        docs: [
+          {
+            id: "ai-run-1",
+            data: () => ({
+              taskId: "ai-run-1",
+              taskType: "contact_digest",
+              provider: "deepseek",
+              model: "deepseek-chat",
+              totalTokenCount: 1080,
+              estimatedCostUsd: 0.0142,
+              usageCalls: [{}, {}, {}],
+              targetType: "conversation",
+              targetId: "conv-123",
+              createdAt: { toDate: () => new Date("2026-01-02T10:00:00Z") },
+            }),
+          },
+        ],
+      });
     }
     if (ref.collectionName === "task_ai_usage") {
       cb({
@@ -91,8 +127,14 @@ describe("AdminDashboard", () => {
     render(<AdminDashboard items={[{ id: "item-123", status: "IN STOCK" }, { id: "item-456", status: "SOLD" }]} user={{ uid: "admin-1", email: "admin@example.com" }} />);
 
     expect(await screen.findByText("Token Usage")).toBeInTheDocument();
+    expect(screen.getByText("Expansion Flags")).toBeInTheDocument();
+    expect(screen.getByText(/1 de 7 flags habilitadas/i)).toBeInTheDocument();
+    expect(screen.getByText("contactReviewQueue")).toBeInTheDocument();
+    expect(screen.getAllByText("Disabled").length).toBeGreaterThan(0);
     expect(screen.getByText("Itens em Estoque")).toBeInTheDocument();
     expect(screen.getByText("Itens Vendidos")).toBeInTheDocument();
+    expect(screen.getByText("1080 tokens")).toBeInTheDocument();
+    expect(screen.getByText("US$ 0.0142")).toBeInTheDocument();
     expect(screen.getByText("42 tokens")).toBeInTheDocument();
     expect(screen.getByText("Activity History")).toBeInTheDocument();
     expect(screen.getByText("Support Inbox")).toBeInTheDocument();

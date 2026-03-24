@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, connectAuthEmulator } from "firebase/auth";
 import {
   connectFirestoreEmulator,
   getFirestore,
@@ -8,6 +8,7 @@ import {
   persistentMultipleTabManager,
 } from "firebase/firestore";
 import { connectStorageEmulator, getStorage } from "firebase/storage";
+import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -23,6 +24,7 @@ let app;
 let auth;
 let db;
 let storage;
+let functions;
 
 const googleProvider = new GoogleAuthProvider(); // Define googleProvider here
 const shouldUseEmulators = process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true";
@@ -30,6 +32,9 @@ const firestoreEmulatorHost = process.env.NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST ||
 const firestoreEmulatorPort = Number(process.env.NEXT_PUBLIC_FIRESTORE_EMULATOR_PORT || 8080);
 const storageEmulatorHost = process.env.NEXT_PUBLIC_STORAGE_EMULATOR_HOST || "127.0.0.1";
 const storageEmulatorPort = Number(process.env.NEXT_PUBLIC_STORAGE_EMULATOR_PORT || 9199);
+const authEmulatorHost = process.env.NEXT_PUBLIC_AUTH_EMULATOR_HOST || "127.0.0.1:9099";
+const functionsEmulatorHost = process.env.NEXT_PUBLIC_FUNCTIONS_EMULATOR_HOST || "127.0.0.1";
+const functionsEmulatorPort = Number(process.env.NEXT_PUBLIC_FUNCTIONS_EMULATOR_PORT || 5001);
 
 if (typeof window !== "undefined") {
   app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
@@ -41,13 +46,15 @@ if (typeof window !== "undefined") {
       localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
     });
   } catch (error) {
-    // If initializeFirestore fails (e.g. during fast refresh where it was already initialized)
     db = getFirestore(app);
   }
   
   storage = getStorage(app);
+  functions = getFunctions(app);
 
   if (shouldUseEmulators) {
+    connectAuthEmulator(auth, `http://${authEmulatorHost}`);
+    
     if (!window.__inventoryOsFirestoreEmulatorConnected) {
       connectFirestoreEmulator(db, firestoreEmulatorHost, firestoreEmulatorPort);
       window.__inventoryOsFirestoreEmulatorConnected = true;
@@ -57,7 +64,12 @@ if (typeof window !== "undefined") {
       connectStorageEmulator(storage, storageEmulatorHost, storageEmulatorPort);
       window.__inventoryOsStorageEmulatorConnected = true;
     }
+
+    if (!window.__inventoryOsFunctionsEmulatorConnected) {
+      connectFunctionsEmulator(functions, functionsEmulatorHost, functionsEmulatorPort);
+      window.__inventoryOsFunctionsEmulatorConnected = true;
+    }
   }
 }
 
-export { app, auth, db, storage, googleProvider };
+export { app, auth, db, storage, functions, googleProvider };

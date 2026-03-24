@@ -1,13 +1,270 @@
 const admin = require("firebase-admin");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onRequest, onCall, HttpsError } = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
+const crypto = require("crypto");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 
 admin.initializeApp();
+
+/**
+ * Helper to ensure user is an admin for onCall functions.
+ */
+async function ensureAdmin(auth) {
+  if (!auth) {
+    throw new HttpsError("unauthenticated", "Authentication required");
+  }
+
+  const db = getFirestore();
+  const userDoc = await db.collection("users").doc(auth.uid).get();
+  
+  if (!userDoc.exists || userDoc.data()?.role !== "admin") {
+    throw new HttpsError("permission-denied", "Admin role required");
+  }
+}
+
+/**
+ * Evolution API Proxy Helper
+ */
+async function evolutionProxy(method, path, body = null) {
+  const apiUrl = process.env.EVOLUTION_API_URL;
+  const apiKey = process.env.EVOLUTION_API_KEY;
+
+  if (!apiUrl || !apiKey) {
+    throw new HttpsError("failed-precondition", "Evolution API not configured");
+  }
+
+  const options = {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": apiKey,
+    },
+  };
+
+  if (body) {
+    options.body = JSON.stringify(body);
+  }
+
+  try {
+    const response = await fetch(`${apiUrl}${path}`, options);
+    const data = await response.json();
+    return { status: response.status, data };
+  } catch (error) {
+    logger.error("Evolution API Proxy Error", { error: error.message, path });
+    throw new HttpsError("internal", "Error communicating with Evolution API");
+  }
+}
+
+/**
+ * Proxy: List all instances
+ */
+exports.listWhatsappInstances = onCall({
+  secrets: ["EVOLUTION_API_URL", "EVOLUTION_API_KEY"],
+}, async (request) => {
+  await ensureAdmin(request.auth);
+  return await evolutionProxy("GET", "/instance/fetchInstances");
+});
+
+/**
+ * Proxy: Create a new instance
+ */
+exports.createWhatsappInstance = onCall({
+  secrets: ["EVOLUTION_API_URL", "EVOLUTION_API_KEY"],
+}, async (request) => {
+  await ensureAdmin(request.auth);
+  const { instanceName } = request.data;
+  if (!instanceName) {
+    throw new HttpsError("invalid-argument", "instanceName is required");
+  }
+
+  return await evolutionProxy("POST", "/instance/create", {
+    instanceName,
+    token: crypto.randomBytes(16).toString("hex"),
+    qrcode: true,
+    integration: "WHATSAPP-BAILEYS",
+  });
+});
+
+/**
+ * Proxy: Get QR Code
+ */
+exports.getWhatsappQrCode = onCall({
+  secrets: ["EVOLUTION_API_URL", "EVOLUTION_API_KEY"],
+}, async (request) => {
+  await ensureAdmin(request.auth);
+  const { instanceName } = request.data;
+  return await evolutionProxy("GET", `/instance/connect/${instanceName}`);
+});
+
+/**
+ * Proxy: Logout instance
+ */
+exports.logoutWhatsappInstance = onCall({
+  secrets: ["EVOLUTION_API_URL", "EVOLUTION_API_KEY"],
+}, async (request) => {
+  await ensureAdmin(request.auth);
+  const { instanceName } = request.data;
+  return await evolutionProxy("DELETE", `/instance/logout/${instanceName}`);
+});
+
+/**
+ * Proxy: Delete instance
+ */
+exports.deleteWhatsappInstance = onCall({
+  secrets: ["EVOLUTION_API_URL", "EVOLUTION_API_KEY"],
+}, async (request) => {
+  await ensureAdmin(request.auth);
+  const { instanceName } = request.data;
+  return await evolutionProxy("DELETE", `/instance/delete/${instanceName}`);
+});
+
+/**
+ * Proxy: Set Webhook
+ */
+exports.setWhatsappWebhook = onCall({
+  secrets: ["EVOLUTION_API_URL", "EVOLUTION_API_KEY"],
+}, async (request) => {
+  await ensureAdmin(request.auth);
+  const { instanceName } = request.data;
+  const webhookUrl = process.env.PUBLIC_WEBHOOK_URL || `https://evolutionwebhook-4itihxxrzq-uc.a.run.app`;
+  
+  return await evolutionProxy("POST", `/webhook/set/${instanceName}`, {
+    webhook: {
+      url: webhookUrl,
+      enabled: true,
+      webhook_by_events: true,
+      events: ["MESSAGES_UPSERT", "QRCODE_UPDATED", "CONNECTION_UPDATE"],
+    }
+  });
+});
 
 function sanitizeText(value, max = 140) {
   const text = String(value || "");
   return text.length > max ? `${text.slice(0, max)}…` : text;
 }
+
+/**
+ * Verifies HMAC signature for Evolution API webhooks.
+ */
+function verifySignature(rawBody, signature, secret) {
+  if (!secret) return true; // Insecure mode for dev
+  if (!signature) return false;
+
+  const hmac = crypto.createHmac("sha256", secret);
+  const digest = hmac.update(rawBody).digest("hex");
+  const candidate = signature.replace("sha256=", "").toLowerCase();
+  
+  return crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(candidate));
+}
+
+/**
+ * Webhook endpoint for Evolution API.
+ */
+exports.evolutionWebhook = onRequest({
+  secrets: ["EVOLUTION_WEBHOOK_SECRET"],
+}, async (req, res) => {
+  const secret = process.env.EVOLUTION_WEBHOOK_SECRET;
+  const signature = req.headers["x-hub-signature-256"] || req.headers["x-evolution-signature"];
+  
+  // Verify signature
+  if (secret && !verifySignature(req.rawBody, signature, secret)) {
+    logger.warn("Invalid webhook signature rejected");
+    res.status(401).send("Unauthorized");
+    return;
+  }
+
+  const payload = req.body;
+  const eventType = payload.event || "UNKNOWN";
+  const instanceId = payload.instance || "unknown";
+
+  // Generate event ID (SHA256 of payload) to avoid duplicates
+  const eventId = crypto
+    .createHash("sha256")
+    .update(JSON.stringify(payload))
+    .digest("hex");
+
+  try {
+    const db = getFirestore();
+    const eventRef = db.collection("whatsapp_webhook_events").doc(eventId);
+    
+    await eventRef.set({
+      id: eventId,
+      provider: "evolution",
+      instanceId,
+      eventType,
+      payload,
+      status: "pending",
+      receivedAt: FieldValue.serverTimestamp(),
+      occurredAt: payload.createdAt || FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    logger.info("Webhook event stored", { eventId, eventType });
+    res.status(200).send({ ok: true, eventId });
+  } catch (error) {
+    logger.error("Error storing webhook event", { error: error.message, eventId });
+    res.status(500).send("Internal Server Error");
+  }
+});
+
+/**
+ * Trigger to process stored WhatsApp events.
+ * Extracts messages and links lineage.
+ */
+exports.processWhatsappEvent = onDocumentCreated("whatsapp_webhook_events/{eventId}", async (event) => {
+  const eventData = event.data?.data();
+  if (!eventData || eventData.eventType !== "messages.upsert") {
+    return;
+  }
+
+  const payload = eventData.payload;
+  const data = payload.data;
+  const message = data?.message;
+
+  if (!message) return;
+
+  const text = message.conversation || 
+               message.extendedTextMessage?.text || 
+               message.imageMessage?.caption || 
+               "";
+
+  if (!text && !message.imageMessage) return;
+
+  const db = getFirestore();
+  const messageId = data.key.id;
+
+  try {
+    const messageDoc = {
+      providerMessageId: messageId,
+      remoteJid: data.key.remoteJid,
+      pushName: data.pushName || "Desconhecido",
+      text,
+      fromMe: data.key.fromMe || false,
+      timestamp: data.messageTimestamp ? new Date(data.messageTimestamp * 1000) : FieldValue.serverTimestamp(),
+      type: message.imageMessage ? "image" : "text",
+      lineage: {
+        rawSourceEventId: event.params.eventId,
+      },
+      processedAt: FieldValue.serverTimestamp(),
+    };
+
+    await db.collection("whatsapp_messages").doc(messageId).set(messageDoc, { merge: true });
+    
+    // Mark event as processed
+    await db.collection("whatsapp_webhook_events").doc(event.params.eventId).update({
+      status: "processed",
+      processedAt: FieldValue.serverTimestamp(),
+    });
+
+    logger.info("WhatsApp message processed and linked", { messageId, eventId: event.params.eventId });
+  } catch (error) {
+    logger.error("Error processing WhatsApp message", { error: error.message, eventId: event.params.eventId });
+    await db.collection("whatsapp_webhook_events").doc(event.params.eventId).update({
+      status: "failed",
+      errorMessage: error.message,
+    });
+  }
+});
 
 async function resolvePrimaryAdminUid(db) {
   const supportDoc = await db.collection("system").doc("support").get();
@@ -24,7 +281,7 @@ async function resolvePrimaryAdminUid(db) {
 }
 
 exports.notifyAdminOnSupportTicket = onDocumentCreated("support_tickets/{ticketId}", async (event) => {
-  const db = admin.firestore();
+  const db = getFirestore();
   const ticketId = event.params.ticketId;
   const ticket = event.data?.data();
 
@@ -46,7 +303,7 @@ exports.notifyAdminOnSupportTicket = onDocumentCreated("support_tickets/{ticketI
     logger.warn("No primary admin resolved for support ticket", { ticketId });
     await db.collection("support_tickets").doc(ticketId).set({
       notificationStatus: "no-admin",
-      lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastUpdatedAt: FieldValue.serverTimestamp(),
     }, { merge: true });
     return;
   }
@@ -61,7 +318,7 @@ exports.notifyAdminOnSupportTicket = onDocumentCreated("support_tickets/{ticketI
     await db.collection("support_tickets").doc(ticketId).set({
       assignedAdminId,
       notificationStatus: "no-device-token",
-      lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastUpdatedAt: FieldValue.serverTimestamp(),
     }, { merge: true });
     return;
   }
@@ -102,11 +359,90 @@ exports.notifyAdminOnSupportTicket = onDocumentCreated("support_tickets/{ticketI
   await db.collection("support_tickets").doc(ticketId).set({
     assignedAdminId,
     notificationStatus: response.failureCount > 0 ? "partial" : "sent",
-    lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    lastUpdatedAt: FieldValue.serverTimestamp(),
   }, { merge: true });
 
   await errorRef.set({
     adminNotified: response.successCount > 0,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
   }, { merge: true });
+});
+
+/**
+ * Trigger to automatically extract transactions from incoming WhatsApp messages.
+ */
+exports.onWhatsappMessageCreated = onDocumentCreated({
+  document: "whatsapp_messages/{messageId}",
+  secrets: ["GEMINI_API_KEY", "DEEPSEEK_API_KEY"]
+}, async (event) => {
+  const messageId = event.params.messageId;
+  const messageData = event.data?.data();
+
+  // Only process incoming text messages that haven't been extracted yet
+  if (!messageData || messageData.fromMe || messageData.type !== "text" || messageData.extracted) {
+    return;
+  }
+
+  const { WHATSAPP_TRANSACTION_EXTRACTION_PROMPT } = require("./whatsappTransactionPrompt");
+  const { WHATSAPP_COLLECTIONS, createWhatsappExtractedTransactionRecord } = require("./whatsappDomain");
+  const { planAiTask, executeAiTask } = require("./aiTaskPlanner");
+
+  const db = getFirestore();
+
+  try {
+    // 1. Plan AI Task (Planning/Tracking)
+    const plan = await planAiTask(
+      "whatsapp_extraction", 
+      messageId, 
+      { 
+        targetType: "whatsapp_message",
+        metadata: { text: messageData.text } 
+      }
+    );
+
+    // 2. Execute AI
+    const prompt = WHATSAPP_TRANSACTION_EXTRACTION_PROMPT.replace("{{messageText}}", messageData.text);
+    const runResult = await executeAiTask(plan, prompt);
+
+    if (runResult.status !== "completed") {
+      throw new Error(runResult.errorMessage || "AI Execution Failed");
+    }
+
+    const extractedData = runResult.output;
+
+    // 3. Save Extracted Transaction
+    const extractionRef = db.collection(WHATSAPP_COLLECTIONS.whatsappExtractedTransactions).doc();
+    const extractionRecord = createWhatsappExtractedTransactionRecord({
+      messageId,
+      remoteJid: messageData.remoteJid,
+      operation: extractedData.operation,
+      items: extractedData.items,
+      grandTotal: extractedData.grandTotal,
+      confidence: extractedData.confidence,
+      summary: extractedData.summary,
+      lineage: {
+        aiRunId: runResult.runId,
+        model: runResult.model
+      }
+    });
+
+    await extractionRef.set(extractionRecord);
+
+    // 4. Update Message
+    await db.collection("whatsapp_messages").doc(messageId).update({
+      extracted: true,
+      extractionId: extractionRef.id,
+      updatedAt: FieldValue.serverTimestamp()
+    });
+
+    logger.info("WhatsApp transaction extracted successfully", { messageId, extractionId: extractionRef.id });
+  } catch (error) {
+    logger.error("Error extracting transaction from WhatsApp message", { error: error.message, messageId });
+    // Update status to failed
+    await db.collection("whatsapp_messages").doc(messageId).update({
+      extracted: "failed",
+      extractionError: error.message,
+      updatedAt: FieldValue.serverTimestamp()
+    });
+  }
 });
