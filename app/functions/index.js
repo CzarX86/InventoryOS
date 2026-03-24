@@ -56,6 +56,8 @@ async function evolutionProxy(method, path, body = null) {
   }
 }
 
+const PROJECT_PREFIX = "ios_";
+
 /**
  * Proxy: List all instances
  */
@@ -63,7 +65,19 @@ exports.listWhatsappInstances = onCall({
   secrets: ["EVOLUTION_API_URL", "EVOLUTION_API_KEY"],
 }, async (request) => {
   await ensureAdmin(request.auth);
-  return await evolutionProxy("GET", "/instance/fetchInstances");
+  const result = await evolutionProxy("GET", "/instance/fetchInstances");
+  
+  // Isolar instâncias deste projeto (filtrando por prefixo ios_)
+  // Note: Mantemos instâncias que porventura já existam com nomes legados se necessário,
+  // mas aqui vamos filtrar estritamente para garantir isolamento contra Psycho Secretary.
+  if (result.status === 200 && Array.isArray(result.data)) {
+    result.data = result.data.filter(inst => {
+      const name = inst?.instance?.instanceName || inst?.name || inst?.instanceName;
+      return name && (name.startsWith(PROJECT_PREFIX) || name.includes("inventory_os"));
+    });
+  }
+  
+  return result;
 });
 
 /**
@@ -78,8 +92,11 @@ exports.createWhatsappInstance = onCall({
     throw new HttpsError("invalid-argument", "instanceName is required");
   }
 
+  // Garantir prefixo para isolamento de projeto
+  const finalName = instanceName.startsWith(PROJECT_PREFIX) ? instanceName : `${PROJECT_PREFIX}${instanceName}`;
+
   return await evolutionProxy("POST", "/instance/create", {
-    instanceName,
+    instanceName: finalName,
     token: crypto.randomBytes(16).toString("hex"),
     qrcode: true,
     integration: "WHATSAPP-BAILEYS",
