@@ -250,11 +250,15 @@ export default function WhatsappInstanceManager() {
                       <div className="grid grid-cols-2 gap-2">
                         <div className="bg-zinc-900/50 p-3 border border-white/5 rounded-lg flex flex-col gap-1">
                           <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Bateria</span>
-                          <span className="text-sm font-bold text-white">94%</span>
+                          <span className="text-sm font-bold text-white">
+                            {inst.battery !== undefined && inst.battery !== null ? `${inst.battery}%` : "---"}
+                          </span>
                         </div>
                         <div className="bg-zinc-900/50 p-3 border border-white/5 rounded-lg flex flex-col gap-1">
                           <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Plataforma</span>
-                          <span className="text-sm font-bold text-white">Android</span>
+                          <span className="text-sm font-bold text-white capitalize">
+                            {inst.platform || "---"}
+                          </span>
                         </div>
                         <button
                           onClick={() => handleLogoutInstance(instanceName)}
