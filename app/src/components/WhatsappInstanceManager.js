@@ -153,11 +153,13 @@ export default function WhatsappInstanceManager() {
           </div>
         ) : (
           instances.map((inst) => {
-            const instanceData = inst?.instance;
-            if (!instanceData) return null;
+            // Suporte para ambas as versões da API (Evolution v1 wrap ou v2 flat)
+            const instanceName = inst?.instance?.instanceName || inst?.name || inst?.instanceName;
+            const connectionStatus = inst?.instance?.status || inst?.connectionStatus || inst?.status;
+            
+            if (!instanceName) return null;
 
-            const instanceName = instanceData.instanceName;
-            const isConnected = instanceData.status === "open";
+            const isConnected = connectionStatus === "open";
             const isActionLoading = actionLoading === instanceName;
 
             return (
