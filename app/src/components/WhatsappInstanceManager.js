@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, Fragment } from "react";
 import { functions } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
-import { Loader2, QrCode, Smartphone, Wifi, WifiOff, Trash2, LogOut, Plus, RefreshCw, CheckCircle2, Info, PauseCircle, PlayCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, QrCode, Smartphone, Wifi, WifiOff, Trash2, LogOut, Plus, RefreshCw, CheckCircle2, Info, PauseCircle, PlayCircle, ChevronDown, ChevronUp, Copy } from "lucide-react";
 
 export default function WhatsappInstanceManager() {
   const [instances, setInstances] = useState([]);
@@ -13,7 +13,36 @@ export default function WhatsappInstanceManager() {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [events, setEvents] = useState([]);
   const [notification, setNotification] = useState(null); // { message: string, type: 'success' | 'error' }
-  const [isPaused, setIsPaused] = useState(false);
+  const [pausedInstances, setPausedInstances] = useState(() => {
+    try {
+      const stored = localStorage.getItem("whatsapp_paused_instances");
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const toggleInstancePause = async (instanceName) => {
+    setActionLoading(`pause-${instanceName}`);
+    // Simulate network delay to give user precise UI feedback on their click action
+    await new Promise(r => setTimeout(r, 600));
+    
+    setPausedInstances(prev => {
+      const newState = { ...prev, [instanceName]: !prev[instanceName] };
+      try {
+        localStorage.setItem("whatsapp_paused_instances", JSON.stringify(newState));
+      } catch {}
+      
+      showNotification(
+        newState[instanceName]
+          ? `Digestion pausada na instância [${instanceName}].`
+          : `Digestion retomada na instância [${instanceName}].`
+      );
+      
+      return newState;
+    });
+    setActionLoading(null);
+  };
   const [expandedEvent, setExpandedEvent] = useState(null);
 
   const getMessagePreview = (payload) => {
@@ -59,17 +88,14 @@ export default function WhatsappInstanceManager() {
 
   useEffect(() => {
     fetchInstances();
-    if (!isPaused) fetchEvents();
+    fetchEvents();
     const instInterval = setInterval(fetchInstances, 30000); // Poll every 30s
-    let eventInterval;
-    if (!isPaused) {
-      eventInterval = setInterval(fetchEvents, 15000);   // Poll events more frequently
-    }
+    const eventInterval = setInterval(fetchEvents, 15000);   // Poll events more frequently
     return () => {
       clearInterval(instInterval);
-      if (eventInterval) clearInterval(eventInterval);
+      clearInterval(eventInterval);
     };
-  }, [fetchInstances, fetchEvents, isPaused]);
+  }, [fetchInstances, fetchEvents]);
 
   const handleCreateInstance = async () => {
     if (!newInstanceName) return;
@@ -262,12 +288,20 @@ export default function WhatsappInstanceManager() {
                       ) : (
                         <>
                           <button 
+                            onClick={() => toggleInstancePause(instanceName)}
+                            title={pausedInstances[instanceName] ? "Retomar Digestão de IA" : "Pausar Digestão de IA"}
+                            className={`p-2 transition-all ${pausedInstances[instanceName] ? "text-amber-500 hover:text-amber-400 bg-amber-500/10 rounded-sm shadow-sm" : "text-zinc-500 hover:text-white"}`}
+                          >
+                            {actionLoading === `pause-${instanceName}` ? <Loader2 size={16} className="animate-spin" /> : (pausedInstances[instanceName] ? <PlayCircle size={16} /> : <PauseCircle size={16} />)}
+                          </button>
+                          <button 
                             onClick={() => handleSetWebhook(instanceName)}
                             title="Configurar Webhook (Necessário para o Monitor de Atividade)"
                             className={`p-2 transition-all ${isConnected ? "text-emerald-500 hover:text-emerald-400" : "text-zinc-500 hover:text-white"}`}
                           >
-                            <CheckCircle2 size={16} />
+                            {actionLoading === `webhook-${instanceName}` ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
                           </button>
+
                           <button 
                             onClick={() => fetchInstances()}
                             className="p-2 text-zinc-500 hover:text-white hover:bg-white/5 transition-all"
@@ -364,28 +398,12 @@ export default function WhatsappInstanceManager() {
       {/* Activity Monitor Section */}
       <div className="mt-4 flex flex-col gap-4">
         <div className="flex items-center justify-between border-b border-white/5 pb-2">
-          <h2 className="text-sm font-black uppercase tracking-[0.2em] text-zinc-500 flex items-center gap-3">
-            Monitor de Atividade (Digestão/IA)
-            <button 
-              onClick={() => setIsPaused(!isPaused)} 
-              title={isPaused ? "Retomar Ingestão" : "Pausar Ingestão"}
-              className={`hover:text-white transition-all ${isPaused ? "text-amber-500" : "text-zinc-500"}`}
-            >
-              {isPaused ? <PlayCircle size={16} /> : <PauseCircle size={16} />}
-            </button>
+          <h2 className="text-sm font-black uppercase tracking-[0.2em] text-zinc-500">
+            Monitor de Atividade Global
           </h2>
           <div className="flex items-center gap-2">
-            {!isPaused ? (
-              <>
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Live</span>
-              </>
-            ) : (
-              <>
-                <span className="w-2 h-2 rounded-full bg-amber-500" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-amber-500">Pausado</span>
-              </>
-            )}
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Live</span>
           </div>
         </div>
         
@@ -462,7 +480,18 @@ export default function WhatsappInstanceManager() {
                                   <p className="text-sm text-zinc-300 font-medium">&quot;{previewText}&quot;</p>
                                 </div>
                               )}
-                              <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Payload Completo:</span>
+                              <div className="flex justify-between items-center mb-1">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Payload Completo:</span>
+                                <button 
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(JSON.stringify(event.payload || event, null, 2));
+                                    showNotification("Payload copiado com sucesso!");
+                                  }}
+                                  className="flex items-center gap-1 p-1 text-zinc-500 hover:text-white transition-colors text-[9px] font-bold uppercase tracking-widest"
+                                >
+                                  <Copy size={12} /> Copiar
+                                </button>
+                              </div>
                               <pre className="text-[10px] text-zinc-400 whitespace-pre-wrap overflow-x-auto p-3 bg-black border border-white/5 font-mono max-h-64 overflow-y-auto">
                                 {JSON.stringify(event.payload || event, null, 2)}
                               </pre>
