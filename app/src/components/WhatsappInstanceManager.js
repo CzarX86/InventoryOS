@@ -459,7 +459,7 @@ export default function WhatsappInstanceManager() {
                               {previewText && (
                                 <div className="mb-2 p-3 bg-zinc-900 border border-white/5 rounded-md">
                                   <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500 mb-1 block">Preview da Mensagem:</span>
-                                  <p className="text-sm text-zinc-300 font-medium">"{previewText}"</p>
+                                  <p className="text-sm text-zinc-300 font-medium">&quot;{previewText}&quot;</p>
                                 </div>
                               )}
                               <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Payload Completo:</span>
