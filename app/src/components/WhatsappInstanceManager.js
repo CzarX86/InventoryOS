@@ -75,13 +75,36 @@ export default function WhatsappInstanceManager() {
     const remoteJid = key?.remoteJid || "";
     const isGroup = remoteJid.includes("@g.us");
     const id = isGroup ? (key?.participant || remoteJid) : remoteJid;
-    const nameStr = payload.data.pushName || id?.split("@")[0] || "Desconhecido";
-    return { name: nameStr, id: id?.split("@")[0], isGroup, groupId: isGroup ? remoteJid : null };
+    const senderName = payload.data.pushName || id?.split("@")[0] || "Desconhecido";
+    
+    // Evolution API v2 often has group name in payload.data.groupContext.groupName
+    let groupName = payload.data?.groupContext?.groupName || 
+                    payload.data?.sender?.name;
+    
+    if (isGroup && !groupName) {
+      groupName = remoteJid.split("@")[0]; // Fallback to JID part
+    }
+
+    return { 
+      name: senderName, 
+      groupName: isGroup ? groupName : null,
+      id: id?.split("@")[0], 
+      isGroup, 
+      groupId: remoteJid
+    };
   };
 
   const getMessagePreview = (payload) => {
-    if (!payload?.data?.message) return null;
-    const msg = payload.data.message;
+    const data = payload?.data;
+    const msg = data?.message;
+    
+    if (!msg) {
+      if (payload.eventType === "groups.upsert" || payload.eventType === "groups.update") {
+        return `Configuração de Grupo: ${data?.subject || data?.name || "Alterada"}`;
+      }
+      return "(Sem conteúdo/Evento de sistema)";
+    }
+    
     return msg.conversation || 
            msg.extendedTextMessage?.text || 
            (msg.imageMessage ? "[Imagem anexada]" : null) || 
@@ -217,6 +240,27 @@ export default function WhatsappInstanceManager() {
     }
   };
 
+  const handleSyncGroups = async (instanceName) => {
+    setActionLoading(`sync-${instanceName}`);
+    try {
+      const syncGroups = httpsCallable(functions, "syncWhatsappGroups");
+      const result = await syncGroups({ instanceName });
+      
+      if (result.data.status === 200) {
+        showNotification(result.data.message || "Grupos sincronizados com sucesso!");
+        await fetchInstances();
+        await fetchEvents(); // Refresh to resolve names
+      } else {
+        throw new Error(result.data.message || "Falha na sincronização");
+      }
+    } catch (error) {
+      console.error("Failed to sync groups:", error);
+      showNotification(`Erro ao sincronizar grupos: ${error.message}`, "error");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   if (loading && instances.length === 0) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -337,7 +381,15 @@ export default function WhatsappInstanceManager() {
                           </button>
 
                           <button 
+                            onClick={() => handleSyncGroups(instanceName)}
+                            title="Sincronizar metadados de grupos"
+                            className="p-2 text-zinc-500 hover:text-emerald-400 hover:bg-emerald-400/5 transition-all"
+                          >
+                            {actionLoading === `sync-${instanceName}` ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+                          </button>
+                          <button 
                             onClick={() => fetchInstances()}
+                            title="Atualizar status da conexão"
                             className="p-2 text-zinc-500 hover:text-white hover:bg-white/5 transition-all"
                           >
                             <RefreshCw size={16} className={isActionLoading ? "animate-spin" : ""} />
@@ -389,13 +441,13 @@ export default function WhatsappInstanceManager() {
                         <div className="bg-zinc-900/50 p-3 border border-white/5 rounded-lg flex flex-col gap-1">
                           <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Bateria</span>
                           <span className="text-sm font-bold text-white">
-                            {inst.battery !== undefined && inst.battery !== null ? `${inst.battery}%` : "---"}
+                            {inst.battery !== undefined && inst.battery !== null ? `${inst.battery}%` : (inst.instance?.batteryLevel ?? "---")}
                           </span>
                         </div>
                         <div className="bg-zinc-900/50 p-3 border border-white/5 rounded-lg flex flex-col gap-1">
                           <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Plataforma</span>
                           <span className="text-sm font-bold text-white capitalize">
-                            {inst.platform || "---"}
+                            {inst.platform || inst.instance?.platform || "---"}
                           </span>
                         </div>
                         <button
@@ -447,8 +499,8 @@ export default function WhatsappInstanceManager() {
               <tr className="bg-zinc-900/50">
                 <th className="p-3 w-8 border-b border-white/5"></th>
                 <th className="p-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5">Evento</th>
-                <th className="p-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5">Contato</th>
-                <th className="p-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5">Status</th>
+                <th className="p-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5">Origem / Contato</th>
+                <th className="p-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5">Sincronização / IA</th>
                 <th className="p-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5 text-right">Data/Hora</th>
               </tr>
             </thead>
@@ -484,33 +536,49 @@ export default function WhatsappInstanceManager() {
                         </td>
                         <td className="p-3">
                           <div className="flex flex-col items-start gap-1">
-                            <span className="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5 capitalize">
-                              {contact.isGroup ? <Users size={10} className="text-zinc-500"/> : <User size={10} className="text-zinc-500"/>} 
-                              {contact.name.toLowerCase()}
-                            </span>
-                            <span className="text-[9px] font-black uppercase tracking-widest text-zinc-600">
+                            {contact.isGroup ? (
+                              <>
+                                <span className="text-[11px] font-black uppercase tracking-tight text-emerald-400 flex items-center gap-1.5 leading-none">
+                                  <Users size={10}/> {contact.groupName.toLowerCase()}
+                                </span>
+                                <span className="text-[9px] font-bold text-zinc-500 flex items-center gap-1 opacity-70">
+                                  <User size={8}/> {contact.name.toLowerCase()}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5 capitalize">
+                                <User size={10} className="text-zinc-500"/> {contact.name.toLowerCase()}
+                              </span>
+                            )}
+                            <span className="text-[9px] font-black uppercase tracking-widest text-zinc-600 mt-0.5">
                               via {event.instanceId || "---"}
                             </span>
                           </div>
                         </td>
-                        <td className="p-3 flex flex-col items-start py-4 gap-2">
-                          <span className={`px-2 py-0.5 text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 rounded-full ${
-                            event.status === "processed" ? "bg-emerald-500/10 text-emerald-400" :
-                            event.status === "failed" ? "bg-red-500/10 text-red-400" :
-                            "bg-amber-500/10 text-amber-400"
-                          }`}>
-                            {event.status === "processed" ? <CheckCircle2 size={10}/> :
-                             event.status === "failed" ? <AlertCircle size={10}/> :
-                             <Loader2 size={10} className="animate-spin" />}
-                            {event.status || "recebido"}
-                          </span>
-                          
-                          {/* AI TAG Placeholder */}
-                          {event.payload?.data?.message && (
-                            <span className="bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded-sm text-[8px] font-black uppercase tracking-widest border border-purple-500/20">
-                              {event.aiClassification || "Aguardando IA"}
+                        <td className="p-3">
+                          <div className="flex flex-col items-start gap-1.5">
+                            {/* Webhook/Sync Status */}
+                            <span className={`px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.1em] flex items-center gap-1 rounded-sm border ${
+                              event.status === "processed" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
+                              event.status === "failed" ? "bg-red-500/10 text-red-400 border-red-500/20" :
+                              "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                            }`}>
+                              {event.status === "processed" ? "SINCRONIZADO" : (event.status || "recebido")}
                             </span>
-                          )}
+                            
+                            {/* AI Processing Status */}
+                            {event.payload?.data?.message && (
+                              <span className={`px-1.5 py-0.5 rounded-sm text-[8px] font-black uppercase tracking-widest border flex items-center gap-1 ${
+                                event.aiExtractionStatus === "processed" ? "bg-purple-500/10 text-purple-400 border-purple-500/20" :
+                                event.aiExtractionStatus === "failed" ? "bg-red-500/10 text-red-300 border-red-500/10" :
+                                "bg-zinc-800 text-zinc-500 border-white/5"
+                              }`}>
+                                <Bot size={8} />
+                                {event.aiExtractionStatus === "processed" ? (event.aiClassification || "PROCESSADO") : 
+                                 event.aiExtractionStatus === "failed" ? "ERRO IA" : "FILA IA"}
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         <td className="p-3 text-right">
@@ -551,7 +619,7 @@ export default function WhatsappInstanceManager() {
                                   <div className="flex gap-2 items-center">
                                     <Users size={14} className="text-emerald-500/50"/>
                                     <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500/80">
-                                      Grupo Detectado: {contact.name.toLowerCase()}
+                                      Grupo Detectado: {contact.groupName?.toLowerCase() || "Sem Nome"}
                                     </span>
                                   </div>
                                   <button 

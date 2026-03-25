@@ -1,10 +1,9 @@
 "use client";
 /* global window, localStorage, navigator, process, document, confirm, caches */
-import { Zap, Clock, LogOut, Check, RefreshCw, MessageSquare } from "lucide-react";
+import { Zap, Clock, LogOut, Check, RefreshCw } from "lucide-react";
 import useAuth from "@/hooks/useAuth";
 import useFeatureFlags from "@/hooks/useFeatureFlags";
 import { isFeatureEnabled } from "@/lib/featureFlags";
-import WhatsappInstanceManager from "@/components/WhatsappInstanceManager";
 
 const WORKFLOWS = [
   {
