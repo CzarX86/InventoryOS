@@ -4,7 +4,6 @@ import { httpsCallable } from "firebase/functions";
 import { Loader2, QrCode, Smartphone, Wifi, WifiOff, Trash2, LogOut, Plus, RefreshCw, CheckCircle2 } from "lucide-react";
 
 export default function WhatsappInstanceManager() {
-  console.log("Ref: WhatsappInstanceManager - 2026-03-25"); // DEBUG LOG
   const [instances, setInstances] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
