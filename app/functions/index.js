@@ -201,7 +201,7 @@ exports.setWhatsappWebhook = onCall({
 }, async (request) => {
   await ensureAdmin(request.auth);
   const { instanceName } = request.data;
-  const webhookUrl = `https://${process.env.GCLOUD_PROJECT}.cloudfunctions.net/evolutionWebhook`;
+  const webhookUrl = `https://us-central1-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/evolutionWebhook`;
   
   return await evolutionProxy("POST", `/webhook/set/${instanceName}`, {
     webhook: {
