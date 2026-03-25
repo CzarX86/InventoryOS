@@ -4,6 +4,7 @@ import { httpsCallable } from "firebase/functions";
 import { Loader2, QrCode, Smartphone, Wifi, WifiOff, Trash2, LogOut, Plus, RefreshCw, CheckCircle2 } from "lucide-react";
 
 export default function WhatsappInstanceManager() {
+  console.log("Ref: WhatsappInstanceManager - 2026-03-25"); // DEBUG LOG
   const [instances, setInstances] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
@@ -11,6 +12,23 @@ export default function WhatsappInstanceManager() {
   const [activeInstance, setActiveInstance] = useState(null);
   const [newInstanceName, setNewInstanceName] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [events, setEvents] = useState([]);
+  const [notification, setNotification] = useState(null); // { message: string, type: 'success' | 'error' }
+
+  const showNotification = (message, type = "success") => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 5000);
+  };
+
+  const fetchEvents = useCallback(async () => {
+    try {
+      const getEvents = httpsCallable(functions, "getWhatsappEvents");
+      const result = await getEvents();
+      setEvents(result.data || []);
+    } catch (error) {
+      console.error("Failed to fetch events:", error);
+    }
+  }, []);
 
   const fetchInstances = useCallback(async () => {
     try {
@@ -21,6 +39,7 @@ export default function WhatsappInstanceManager() {
       }
     } catch (error) {
       console.error("Failed to fetch instances:", error);
+      showNotification("Erro ao atualizar instâncias. Verifique a conexão com a Evolution API.", "error");
     } finally {
       setLoading(false);
     }
@@ -28,9 +47,14 @@ export default function WhatsappInstanceManager() {
 
   useEffect(() => {
     fetchInstances();
-    const interval = setInterval(fetchInstances, 30000); // Poll every 30s
-    return () => clearInterval(interval);
-  }, [fetchInstances]);
+    fetchEvents();
+    const instInterval = setInterval(fetchInstances, 30000); // Poll every 30s
+    const eventInterval = setInterval(fetchEvents, 15000);   // Poll events more frequently
+    return () => {
+      clearInterval(instInterval);
+      clearInterval(eventInterval);
+    };
+  }, [fetchInstances, fetchEvents]);
 
   const handleCreateInstance = async () => {
     if (!newInstanceName) return;
@@ -53,15 +77,22 @@ export default function WhatsappInstanceManager() {
     setActionLoading(instanceName);
     try {
       const deleteInstance = httpsCallable(functions, "deleteWhatsappInstance");
-      await deleteInstance({ instanceName });
-      await fetchInstances();
-      if (activeInstance === instanceName) {
-        setActiveInstance(null);
-        setQrCode(null);
+      const result = await deleteInstance({ instanceName });
+      
+      if (result.data.status === 200) {
+        showNotification(`Instância ${instanceName} deletada com sucesso!`);
+        await fetchInstances();
+        if (activeInstance === instanceName) {
+          setActiveInstance(null);
+          setQrCode(null);
+        }
+      } else {
+        throw new Error(result.data.data?.message || "Erro desconhecido");
       }
       setConfirmDelete(null);
     } catch (error) {
       console.error("Failed to delete instance:", error);
+      showNotification(`Falha ao deletar: ${error.message}`, "error");
     } finally {
       setActionLoading(null);
     }
@@ -102,9 +133,10 @@ export default function WhatsappInstanceManager() {
     try {
       const setWebhook = httpsCallable(functions, "setWhatsappWebhook");
       await setWebhook({ instanceName });
-      alert("Webhook configurado com sucesso!");
+      showNotification("Webhook configurado com sucesso! Monitorando eventos...");
     } catch (error) {
       console.error("Failed to set webhook:", error);
+      showNotification(`Erro ao configurar webhook: ${error.message}`, "error");
     } finally {
       setActionLoading(null);
     }
@@ -295,6 +327,83 @@ export default function WhatsappInstanceManager() {
             );
           })
         )}
+      </div>
+
+      {/* Global Notification */}
+      {notification && (
+        <div 
+          className={`fixed bottom-8 right-8 z-50 p-4 border flex items-center gap-3 animate-in slide-in-from-bottom-4 fade-in duration-300 ${
+            notification.type === "error" 
+              ? "bg-red-950 border-red-500 text-red-200" 
+              : "bg-emerald-950 border-emerald-500 text-emerald-200"
+          }`}
+        >
+          {notification.type === "error" ? <WifiOff size={18} /> : <CheckCircle2 size={18} />}
+          <span className="text-xs font-black uppercase tracking-tight">{notification.message}</span>
+        </div>
+      )}
+
+      {/* Activity Monitor Section */}
+      <div className="mt-4 flex flex-col gap-4">
+        <div className="flex items-center justify-between border-b border-white/5 pb-2">
+          <h2 className="text-sm font-black uppercase tracking-[0.2em] text-zinc-500">Monitor de Atividade (Digestão/IA)</h2>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Live</span>
+          </div>
+        </div>
+        
+        <div className="bg-black border border-white/5 overflow-hidden">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-zinc-900/50">
+                <th className="p-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5">Evento</th>
+                <th className="p-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5">Instância</th>
+                <th className="p-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5">Status</th>
+                <th className="p-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5 text-right">Data/Hora</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {events.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="p-8 text-center text-[10px] font-bold uppercase tracking-widest text-zinc-700">
+                    Aguardando eventos do WhatsApp...
+                  </td>
+                </tr>
+              ) : (
+                events.map((event) => (
+                  <tr key={event.id} className="hover:bg-white/[0.02] transition-colors group">
+                    <td className="p-3">
+                      <div className="flex flex-col">
+                        <span className="text-[11px] font-black uppercase tracking-tight text-white group-hover:text-emerald-400 transition-colors">
+                          {event.eventType || "MESSAGES_UPSERT"}
+                        </span>
+                        <span className="text-[9px] font-medium text-zinc-600">ID: {event.id.slice(-8)}</span>
+                      </div>
+                    </td>
+                    <td className="p-3">
+                      <span className="text-[10px] font-bold text-zinc-400">{event.instanceId || "---"}</span>
+                    </td>
+                    <td className="p-3">
+                      <span className={`px-2 py-0.5 text-[9px] font-black uppercase tracking-widest rounded-full ${
+                        event.status === "processed" ? "bg-emerald-500/10 text-emerald-400" :
+                        event.status === "failed" ? "bg-red-500/10 text-red-400" :
+                        "bg-amber-500/10 text-amber-400"
+                      }`}>
+                        {event.status || "recebido"}
+                      </span>
+                    </td>
+                    <td className="p-3 text-right">
+                      <span className="text-[10px] font-medium text-zinc-500">
+                        {event.occurredAt ? new Date(event.occurredAt).toLocaleTimeString() : "---"}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
