@@ -26,7 +26,7 @@ async function ensureAdmin(auth) {
 /**
  * Evolution API Proxy Helper
  */
-async function evolutionProxy(method, path, body = null) {
+async function evolutionProxy(method, path, body = null, timeoutMs = 20000) {
   const apiUrl = process.env.EVOLUTION_API_URL;
   const apiKey = process.env.EVOLUTION_API_KEY;
 
@@ -34,12 +34,16 @@ async function evolutionProxy(method, path, body = null) {
     throw new HttpsError("failed-precondition", "Evolution API not configured");
   }
 
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+
   const options = {
     method,
     headers: {
       "Content-Type": "application/json",
       "apikey": apiKey,
     },
+    signal: controller.signal,
   };
 
   if (body) {
@@ -48,11 +52,28 @@ async function evolutionProxy(method, path, body = null) {
 
   try {
     const response = await fetch(`${apiUrl}${path}`, options);
+    clearTimeout(id);
+    
+    // Check if response is JSON
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      const text = await response.text();
+      logger.error("Evolution API Non-JSON Response", { status: response.status, text: text.slice(0, 500), path });
+      throw new HttpsError("internal", `API returned non-JSON response (${response.status})`);
+    }
+
     const data = await response.json();
     return { status: response.status, data };
   } catch (error) {
+    clearTimeout(id);
+    if (error.name === "AbortError") {
+      logger.error("Evolution API Timeout", { timeoutMs, path });
+      throw new HttpsError("deadline-exceeded", `Timeout communicating with Evolution API after ${timeoutMs}ms`);
+    }
     logger.error("Evolution API Proxy Error", { error: error.message, path });
-    throw new HttpsError("internal", "Error communicating with Evolution API");
+    // Re-throw if it's already an HttpsError, otherwise wrap it
+    if (error instanceof HttpsError) throw error;
+    throw new HttpsError("internal", `Error communicating with Evolution API: ${error.message}`);
   }
 }
 
@@ -65,7 +86,14 @@ exports.listWhatsappInstances = onCall({
   secrets: ["EVOLUTION_API_URL", "EVOLUTION_API_KEY"],
 }, async (request) => {
   await ensureAdmin(request.auth);
-  const result = await evolutionProxy("GET", "/instance/fetchInstances");
+  
+  let result;
+  try {
+    result = await evolutionProxy("GET", "/instance/fetchInstances", null, 15000);
+  } catch (err) {
+    logger.error("Falha fatal ao listar instâncias", { error: err.message });
+    throw err;
+  }
   
   if (result.status === 200 && Array.isArray(result.data)) {
     // 1. Filtrar e mapear instâncias básicas
@@ -82,12 +110,12 @@ exports.listWhatsappInstances = onCall({
       });
 
     // 2. Buscar status detalhado (bateria, plataforma) para instâncias "open"
-    // Faremos isso em paralelo para performance, mas com limite de 5 para segurança
+    // Limitamos a concorrência e o timeout por item para não travar a lista toda
     const updatedData = await Promise.all(instances.map(async (inst) => {
       if (inst.connectionStatus === "open") {
         try {
-          // Evolution API v2: get connectionState for battery/platform
-          const stateResult = await evolutionProxy("GET", `/instance/connectionState/${inst.name}`);
+          // Timeout menor para chamadas individuais (10s) para evitar cascata de lags
+          const stateResult = await evolutionProxy("GET", `/instance/connectionState/${inst.name}`, null, 10000);
           if (stateResult.status === 200 && stateResult.data) {
             return {
               ...inst,
@@ -97,6 +125,7 @@ exports.listWhatsappInstances = onCall({
           }
         } catch (err) {
           logger.warn("Falha ao buscar status detalhado para instância", { name: inst.name, error: err.message });
+          // Não falhamos a lista inteira se uma instância falhar no status detalhado
         }
       }
       return inst;
@@ -168,20 +197,55 @@ exports.deleteWhatsappInstance = onCall({
  * Proxy: Set Webhook
  */
 exports.setWhatsappWebhook = onCall({
-  secrets: ["EVOLUTION_API_URL", "EVOLUTION_API_KEY"],
+  secrets: ["EVOLUTION_API_URL", "EVOLUTION_API_KEY", "EVOLUTION_WEBHOOK_SECRET"],
 }, async (request) => {
   await ensureAdmin(request.auth);
   const { instanceName } = request.data;
-  const webhookUrl = process.env.PUBLIC_WEBHOOK_URL || `https://evolutionwebhook-4itihxxrzq-uc.a.run.app`;
+  const webhookUrl = `https://${process.env.GCLOUD_PROJECT}.cloudfunctions.net/evolutionWebhook`;
   
   return await evolutionProxy("POST", `/webhook/set/${instanceName}`, {
     webhook: {
       url: webhookUrl,
       enabled: true,
+      secret: process.env.EVOLUTION_WEBHOOK_SECRET || "default_secret",
       webhook_by_events: true,
-      events: ["MESSAGES_UPSERT", "QRCODE_UPDATED", "CONNECTION_UPDATE"],
+      events: [
+        "MESSAGES_UPSERT",
+        "MESSAGES_UPDATE",
+        "MESSAGES_DELETE",
+        "SEND_MESSAGE",
+        "CONTACTS_UPSERT",
+        "CONTACTS_UPDATE",
+        "PRESENCE_UPDATE",
+        "CHATS_UPSERT",
+        "CHATS_UPDATE",
+        "CHATS_DELETE",
+        "GROUPS_UPSERT",
+        "GROUPS_UPDATE",
+        "GROUP_PARTICIPANTS_UPDATE",
+        "CONNECTION_UPDATE",
+        "CALL",
+      ],
     }
   });
+});
+
+/**
+ * Monitor: List recent WhatsApp events
+ */
+exports.getWhatsappEvents = onCall(async (request) => {
+  await ensureAdmin(request.auth);
+  
+  const db = getFirestore();
+  const eventsSnap = await db.collection("whatsapp_webhook_events")
+    .orderBy("occurredAt", "desc")
+    .limit(10)
+    .get();
+    
+  return eventsSnap.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  }));
 });
 
 function sanitizeText(value, max = 140) {
