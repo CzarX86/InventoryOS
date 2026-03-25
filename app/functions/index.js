@@ -356,7 +356,6 @@ exports.syncWhatsappGroups = onCall(async (request) => {
   }
 
   const db = getFirestore();
-  const logger = (await import("firebase-functions/logger")).default;
 
   try {
     const response = await evolutionProxy("GET", `/group/findAll/${instanceName}`, null, 30000);
@@ -386,15 +385,15 @@ exports.syncWhatsappGroups = onCall(async (request) => {
       }
     }
 
-    if (count % 400 !== 0) {
+    if (count % 400 !== 0 && count > 0) {
       await batch.commit();
     }
 
     logger.info("WhatsApp groups synced", { instanceName, count });
     return { status: 200, message: `${count} grupos sincronizados.`, count };
   } catch (error) {
-    logger.error("Error syncing WhatsApp groups", { error: error.message, instanceName });
-    throw new HttpsError("internal", error.message);
+    logger.error("Error syncing WhatsApp groups", { error: error.message || error, instanceName });
+    throw new HttpsError("internal", error.message || "Erro desconhecido na sincronização");
   }
 });
 
