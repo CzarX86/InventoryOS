@@ -208,7 +208,11 @@ exports.setWhatsappWebhook = onCall({
       url: webhookUrl,
       enabled: true,
       secret: process.env.EVOLUTION_WEBHOOK_SECRET || "default_secret",
-      webhook_by_events: true,
+      headers: {
+        Authorization: `Bearer ${process.env.EVOLUTION_WEBHOOK_SECRET || "default_secret"}`
+      },
+      webhook_by_events: true, // keep for compat with older versions
+      webhookByEvents: true, // add for v2
       events: [
         "MESSAGES_UPSERT",
         "MESSAGES_UPDATE",
@@ -277,8 +281,26 @@ exports.evolutionWebhook = onRequest({
   const signature = req.headers["x-hub-signature-256"] || req.headers["x-evolution-signature"];
   
   // Verify signature
-  if (secret && !verifySignature(req.rawBody, signature, secret)) {
-    logger.warn("Invalid webhook signature rejected");
+  let isSignatureValid = false;
+  
+  if (!secret) {
+    isSignatureValid = true;
+  } else {
+    // 1. Check if the secret is just passed directly in a header
+    if (
+      req.headers["apikey"] === secret ||
+      req.headers["authorization"] === `Bearer ${secret}` ||
+      req.headers["x-webhook-secret"] === secret
+    ) {
+      isSignatureValid = true;
+    } else {
+      // 2. Fallback to HMAC validation
+      isSignatureValid = verifySignature(req.rawBody, signature, secret);
+    }
+  }
+
+  if (!isSignatureValid) {
+    logger.warn(`Invalid webhook signature rejected. Candidate: ${signature}. Headers: ${JSON.stringify(req.headers)}`);
     res.status(401).send("Unauthorized");
     return;
   }
