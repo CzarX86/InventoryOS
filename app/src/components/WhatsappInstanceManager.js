@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, Fragment } from "react";
 import { functions } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
-import { Loader2, QrCode, Smartphone, Wifi, WifiOff, Trash2, LogOut, Plus, RefreshCw, CheckCircle2, Info, PauseCircle, PlayCircle, ChevronDown, ChevronUp, Copy } from "lucide-react";
+import { Loader2, QrCode, Smartphone, Wifi, WifiOff, Trash2, LogOut, Plus, RefreshCw, CheckCircle2, Info, PauseCircle, PlayCircle, ChevronDown, ChevronUp, Copy, Bot, AlertCircle, Eye, PowerOff, Users, User } from "lucide-react";
 
 export default function WhatsappInstanceManager() {
   const [instances, setInstances] = useState([]);
@@ -44,6 +44,40 @@ export default function WhatsappInstanceManager() {
     setActionLoading(null);
   };
   const [expandedEvent, setExpandedEvent] = useState(null);
+
+  const [ignoredGroups, setIgnoredGroups] = useState(() => {
+    try {
+      const stored = localStorage.getItem("whatsapp_ignored_groups");
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const toggleGroupIgnore = async (groupId, groupName) => {
+    setActionLoading(`group-${groupId}`);
+    await new Promise(r => setTimeout(r, 600)); // fake delay
+    setIgnoredGroups(prev => {
+      const newState = { ...prev, [groupId]: !prev[groupId] };
+      try { localStorage.setItem("whatsapp_ignored_groups", JSON.stringify(newState)); } catch {}
+      showNotification(newState[groupId] 
+        ? `Grupo "${groupName}" silenciado. A IA não processará mais mensagens dele.`
+        : `Grupo "${groupName}" monitorado. A IA voltará a escutá-lo.`
+      );
+      return newState;
+    });
+    setActionLoading(null);
+  };
+
+  const getContactInfo = (payload) => {
+    if (!payload?.data?.message?.key && !payload?.data?.key) return { name: "Sistema", id: "---", isGroup: false };
+    const key = payload.data.message?.key || payload.data.key;
+    const remoteJid = key?.remoteJid || "";
+    const isGroup = remoteJid.includes("@g.us");
+    const id = isGroup ? (key?.participant || remoteJid) : remoteJid;
+    const nameStr = payload.data.pushName || id?.split("@")[0] || "Desconhecido";
+    return { name: nameStr, id: id?.split("@")[0], isGroup, groupId: isGroup ? remoteJid : null };
+  };
 
   const getMessagePreview = (payload) => {
     if (!payload?.data?.message) return null;
@@ -413,7 +447,7 @@ export default function WhatsappInstanceManager() {
               <tr className="bg-zinc-900/50">
                 <th className="p-3 w-8 border-b border-white/5"></th>
                 <th className="p-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5">Evento</th>
-                <th className="p-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5">Instância</th>
+                <th className="p-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5">Contato</th>
                 <th className="p-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5">Status</th>
                 <th className="p-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5 text-right">Data/Hora</th>
               </tr>
@@ -429,6 +463,7 @@ export default function WhatsappInstanceManager() {
                 events.map((event) => {
                   const isExpanded = expandedEvent === event.id;
                   const previewText = getMessagePreview(event.payload);
+                  const contact = getContactInfo(event.payload);
                   
                   return (
                     <Fragment key={event.id}>
@@ -440,7 +475,7 @@ export default function WhatsappInstanceManager() {
                           {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                         </td>
                         <td className="p-3">
-                          <div className="flex flex-col">
+                          <div className="flex flex-col gap-1">
                             <span className="text-[11px] font-black uppercase tracking-tight text-white group-hover:text-emerald-400 transition-colors">
                               {event.eventType || "MESSAGES_UPSERT"}
                             </span>
@@ -448,17 +483,36 @@ export default function WhatsappInstanceManager() {
                           </div>
                         </td>
                         <td className="p-3">
-                          <span className="text-[10px] font-bold text-zinc-400">{event.instanceId || "---"}</span>
+                          <div className="flex flex-col items-start gap-1">
+                            <span className="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5 capitalize">
+                              {contact.isGroup ? <Users size={10} className="text-zinc-500"/> : <User size={10} className="text-zinc-500"/>} 
+                              {contact.name.toLowerCase()}
+                            </span>
+                            <span className="text-[9px] font-black uppercase tracking-widest text-zinc-600">
+                              via {event.instanceId || "---"}
+                            </span>
+                          </div>
                         </td>
-                        <td className="p-3">
-                          <span className={`px-2 py-0.5 text-[9px] font-black uppercase tracking-widest rounded-full ${
+                        <td className="p-3 flex flex-col items-start py-4 gap-2">
+                          <span className={`px-2 py-0.5 text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 rounded-full ${
                             event.status === "processed" ? "bg-emerald-500/10 text-emerald-400" :
                             event.status === "failed" ? "bg-red-500/10 text-red-400" :
                             "bg-amber-500/10 text-amber-400"
                           }`}>
+                            {event.status === "processed" ? <CheckCircle2 size={10}/> :
+                             event.status === "failed" ? <AlertCircle size={10}/> :
+                             <Loader2 size={10} className="animate-spin" />}
                             {event.status || "recebido"}
                           </span>
+                          
+                          {/* AI TAG Placeholder */}
+                          {event.payload?.data?.message && (
+                            <span className="bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded-sm text-[8px] font-black uppercase tracking-widest border border-purple-500/20">
+                              {event.aiClassification || "Aguardando IA"}
+                            </span>
+                          )}
                         </td>
+
                         <td className="p-3 text-right">
                           <div className="flex flex-col items-end">
                             <span className="text-[10px] font-medium text-zinc-400">
@@ -480,7 +534,40 @@ export default function WhatsappInstanceManager() {
                                   <p className="text-sm text-zinc-300 font-medium">&quot;{previewText}&quot;</p>
                                 </div>
                               )}
-                              <div className="flex justify-between items-center mb-1">
+                              
+                              <div className="mt-1 mb-2 p-3 bg-zinc-900 border border-white/5 rounded-md flex items-center justify-between">
+                                <div className="flex gap-2 items-center">
+                                  <Bot size={14} className="text-zinc-500"/>
+                                  <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Dados Extraídos (IA): <span className="text-zinc-400 font-medium ml-1">{event.aiExtraction ? "Processado" : "Aguardando fila assíncrona..."}</span></span>
+                                </div>
+                                <button className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest bg-white/5 hover:bg-white/10 text-white px-2 py-1.5 rounded-sm transition-colors">
+                                  <Eye size={12} />
+                                  Detalhes
+                                </button>
+                              </div>
+
+                              {contact.isGroup && (
+                                <div className="mb-2 p-3 bg-emerald-950/20 border border-emerald-500/10 rounded-md flex items-center justify-between">
+                                  <div className="flex gap-2 items-center">
+                                    <Users size={14} className="text-emerald-500/50"/>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500/80">
+                                      Grupo Detectado: {contact.name.toLowerCase()}
+                                    </span>
+                                  </div>
+                                  <button 
+                                    onClick={(e) => { e.stopPropagation(); toggleGroupIgnore(contact.groupId, contact.name); }}
+                                    className={`flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest px-3 py-1.5 transition-colors shadow-sm ${
+                                      ignoredGroups[contact.groupId] ? "bg-amber-500 hover:bg-amber-400 text-black rounded-full" : "bg-white/5 hover:bg-white/10 text-white rounded-sm"
+                                    }`}
+                                  >
+                                    {actionLoading === `group-${contact.groupId}` ? <Loader2 size={12} className="animate-spin" /> : <PowerOff size={12} />}
+                                    {ignoredGroups[contact.groupId] ? "Grupo Silenciado" : "Silenciar IA para este grupo"}
+                                  </button>
+                                </div>
+                              )}
+
+                              <div className="flex justify-between items-center mb-1 mt-2">
+
                                 <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Payload Completo:</span>
                                 <button 
                                   onClick={() => {
