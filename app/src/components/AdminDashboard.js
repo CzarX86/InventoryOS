@@ -8,6 +8,7 @@ import AdminPushRegistration from "@/components/AdminPushRegistration";
 import useFeatureFlags from "@/hooks/useFeatureFlags";
 import { EXPANSION_FEATURE_FLAGS, isFeatureEnabled } from "@/lib/featureFlags";
 import WhatsappInstanceManager from "@/components/WhatsappInstanceManager";
+import AdminUsageStats from "@/components/AdminUsageStats";
 
 function extractTimestampValue(value) {
   if (!value) return 0;
@@ -173,6 +174,7 @@ export default function AdminDashboard({ items = [], user = null }) {
 
       {/* Financial stats */}
       <AdminPushRegistration user={user} isAdmin={Boolean(user)} />
+      <AdminUsageStats />
 
       <div className="flex border-b border-white/[0.07]">
         <div className="flex-1 px-4 md:px-6 py-5 border-r border-white/[0.07]">
