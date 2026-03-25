@@ -245,11 +245,15 @@ exports.getWhatsappEvents = onCall(async (request) => {
     .orderBy("occurredAt", "desc")
     .limit(10)
     .get();
-    
-  return eventsSnap.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  }));
+  return eventsSnap.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      occurredAt: data.occurredAt && data.occurredAt.toDate ? data.occurredAt.toDate().toISOString() : data.occurredAt,
+      receivedAt: data.receivedAt && data.receivedAt.toDate ? data.receivedAt.toDate().toISOString() : data.receivedAt
+    };
+  });
 });
 
 function sanitizeText(value, max = 140) {

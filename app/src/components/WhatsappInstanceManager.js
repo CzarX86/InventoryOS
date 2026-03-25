@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 import { functions } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
-import { Loader2, QrCode, Smartphone, Wifi, WifiOff, Trash2, LogOut, Plus, RefreshCw, CheckCircle2, Info } from "lucide-react";
+import { Loader2, QrCode, Smartphone, Wifi, WifiOff, Trash2, LogOut, Plus, RefreshCw, CheckCircle2, Info, PauseCircle, PlayCircle, ChevronDown, ChevronUp } from "lucide-react";
 
 export default function WhatsappInstanceManager() {
   const [instances, setInstances] = useState([]);
@@ -13,6 +13,19 @@ export default function WhatsappInstanceManager() {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [events, setEvents] = useState([]);
   const [notification, setNotification] = useState(null); // { message: string, type: 'success' | 'error' }
+  const [isPaused, setIsPaused] = useState(false);
+  const [expandedEvent, setExpandedEvent] = useState(null);
+
+  const getMessagePreview = (payload) => {
+    if (!payload?.data?.message) return null;
+    const msg = payload.data.message;
+    return msg.conversation || 
+           msg.extendedTextMessage?.text || 
+           (msg.imageMessage ? "[Imagem anexada]" : null) || 
+           (msg.audioMessage ? "[Áudio anexado]" : null) || 
+           (msg.videoMessage ? "[Vídeo anexado]" : null) || 
+           (msg.documentMessage ? "[Documento anexado]" : "[Arquivo/Mídia]");
+  };
 
   const showNotification = (message, type = "success") => {
     setNotification({ message, type });
@@ -46,14 +59,17 @@ export default function WhatsappInstanceManager() {
 
   useEffect(() => {
     fetchInstances();
-    fetchEvents();
+    if (!isPaused) fetchEvents();
     const instInterval = setInterval(fetchInstances, 30000); // Poll every 30s
-    const eventInterval = setInterval(fetchEvents, 15000);   // Poll events more frequently
+    let eventInterval;
+    if (!isPaused) {
+      eventInterval = setInterval(fetchEvents, 15000);   // Poll events more frequently
+    }
     return () => {
       clearInterval(instInterval);
-      clearInterval(eventInterval);
+      if (eventInterval) clearInterval(eventInterval);
     };
-  }, [fetchInstances, fetchEvents]);
+  }, [fetchInstances, fetchEvents, isPaused]);
 
   const handleCreateInstance = async () => {
     if (!newInstanceName) return;
@@ -348,10 +364,28 @@ export default function WhatsappInstanceManager() {
       {/* Activity Monitor Section */}
       <div className="mt-4 flex flex-col gap-4">
         <div className="flex items-center justify-between border-b border-white/5 pb-2">
-          <h2 className="text-sm font-black uppercase tracking-[0.2em] text-zinc-500">Monitor de Atividade (Digestão/IA)</h2>
+          <h2 className="text-sm font-black uppercase tracking-[0.2em] text-zinc-500 flex items-center gap-3">
+            Monitor de Atividade (Digestão/IA)
+            <button 
+              onClick={() => setIsPaused(!isPaused)} 
+              title={isPaused ? "Retomar Ingestão" : "Pausar Ingestão"}
+              className={`hover:text-white transition-all ${isPaused ? "text-amber-500" : "text-zinc-500"}`}
+            >
+              {isPaused ? <PlayCircle size={16} /> : <PauseCircle size={16} />}
+            </button>
+          </h2>
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Live</span>
+            {!isPaused ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Live</span>
+              </>
+            ) : (
+              <>
+                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-amber-500">Pausado</span>
+              </>
+            )}
           </div>
         </div>
         
@@ -359,6 +393,7 @@ export default function WhatsappInstanceManager() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-zinc-900/50">
+                <th className="p-3 w-8 border-b border-white/5"></th>
                 <th className="p-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5">Evento</th>
                 <th className="p-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5">Instância</th>
                 <th className="p-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5">Status</th>
@@ -368,40 +403,76 @@ export default function WhatsappInstanceManager() {
             <tbody className="divide-y divide-white/5">
               {events.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="p-8 text-center text-[10px] font-bold uppercase tracking-widest text-zinc-700">
+                  <td colSpan={5} className="p-8 text-center text-[10px] font-bold uppercase tracking-widest text-zinc-700">
                     Aguardando eventos do WhatsApp...
                   </td>
                 </tr>
               ) : (
-                events.map((event) => (
-                  <tr key={event.id} className="hover:bg-white/[0.02] transition-colors group">
-                    <td className="p-3">
-                      <div className="flex flex-col">
-                        <span className="text-[11px] font-black uppercase tracking-tight text-white group-hover:text-emerald-400 transition-colors">
-                          {event.eventType || "MESSAGES_UPSERT"}
-                        </span>
-                        <span className="text-[9px] font-medium text-zinc-600">ID: {event.id.slice(-8)}</span>
-                      </div>
-                    </td>
-                    <td className="p-3">
-                      <span className="text-[10px] font-bold text-zinc-400">{event.instanceId || "---"}</span>
-                    </td>
-                    <td className="p-3">
-                      <span className={`px-2 py-0.5 text-[9px] font-black uppercase tracking-widest rounded-full ${
-                        event.status === "processed" ? "bg-emerald-500/10 text-emerald-400" :
-                        event.status === "failed" ? "bg-red-500/10 text-red-400" :
-                        "bg-amber-500/10 text-amber-400"
-                      }`}>
-                        {event.status || "recebido"}
-                      </span>
-                    </td>
-                    <td className="p-3 text-right">
-                      <span className="text-[10px] font-medium text-zinc-500">
-                        {event.occurredAt ? new Date(event.occurredAt).toLocaleTimeString() : "---"}
-                      </span>
-                    </td>
-                  </tr>
-                ))
+                events.map((event) => {
+                  const isExpanded = expandedEvent === event.id;
+                  const previewText = getMessagePreview(event.payload);
+                  
+                  return (
+                    <Fragment key={event.id}>
+                      <tr 
+                        className="hover:bg-white/[0.02] transition-colors group cursor-pointer"
+                        onClick={() => setExpandedEvent(isExpanded ? null : event.id)}
+                      >
+                        <td className="p-3 text-zinc-600 group-hover:text-white transition-colors">
+                          {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        </td>
+                        <td className="p-3">
+                          <div className="flex flex-col">
+                            <span className="text-[11px] font-black uppercase tracking-tight text-white group-hover:text-emerald-400 transition-colors">
+                              {event.eventType || "MESSAGES_UPSERT"}
+                            </span>
+                            <span className="text-[9px] font-medium text-zinc-600">ID: {event.id.slice(-8)}</span>
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <span className="text-[10px] font-bold text-zinc-400">{event.instanceId || "---"}</span>
+                        </td>
+                        <td className="p-3">
+                          <span className={`px-2 py-0.5 text-[9px] font-black uppercase tracking-widest rounded-full ${
+                            event.status === "processed" ? "bg-emerald-500/10 text-emerald-400" :
+                            event.status === "failed" ? "bg-red-500/10 text-red-400" :
+                            "bg-amber-500/10 text-amber-400"
+                          }`}>
+                            {event.status || "recebido"}
+                          </span>
+                        </td>
+                        <td className="p-3 text-right">
+                          <div className="flex flex-col items-end">
+                            <span className="text-[10px] font-medium text-zinc-400">
+                              {event.occurredAt ? new Date(event.occurredAt).toLocaleDateString("pt-BR") : "---"}
+                            </span>
+                            <span className="text-[9px] font-black text-zinc-500">
+                              {event.occurredAt ? new Date(event.occurredAt).toLocaleTimeString("pt-BR") : "---"}
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr className="bg-zinc-950/50">
+                          <td colSpan={5} className="p-4 border-l-2 border-emerald-500/50">
+                            <div className="flex flex-col gap-2">
+                              {previewText && (
+                                <div className="mb-2 p-3 bg-zinc-900 border border-white/5 rounded-md">
+                                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500 mb-1 block">Preview da Mensagem:</span>
+                                  <p className="text-sm text-zinc-300 font-medium">"{previewText}"</p>
+                                </div>
+                              )}
+                              <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Payload Completo:</span>
+                              <pre className="text-[10px] text-zinc-400 whitespace-pre-wrap overflow-x-auto p-3 bg-black border border-white/5 font-mono max-h-64 overflow-y-auto">
+                                {JSON.stringify(event.payload || event, null, 2)}
+                              </pre>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })
               )}
             </tbody>
           </table>
