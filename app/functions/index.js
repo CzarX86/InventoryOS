@@ -555,3 +555,7 @@ exports.onWhatsappMessageCreated = onDocumentCreated({
     });
   }
 });
+
+// FinOps - Real-time aggregated usage monitoring
+const { aggregateAiUsage } = require("./finops");
+exports.aggregateAiUsage = aggregateAiUsage;

@@ -34,19 +34,6 @@ export default function SettingsView() {
         </h1>
       </div>
 
-      {/* WhatsApp Connectivity */}
-      {isFeatureEnabled(flags, "whatsappIngestion") && (
-        <div className="border-b border-white/[0.07]">
-          <div className="px-4 md:px-6 py-4 border-b border-white/[0.07] flex items-center gap-2">
-            <MessageSquare size={14} className="text-zinc-400" />
-            <p className="text-base font-black uppercase tracking-widest text-zinc-300">Conectividade WhatsApp</p>
-          </div>
-          <div className="bg-white/[0.01]">
-            <WhatsappInstanceManager />
-          </div>
-        </div>
-      )}
-
       {/* AI Workflow */}
       <div className="border-b border-white/[0.07]">
         <div className="px-4 md:px-6 py-4 border-b border-white/[0.07]">

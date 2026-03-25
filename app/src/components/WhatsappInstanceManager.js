@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { functions } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
-import { Loader2, QrCode, Smartphone, Wifi, WifiOff, Trash2, LogOut, Plus, RefreshCw, CheckCircle2 } from "lucide-react";
+import { Loader2, QrCode, Smartphone, Wifi, WifiOff, Trash2, LogOut, Plus, RefreshCw, CheckCircle2, Info } from "lucide-react";
 
 export default function WhatsappInstanceManager() {
   const [instances, setInstances] = useState([]);
@@ -166,6 +166,9 @@ export default function WhatsappInstanceManager() {
             onChange={(e) => setNewInstanceName(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ""))}
             className="bg-zinc-950 border border-white/10 px-4 py-2 text-sm font-bold text-white placeholder:text-zinc-600 focus:outline-none focus:border-white/20 transition-colors"
           />
+          <div className="hidden lg:block group relative" title="O prefixo ios_ é adicionado automaticamente para identificar este projeto.">
+            <Info size={14} className="text-zinc-500 cursor-help" />
+          </div>
           <button
             onClick={handleCreateInstance}
             disabled={actionLoading === "create" || !newInstanceName}
@@ -244,8 +247,8 @@ export default function WhatsappInstanceManager() {
                         <>
                           <button 
                             onClick={() => handleSetWebhook(instanceName)}
-                            title="Configurar Webhook"
-                            className="p-2 text-zinc-500 hover:text-white hover:bg-white/5 transition-all"
+                            title="Configurar Webhook (Necessário para o Monitor de Atividade)"
+                            className={`p-2 transition-all ${isConnected ? "text-emerald-500 hover:text-emerald-400" : "text-zinc-500 hover:text-white"}`}
                           >
                             <CheckCircle2 size={16} />
                           </button>
