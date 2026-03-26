@@ -1,7 +1,10 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Download, X, Loader2 } from "lucide-react";
+import { Download, X, Loader2, Smartphone, Apple } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 function getClientInstallState() {
   if (typeof window === "undefined") {
@@ -20,45 +23,62 @@ function getClientInstallState() {
   return {
     isIOS,
     isStandalone,
-    isInstallable: isIOS && !isStandalone,
+    isInstallable: (isIOS && !isStandalone) || (!isIOS && !isStandalone),
   };
 }
 
 export default function PWAInstallPrompt() {
-  const clientInstallState = getClientInstallState();
   const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [isInstallable, setIsInstallable] = useState(clientInstallState.isInstallable);
   const [isInstalling, setIsInstalling] = useState(false);
   const [dismissed, setDismissed] = useState(false);
-  const [isIOS] = useState(clientInstallState.isIOS);
-  const [isStandalone, setIsStandalone] = useState(clientInstallState.isStandalone);
+  const [clientState, setClientState] = useState({
+    isIOS: false,
+    isStandalone: false,
+    isInstallable: false,
+  });
+
+  const { isIOS, isStandalone, isInstallable } = clientState;
 
   useEffect(() => {
-    if (isStandalone) {
-      return; // Already installed, no need to show anything
-    }
+    const state = getClientInstallState();
+    setTimeout(() => {
+      setClientState(state);
+    }, 0);
 
-    // Handle Android/Desktop beforeinstallprompt
+    if (state.isStandalone) return;
+
+
     const handler = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      setIsInstallable(true);
+      setClientState(prev => ({ ...prev, isInstallable: true }));
     };
+    
     const onAppInstalled = () => {
-      setIsInstallable(false);
-      setIsInstalling(false);
       setDeferredPrompt(null);
-      setIsStandalone(true);
+      setIsInstalling(false);
+      setClientState({
+        isIOS: clientState.isIOS,
+        isStandalone: true,
+        isInstallable: false
+      });
     };
+
 
     window.addEventListener("beforeinstallprompt", handler);
     window.addEventListener("appinstalled", onAppInstalled);
 
+    // Auto-dismiss after 8 seconds if not interacted with
+    const timer = setTimeout(() => {
+      setDismissed(true);
+    }, 8000);
+
     return () => {
       window.removeEventListener("beforeinstallprompt", handler);
       window.removeEventListener("appinstalled", onAppInstalled);
+      clearTimeout(timer);
     };
-  }, [isStandalone]);
+  }, []);
 
   const handleInstall = async () => {
     if (!deferredPrompt && !isIOS) return;
@@ -70,12 +90,11 @@ export default function PWAInstallPrompt() {
       const { outcome } = await deferredPrompt.userChoice;
       if (outcome === "accepted") {
         setDeferredPrompt(null);
-        setIsInstallable(false);
+        setClientState(prev => ({ ...prev, isInstallable: false }));
       }
+
     }
     
-    // For iOS, there might be no prompt(), we just keep showing instructions
-    // but we can simulate a short loading state to give feedback that they clicked
     if (isIOS && !deferredPrompt) {
       setTimeout(() => {
         setIsInstalling(false);
@@ -94,57 +113,67 @@ export default function PWAInstallPrompt() {
         initial={{ y: 100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 100, opacity: 0 }}
-        className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-32px)] max-w-sm pointer-events-auto"
+        className="fixed bottom-6 left-4 right-4 z-[100] max-w-sm mx-auto pointer-events-auto"
       >
-        <div className="bg-[#1a1a1a] border border-emerald-500/30 shadow-2xl p-4 flex flex-col gap-3 relative overflow-hidden group">
+        <div className="bg-[#131313] border border-white/10 shadow-2xl overflow-hidden relative group">
+          {/* Progress Bar Detail */}
+          <div className="absolute top-0 left-0 w-full h-[2px] bg-white/5" />
+          <div className="absolute top-0 left-0 h-[2px] bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)] transition-all duration-1000 w-1/3 group-hover:w-full" />
           
-          {/* subtle animated background glow */}
-          <div className="absolute inset-0 bg-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
-
-          <button 
-            onClick={() => setDismissed(true)} 
-            className="absolute top-2 right-2 p-1 text-zinc-500 hover:text-white transition-colors z-10"
-            aria-label="Dismiss install prompt"
-          >
-            <X size={14} />
-          </button>
-          
-          <div className="flex items-start gap-3 mt-1 relative z-10">
-            <div className="w-10 h-10 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex items-center justify-center shrink-0">
-              <Download size={20} className="text-emerald-400" />
-            </div>
-            <div>
-              <p className="text-sm font-black uppercase tracking-widest text-white mb-1">
-                Instalar App Localmente
-              </p>
-              {isIOS && !deferredPrompt ? (
-                <p className="text-xs text-zinc-400 leading-relaxed max-w-[200px]">
-                  No iOS, toque no botao &quot;Compartilhar&quot; e depois em &quot;Adicionar a Tela de Inicio&quot;.
-                </p>
-              ) : (
-                <p className="text-xs text-zinc-400 leading-relaxed max-w-[200px]">
-                  Tenha acesso rápido e melhor performance instalando o app.
-                </p>
-              )}
-            </div>
-          </div>
-          
-          {(!isIOS || deferredPrompt) && (
-            <button
-              onClick={handleInstall}
-              disabled={isInstalling}
-              className="w-full flex items-center justify-center gap-2 mt-2 py-3 bg-white text-[#141414] font-black uppercase tracking-widest text-xs hover:bg-zinc-200 transition-colors disabled:opacity-50 relative z-10"
+          <div className="p-5">
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => setDismissed(true)} 
+              className="absolute top-2 right-2 h-8 w-8 rounded-none text-muted-foreground hover:text-white hover:bg-white/5"
             >
-              {isInstalling ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  <span>Instalando...</span>
-                </>
-              ) : (
-                "Instalar Agora"
-              )}
-            </button>
-          )}
+              <X size={16} />
+            </Button>
+            
+            <div className="flex items-start gap-4 mb-6">
+              <div className="w-12 h-12 bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                {isIOS ? <Apple size={24} className="text-emerald-500" /> : <Smartphone size={24} className="text-emerald-500" />}
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 mb-2">
+                  <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-white">
+                    MODO_APLICATIVO
+                  </h3>
+                  <div className="px-1.5 py-0.5 border border-emerald-500/30 text-[8px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-500/5">
+                    PWA_MODE
+                  </div>
+                </div>
+                <p className="text-[10px] font-bold text-muted-foreground/80 leading-relaxed uppercase tracking-wide font-mono">
+                  {isIOS && !deferredPrompt 
+                    ? "SISTEMA: ACESSE COMPARTILHAR > ADICIONAR À TELA DE INÍCIO"
+                    : "INSTALE O NÚCLEO INVENTORYOS PARA PERFORMANCE OTIMIZADA"}
+                </p>
+              </div>
+            </div>
+            
+            {(!isIOS || deferredPrompt) && (
+              <Button
+                onClick={handleInstall}
+                disabled={isInstalling}
+                className="w-full h-12 bg-white text-black font-black uppercase tracking-[0.2em] text-[10px] rounded-none hover:bg-zinc-200 transition-all"
+              >
+                {isInstalling ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin mr-2" />
+                    EXECUTANDO_SETUP...
+                  </>
+                ) : (
+                  <>
+                    <Download size={14} className="mr-2" />
+                    INSTALAR_SISTEMA
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+
+          {/* Decorative Corner */}
+          <div className="absolute bottom-0 right-0 w-2 h-2 border-r border-b border-white/20" />
         </div>
       </motion.div>
     </AnimatePresence>

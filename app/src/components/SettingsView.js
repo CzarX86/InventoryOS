@@ -4,6 +4,12 @@ import { Zap, Clock, LogOut, Check, RefreshCw } from "lucide-react";
 import useAuth from "@/hooks/useAuth";
 import useFeatureFlags from "@/hooks/useFeatureFlags";
 import { isFeatureEnabled } from "@/lib/featureFlags";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const WORKFLOWS = [
   {
@@ -25,107 +31,145 @@ export default function SettingsView() {
   const { flags } = useFeatureFlags(user);
 
   return (
-    <div className="pb-20">
+    <div className="pb-20 max-w-2xl mx-auto">
       {/* Title */}
-      <div className="px-4 md:px-6 pt-8 pb-6 border-b border-white/[0.07]">
-        <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tight text-white leading-none">
-          Config.
+      <div className="px-4 md:px-6 pt-10 pb-8 bg-[#0e0e0e] border-b border-[#484848]/20 mb-8">
+        <div className="flex items-center gap-3 mb-4">
+          <Badge variant="outline" className="h-5 px-2 bg-[#1f2020] text-[#97a5ff] border-[#484848]/20 text-[9px] font-bold uppercase tracking-[0.2em] shadow-none rounded-none font-display">
+            SYSTEM_PREFERENCES.CFG
+          </Badge>
+        </div>
+        <h1 className="text-3xl md:text-4xl font-black uppercase tracking-tighter text-[#e7e5e5] leading-none font-display">
+          CONFIGURAÇÕES_<span className="text-[#acabaa]/30">DO_AMBIENTE</span>
         </h1>
       </div>
 
-      {/* AI Workflow */}
-      <div className="border-b border-white/[0.07]">
-        <div className="px-4 md:px-6 py-4 border-b border-white/[0.07]">
-          <p className="text-base font-black uppercase tracking-widest text-zinc-300">Fluxo de Extração via IA</p>
-        </div>
-        {WORKFLOWS.map(({ id, name, desc, icon: Icon }) => {
-          const active = user?.aiWorkflow === id;
-          return (
-            <button
-              key={id}
-              onClick={() => updateSettings({ aiWorkflow: id })}
-              className={`w-full flex items-start gap-4 px-4 md:px-6 py-5 border-b border-white/[0.07] text-left hover:bg-white/[0.02] transition-colors ${
-                active ? "bg-white/[0.03]" : ""
-              }`}
-            >
-              <div className={`mt-0.5 shrink-0 ${active ? "text-white" : "text-zinc-200"}`}>
-                <Icon size={14} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className={`text-base font-bold uppercase tracking-wide mb-0.5 ${active ? "text-white" : "text-zinc-300"}`}>
-                  {name}
-                </p>
-                <p className="text-base text-zinc-200 leading-relaxed">{desc}</p>
-              </div>
-              {active && (
-                <Check size={13} className="text-white shrink-0 mt-0.5" />
-              )}
-            </button>
-          );
-        })}
-      </div>
+      <div className="space-y-8">
+        {/* AI Workflow Selection */}
+        <section>
+          <div className="px-4 md:px-6 py-4">
+            <h2 className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#acabaa]/50 font-display">
+              CORE_AI_EXTRACTION_ENGINE
+            </h2>
+          </div>
+          <div className="flex flex-col gap-px bg-[#484848]/20 border-y border-[#484848]/20">
+            {WORKFLOWS.map(({ id, name, desc, icon: Icon }) => {
+              const active = user?.aiWorkflow === id;
+              return (
+                <button
+                  key={id}
+                  onClick={() => updateSettings({ aiWorkflow: id })}
+                  className={`flex items-start gap-4 px-4 md:px-6 py-6 text-left transition-none ${
+                    active ? "bg-[#1f2020]" : "bg-[#0e0e0e] hover:bg-[#131313]"
+                  }`}
+                >
+                  <div className={`mt-0.5 p-3 rounded-none shrink-0 border ${active ? "bg-[#293e48] text-[#acc3ce] border-[#8ba1ac]/20" : "bg-[#131313] text-[#acabaa]/40 border-[#484848]/10"}`}>
+                    <Icon size={18} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <p className={`text-sm font-bold uppercase tracking-widest font-display ${active ? "text-[#e7e5e5]" : "text-[#acabaa]/40"}`}>
+                        {name.toUpperCase()}_MODE
+                      </p>
+                      {active && (
+                        <Badge variant="default" className="h-4 px-1.5 text-[7px] font-bold uppercase tracking-widest bg-[#293e48] text-[#acc3ce] rounded-none font-mono">
+                          ACTIVE_STATE
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-[#acabaa]/60 leading-relaxed font-mono uppercase tracking-tight">{desc}</p>
+                  </div>
+                  {active && (
+                    <div className="shrink-0 mt-0.5 w-6 h-6 rounded-none bg-[#acc3ce]/10 flex items-center justify-center border border-[#acc3ce]/20">
+                      <Check size={12} className="text-[#acc3ce]" />
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </section>
 
-      {/* Profile */}
-      <div className="border-b border-white/[0.07]">
-        <div className="px-4 md:px-6 py-4 border-b border-white/[0.07]">
-          <p className="text-base font-black uppercase tracking-widest text-zinc-300">Perfil & Segurança</p>
-        </div>
-        <div className="flex items-center justify-between px-4 md:px-6 py-5">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-[#141414] font-black text-base shrink-0">
-              {user?.email?.[0].toUpperCase()}
-            </div>
-            <div>
-              <p className="text-base font-bold text-white">{user?.email}</p>
-              <p className="text-base font-bold uppercase tracking-widest text-zinc-200 mt-0.5">
-                {isAdmin ? "Admin" : "Usuário"} · Firebase
-              </p>
+        {/* Profile & Security */}
+        <section>
+          <div className="px-4 md:px-6 py-4">
+            <h2 className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#acabaa]/50 font-display">
+              AUTH_SESSION_CONTROL
+            </h2>
+          </div>
+          <div className="mx-4 md:mx-6 p-6 border border-[#484848]/20 bg-[#131313] rounded-none relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-2 text-[8px] font-mono text-[#484848] uppercase tracking-widest">ENCRYPTED_AUTH_DATA</div>
+            <div className="flex items-center justify-between relative z-10">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-none bg-[#1f2020] border border-[#484848]/20 flex items-center justify-center text-[#97a5ff] font-black text-lg">
+                  {user?.email?.[0].toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-[#e7e5e5] leading-none mb-1.5 font-mono uppercase tracking-tight">{user?.email}</p>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={isAdmin ? "default" : "secondary"} className={`h-5 px-1.5 text-[8px] font-bold uppercase tracking-widest rounded-none font-display ${isAdmin ? "bg-[#293e48] text-[#acc3ce]" : "bg-[#191a1a] text-[#acabaa]"}`}>
+                      {isAdmin ? "SYSTEM_ROOT" : "AUTH_USER"}
+                    </Badge>
+                    <span className="text-[8px] text-[#acabaa]/30 uppercase font-bold tracking-widest font-mono">FIREBASE_JWT_PROVIDER</span>
+                  </div>
+                </div>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={logout}
+                className="text-[9px] font-bold uppercase tracking-widest border-[#7f2927]/20 text-[#ee7d77] hover:bg-[#7f2927]/10 rounded-none transition-none font-display h-10 px-6"
+              >
+                <LogOut size={14} className="mr-2" /> EXIT_SESSION
+              </Button>
             </div>
           </div>
-          <button
-            onClick={logout}
-            className="flex items-center gap-1.5 text-base font-black uppercase tracking-widest text-zinc-200 hover:text-red-400 transition-colors"
-          >
-            <LogOut size={12} /> Sair
-          </button>
-        </div>
-      </div>
+        </section>
 
-      <div className="px-4 md:px-6 py-6 border-b border-white/[0.07] flex flex-col gap-6">
-        <button
-          onClick={async () => {
-            if (window.confirm("Isso irá limpar o cache local e forçar a atualização para a versão mais recente. Continuar?")) {
-              try {
-                // 1. Unregister all service workers
-                if ("serviceWorker" in window.navigator) {
-                  const registrations = await window.navigator.serviceWorker.getRegistrations();
-                  for (const registration of registrations) {
-                    await registration.unregister();
+        {/* System & Maintenance */}
+        <section className="px-4 md:px-6 space-y-6 pt-4">
+          <Separator className="bg-[#484848]/10" />
+          
+          <div className="flex flex-col gap-6">
+            <Button
+              variant="outline"
+              className="text-[10px] font-bold uppercase tracking-[0.25em] h-14 justify-start border-[#484848]/20 bg-[#0e0e0e] hover:bg-[#131313] rounded-none transition-none font-display text-[#acabaa]"
+              onClick={async () => {
+                if (window.confirm("CONFIRM_ACTION: CLEAR_CACHE_AND_FORCE_REBOOT?")) {
+                  try {
+                    if ("serviceWorker" in window.navigator) {
+                      const registrations = await window.navigator.serviceWorker.getRegistrations();
+                      for (const registration of registrations) {
+                        await registration.unregister();
+                      }
+                    }
+                    if ("caches" in window) {
+                      const cacheNames = await window.caches.keys();
+                      for (const name of cacheNames) {
+                        await window.caches.delete(name);
+                      }
+                    }
+                    window.location.reload(true);
+                  } catch (err) {
+                    console.error("Erro ao limpar cache:", err);
+                    window.location.reload();
                   }
                 }
-                // 2. Clear all cache storages
-                if ("caches" in window) {
-                  const cacheNames = await window.caches.keys();
-                  for (const name of cacheNames) {
-                    await window.caches.delete(name);
-                  }
-                }
-                // 3. Hard reload
-                window.location.reload(true);
-              } catch (err) {
-                console.error("Erro ao limpar cache:", err);
-                window.location.reload();
-              }
-            }
-          }}
-          className="flex items-center gap-2 text-base font-black uppercase tracking-widest text-zinc-400 hover:text-white transition-colors w-fit"
-        >
-          <RefreshCw size={14} /> Limpar Cache e Sincronizar
-        </button>
+              }}
+            >
+              <RefreshCw size={14} className="mr-3 text-[#97a5ff]" /> CLEAR_CACHE_AND_SYNC_BUFFERS
+            </Button>
 
-        <p className="text-base font-black uppercase tracking-[0.3em] text-zinc-300">
-          InventoryOS v{process.env.NEXT_PUBLIC_APP_VERSION || "0.1.0"}
-        </p>
+            <div className="flex items-center justify-between pt-4 border-t border-[#484848]/5">
+              <p className="text-[8px] font-bold uppercase tracking-[0.4em] text-[#acabaa]/20 font-mono">
+                IOS_SYSTEM_CORE_V{process.env.NEXT_PUBLIC_APP_VERSION || "1.0.2"}
+              </p>
+              <Badge variant="outline" className="text-[7px] font-bold uppercase tracking-widest border-[#484848]/10 text-[#acabaa]/20 rounded-none font-display">
+                DEPLOYED_STABLE_BUILD
+              </Badge>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );

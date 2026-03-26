@@ -1,16 +1,70 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: ui-sans-serif, system-ui, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, monospace;
+  --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-display), sans-serif;
+  --font-mono: var(--font-mono), ui-monospace, monospace;
+
+  /* Forge Industrial - Obsidian Core */
+  --color-background: #0e0e0e;
+  --color-foreground: #e7e5e5;
+  
+  --color-primary: #c6c6c7;
+  --color-primary-foreground: #3f4041;
+  
+  --color-secondary: #8ba1ac;
+  --color-secondary-foreground: #0d232b;
+  
+  --color-muted: #191a1a;
+  --color-muted-foreground: #acabaa;
+  
+  --color-accent: #191a1a;
+  --color-accent-foreground: #e7e5e5;
+  
+  --color-popover: #0e0e0e;
+  --color-popover-foreground: #e7e5e5;
+  
+  --color-card: #0e0e0e;
+  --color-card-foreground: #e7e5e5;
+  
+  --color-border: #484848;
+  --color-input: #484848;
+  --color-ring: #c6c6c7;
+
+  /* Radius always 0 - Industrial Precision */
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+  --radius-3xl: 0;
+  --radius-full: 0;
 }
+
+@layer base {
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display tracking-tight uppercase;
+  }
+}
+
 
 html {
   color-scheme: dark;
 }
 
+::selection {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 99px; }
+::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 0; }
 ::-webkit-scrollbar-thumb:hover { background: #52525b; }
 /* v1.0.2 - Final PWA Update Verification */
+.magnetic-tooltip {
+  @apply bg-[#1f2020] border border-white/10 text-white text-[9px] font-black uppercase tracking-[0.2em] px-2 py-1 shadow-2xl pointer-events-none z-[9999];
+  border-radius: 0;
+  transform: translate(12px, 12px);
+  backdrop-filter: blur(8px);
+}

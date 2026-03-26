@@ -19,8 +19,21 @@ import {
 } from "@/lib/audit";
 import { escalateErrorReport, recordAppError, toUserFacingError } from "@/lib/errorReporting";
 import GlobalLoadingBar from "@/components/GlobalLoadingBar";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
-const INPUT = "w-full bg-transparent border-b border-white/[0.1] py-2.5 text-base text-white placeholder:text-zinc-200 outline-none focus:border-white/30 transition-colors";
 const STATUS_OPTIONS = ["IN STOCK", "SOLD", "REPAIR", "RESERVED"];
 
 const EMPTY_FORM = {
@@ -107,7 +120,6 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
       setFormData(prev => ({
         ...prev,
         ...Object.keys(suggestions).reduce((acc, key) => {
-          // Robust mapping for common field variations
           let normalizedKey = key.toLowerCase();
           if (normalizedKey.includes("spec") || normalizedKey.includes("technical")) normalizedKey = "specifications";
           if (normalizedKey.includes("brand") || normalizedKey.includes("manufacturer")) normalizedKey = "brand";
@@ -361,20 +373,14 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
     }
   };
 
-  if (!isOpen) return null;
-
   const isAI = (f) => !!suggestions?.[f];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/80 backdrop-blur-sm">
-      <motion.div
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 24 }}
-        transition={{ duration: 0.18 }}
-        className="w-full md:max-w-xl bg-[#141414] border-t md:border border-white/[0.08] overflow-hidden shadow-2xl max-h-[95vh] flex flex-col relative"
-      >
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-xl bg-[#0e0e0e] border-foreground/10 p-0 overflow-hidden shadow-[0_24px_48px_rgba(0,0,0,0.5)] flex flex-col max-h-[90vh] rounded-none border-[1px]">
+        <div className="absolute inset-0 pointer-events-none industrial-noise opacity-20" />
         <GlobalLoadingBar isLoading={saving || isExtracting || isProcessingProductPhoto} />
+        
         <AnimatePresence mode="wait">
           {success ? (
             <motion.div 
@@ -382,47 +388,44 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex-1 flex flex-col items-center justify-center p-8 bg-black min-h-[400px]"
+              transition={{ duration: 0.1 }}
+              className="flex-1 flex flex-col items-center justify-center p-8 min-h-[400px] relative z-10"
             >
               <div className="relative mb-12">
-                <motion.div
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ 
-                    scale: [0.8, 1.2, 0.8],
-                    opacity: [0, 0.2, 0]
-                  }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                  className="absolute inset-0 bg-white blur-3xl rounded-full"
-                />
                 <motion.div 
-                  initial={{ scale: 0, rotate: -20 }}
+                  initial={{ scale: 0, rotate: -45 }}
                   animate={{ scale: 1, rotate: 0 }}
-                  transition={{ type: "spring", damping: 15, stiffness: 200 }}
-                  className="relative w-24 h-24 bg-white rounded-3xl flex items-center justify-center text-black"
+                  transition={{ type: "spring", damping: 15, stiffness: 400, mass: 0.5 }}
+                  className="relative w-24 h-24 bg-primary rounded-none flex items-center justify-center text-primary-foreground border-4 border-[#0e0e0e] shadow-[0_0_20px_rgba(var(--primary),0.3)]"
                 >
-                  <Check size={48} strokeWidth={3} />
+                  <Check size={48} strokeWidth={4} />
                 </motion.div>
+                <div className="absolute -top-4 -right-4 bg-primary px-2 py-1 text-[8px] font-mono font-black uppercase tracking-widest text-[#0e0e0e]">
+                  STATUS:OK
+                </div>
               </div>
 
               <motion.h3 
-                initial={{ y: 20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.2 }}
-                className="text-4xl font-black uppercase tracking-tighter text-white mb-2"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.05, delay: 0.1 }}
+                className="text-5xl font-display font-black uppercase tracking-tighter text-foreground mb-4 leading-none text-center"
               >
                 REGISTRADO
               </motion.h3>
               <motion.p 
-                initial={{ y: 20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.3 }}
-                className="text-zinc-500 text-xs font-black uppercase tracking-[0.3em] mb-12"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.05, delay: 0.2 }}
+                className="text-muted-foreground text-[10px] font-mono font-bold uppercase tracking-[0.4em] mb-12 text-center"
               >
-                Ativo processado com sucesso
+                SYSTEMS_UPDATE_SUCCESS // ATIVO_ID_SINC
               </motion.p>
 
-              <div className="flex flex-col w-full gap-3 max-w-xs">
-                <button
+              <div className="flex flex-col w-full gap-px bg-foreground/10 border border-foreground/10 max-w-sm">
+                <Button
+                  size="lg"
+                  className="w-full py-10 text-[10px] font-display font-black uppercase tracking-[0.25em] rounded-none bg-primary hover:bg-primary/90 text-primary-foreground transition-none"
                   onClick={() => {
                     setFormData(EMPTY_FORM);
                     setAudioBlob(null);
@@ -430,16 +433,17 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                     setSuccess(false);
                     resetTaskLedger();
                   }}
-                  className="w-full py-5 bg-white text-black font-black uppercase tracking-widest text-xs hover:bg-zinc-200 transition-all active:scale-[0.98] shadow-[0_10px_30px_rgba(255,255,255,0.1)]"
                 >
-                  Novo Item
-                </button>
-                <button
+                  NOVO_CADASTRO
+                </Button>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="w-full py-10 text-[10px] font-display font-black uppercase tracking-[0.25em] rounded-none border-0 bg-obsidian-800 hover:bg-obsidian-750 text-foreground transition-none"
                   onClick={onClose}
-                  className="w-full py-5 border border-white/[0.08] text-zinc-400 font-black uppercase tracking-widest text-xs hover:bg-white/[0.05] hover:text-white transition-all active:scale-[0.98]"
                 >
-                  Voltar para Home
-                </button>
+                  VOLTAR_PAINEL
+                </Button>
               </div>
             </motion.div>
           ) : (
@@ -448,58 +452,58 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              transition={{ duration: 0.1 }}
               className="flex-1 flex flex-col overflow-hidden"
             >
-              {/* Header */}
-              <div className="flex items-center justify-between px-5 md:px-6 py-4 border-b border-white/[0.08] shrink-0">
-                <div className="flex items-center gap-3">
-                  <h2 className="text-base font-black uppercase tracking-widest text-white">
-                    {editItem ? "Editar" : "Novo Registro"}
-                  </h2>
-                  {editItem && (
-                    <span className="text-base font-mono text-zinc-200">{editItem.id?.slice(0, 8)}</span>
-                  )}
+              <DialogHeader className="px-6 py-8 border-b border-foreground/10 shrink-0 space-y-0 bg-[#0e0e0e] relative z-10">
+                <div className="flex items-center gap-4">
+                  <div className="w-2 h-8 bg-primary" />
+                  <div>
+                    <DialogTitle className="text-lg font-display font-black uppercase tracking-[0.15em] text-foreground leading-none">
+                      {editItem ? "EDIÇÃO_DE_ATIVO" : "SISTEMA_INGESTÃO_FORGE"}
+                    </DialogTitle>
+                    {editItem && (
+                      <p className="font-mono text-[9px] text-primary mt-1 uppercase tracking-widest">
+                        UUID_REF: {editItem.id}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <button onClick={onClose} className="text-zinc-200 hover:text-white transition-colors p-1">
-                  <X size={16} />
-                </button>
-              </div>
+                <DialogDescription className="hidden">
+                  Módulo de digitalização de ativos industriais via OCR Vision e Extração Semântica.
+                </DialogDescription>
+              </DialogHeader>
 
-              {/* Body */}
-              <div className="overflow-y-auto flex-1">
-
+              <div className="overflow-y-auto flex-1 custom-scrollbar">
                 {/* AI Scanner & Product Photo */}
                 {!editItem ? (
-                  <div className="border-b border-white/[0.08]">
+                  <div className="border-b border-foreground/10 grid grid-cols-3 divide-x divide-foreground/10 bg-[#131313] relative z-10">
                     {isExtracting ? (
-                      <div className="flex flex-col items-center justify-center py-10 gap-4 bg-white/[0.02]">
-                        <div className="relative flex items-center justify-center w-14 h-14">
+                      <div className="col-span-3 flex flex-col items-center justify-center py-16 gap-6 bg-primary/[0.02]">
+                        <div className="relative flex items-center justify-center w-20 h-20">
                           <motion.div
-                            animate={{ scale: [1, 2, 1], opacity: [0.2, 0, 0.2] }}
-                            transition={{ duration: 1.5, repeat: Infinity }}
-                            className="absolute inset-0 rounded-full bg-white"
+                            animate={{ scale: [1, 1.4, 1], opacity: [0.1, 0, 0.1] }}
+                            transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
+                            className="absolute inset-0 rounded-none bg-primary"
                           />
                           <motion.div
-                            animate={{ rotate: 360 }}
-                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                            animate={{ rotate: [0, 90, 180, 270, 360] }}
+                            transition={{ duration: 1, repeat: Infinity, ease: "steps(4)" }}
                           >
-                            <Sparkles size={22} className="text-white" />
+                            <Sparkles size={32} className="text-primary" />
                           </motion.div>
                         </div>
                         <div className="text-center">
-                          <p className="text-sm font-black uppercase tracking-[0.2em] text-white">IA Processando</p>
-                          <motion.p
-                            animate={{ opacity: [0.3, 1, 0.3] }}
-                            transition={{ duration: 1.4, repeat: Infinity }}
-                            className="text-[11px] font-bold uppercase tracking-widest text-zinc-400 mt-1"
-                          >
-                            Processando base de dados...
-                          </motion.p>
+                          <p className="text-sm font-display font-black uppercase tracking-[0.4em] text-foreground">EXTRACTING_DATA</p>
+                          <p className="text-[9px] font-mono uppercase tracking-widest text-primary/60 mt-2 animate-pulse">
+                            NEURAL_PATH_ENGAGED // STREAM_DATA...
+                          </p>
                         </div>
                       </div>
                     ) : (
-                      <div className="flex flex-col sm:flex-row">
-                        <div className="relative flex-1 border-b sm:border-b-0 sm:border-r border-white/[0.08]">
+                      <>
+                        {/* Scan Etiqueta */}
+                        <div className="relative flex flex-col items-center justify-center p-8 hover:bg-white/[0.03] transition-none cursor-pointer group min-h-[180px]">
                           <input
                             type="file"
                             accept="image/*"
@@ -507,14 +511,15 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                             disabled={isRecording}
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
                           />
-                          <div className="flex flex-col items-center justify-center p-6 h-full hover:bg-white/[0.02] transition-colors">
-                            <Camera size={24} className="shrink-0 mb-3 text-zinc-200" />
-                            <p className="text-sm font-bold uppercase tracking-wider text-center text-zinc-300">Scan Etiqueta</p>
-                            <span className="mt-2 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Extração IA</span>
+                          <Camera size={28} className="shrink-0 mb-5 text-muted-foreground group-hover:text-primary transition-none" />
+                          <p className="text-[10px] font-display font-black uppercase tracking-[0.2em] text-center text-foreground">ETIQUETA_OCR</p>
+                          <div className="mt-4 px-2 py-0.5 border border-foreground/20 bg-[#0e0e0e] text-[8px] font-mono font-black uppercase tracking-widest text-muted-foreground group-hover:text-primary group-hover:border-primary">
+                            INIT_SCAN
                           </div>
                         </div>
 
-                        <div className="relative flex-1 border-b sm:border-b-0 sm:border-r border-white/[0.08]">
+                        {/* Foto Produto */}
+                        <div className="relative flex flex-col items-center justify-center p-8 transition-none hover:bg-white/[0.03] group">
                           <input
                             type="file"
                             accept="image/*"
@@ -523,195 +528,216 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                               if (file) {
                                 setIsProcessingProductPhoto(true);
                                 setProductImageFile(file);
-                                // Brief "processing" feel
-                                setTimeout(() => setIsProcessingProductPhoto(false), 800);
+                                setTimeout(() => setIsProcessingProductPhoto(false), 400);
                               }
                             }}
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                           />
-                          <div className={`flex flex-col items-center justify-center p-6 h-full transition-colors ${productImageFile ? "bg-white/[0.03]" : "hover:bg-white/[0.02]"}`}>
-                            <div className={`shrink-0 mb-3 ${productImageFile ? "text-emerald-400" : "text-zinc-200"}`}>
-                              {productImageFile ? <Check size={24} /> : <Camera size={24} />}
-                            </div>
-                            <p className={`text-sm font-bold uppercase tracking-wider text-center ${productImageFile ? "text-emerald-400" : "text-zinc-300"}`}>
-                              {productImageFile ? "Foto Selecionada" : "Foto do Produto"}
-                            </p>
-                            <span className="mt-2 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Visualização</span>
+                          <div className={`shrink-0 mb-5 transition-none ${productImageFile ? "text-primary" : "text-muted-foreground group-hover:text-primary"}`}>
+                            {productImageFile ? <Check size={28} strokeWidth={3} /> : <Camera size={28} />}
+                          </div>
+                          <p className={`text-[10px] font-display font-black uppercase tracking-[0.2em] text-center ${productImageFile ? "text-primary" : "text-foreground"}`}>
+                            FOTO_REFERÊN
+                          </p>
+                          <div className={`mt-4 px-2 py-0.5 border text-[8px] font-mono font-black uppercase tracking-widest ${productImageFile ? "border-primary/40 bg-primary/10 text-primary" : "border-foreground/20 bg-[#0e0e0e] text-muted-foreground group-hover:border-primary group-hover:text-primary"}`}>
+                            VISUAL_REF
                           </div>
                         </div>
 
-                        {isRecording ? (
-                          <div className="relative flex-1 flex flex-col items-center justify-center p-6 h-full bg-white/[0.03]">
-                            <div className="flex items-center gap-6 mb-3">
-                              <button onClick={(e) => { e.stopPropagation(); cancelRecording(); }} className="text-zinc-400 hover:text-white transition-colors flex flex-col items-center">
-                                <X size={20} className="mb-1" />
-                                <span className="text-[9px] font-black uppercase tracking-widest">Cancelar</span>
-                              </button>
-                              <button onClick={(e) => { e.stopPropagation(); stopRecording(); }} className="text-red-500 hover:text-red-400 transition-colors flex flex-col items-center">
-                                <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 0.7, repeat: Infinity }}>
-                                  <Square size={20} className="mb-1 fill-red-500" />
-                                </motion.div>
-                                <span className="text-[9px] font-black uppercase tracking-widest">Enviar AI</span>
-                              </button>
+                        {/* Ditar */}
+                        <div 
+                          className={`relative flex flex-col items-center justify-center p-8 h-full transition-none cursor-pointer group ${isRecording ? "bg-red-950/20" : "hover:bg-white/[0.03]"}`}
+                          onClick={isRecording ? stopRecording : startRecording}
+                        >
+                          {isRecording ? (
+                            <div className="flex flex-col items-center">
+                              <motion.div animate={{ opacity: [1, 0.4, 1] }} transition={{ duration: 0.3, repeat: Infinity }}>
+                                <Square size={28} className="mb-5 fill-red-500 text-red-500" />
+                              </motion.div>
+                              <p className="text-[10px] font-display font-black uppercase tracking-[0.2em] text-red-500">STOP_RECORD</p>
+                              <div className="mt-4 px-2 py-0.5 border border-red-500/40 bg-red-500/10 text-[8px] font-mono font-black uppercase tracking-widest text-red-500">
+                                REC_ACTIVE
+                              </div>
                             </div>
-                            <span className="mt-2 text-[10px] font-black uppercase tracking-[0.2em] text-red-500 animate-pulse">Gravando...</span>
-                          </div>
-                        ) : (
-                          <div
-                            className="relative flex-1 flex flex-col items-center justify-center p-6 h-full transition-colors cursor-pointer hover:bg-white/[0.02]"
-                            onClick={startRecording}
-                          >
-                            <div className="shrink-0 mb-3 text-zinc-200">
-                              <Mic size={24} />
-                            </div>
-                            <p className="text-sm font-bold uppercase tracking-wider text-center text-zinc-300">
-                              Ditar
-                            </p>
-                            <span className="mt-2 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Voz IA</span>
-                          </div>
-                        )}
-                      </div>
+                          ) : (
+                            <>
+                              <Mic size={28} className="shrink-0 mb-5 text-muted-foreground group-hover:text-primary transition-none" />
+                              <p className="text-[10px] font-display font-black uppercase tracking-[0.2em] text-center text-foreground">COMANDO_VOZ</p>
+                              <div className="mt-4 px-2 py-0.5 border border-foreground/20 bg-[#0e0e0e] text-[8px] font-mono font-black uppercase tracking-widest text-muted-foreground group-hover:border-primary group-hover:text-primary">
+                                VOICE_DRIVE
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </>
                     )}
                   </div>
                 ) : (
-                  <div className="border-b border-white/[0.08] p-6 text-center">
-                    <p className="text-xs font-black uppercase tracking-[0.3em] text-zinc-600">Edição de Atributos</p>
+                  <div className="border-b border-foreground/10 p-4 text-center bg-[#131313]/40 relative z-10 flex items-center justify-center gap-3">
+                    <div className="w-1 h-3 bg-primary/40" />
+                    <p className="text-[9px] font-mono font-black uppercase tracking-[0.4em] text-muted-foreground/60">BUFFER://ATTRIBUTE_EDIT_MODE</p>
+                    <div className="w-1 h-3 bg-primary/40" />
                   </div>
                 )}
 
                 {/* Audio Log */}
                 {(audioBlob || formData.audioUrl) && (
-                  <div className="px-5 md:px-6 py-4 border-b border-white/[0.08] flex items-center gap-4 bg-white/[0.02]">
-                    <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-black shrink-0">
-                      <Mic size={18} />
+                  <div className="px-6 py-6 border-b border-foreground/10 flex items-center gap-6 bg-primary/[0.02] relative z-10">
+                    <div className="w-14 h-14 rounded-none bg-primary flex items-center justify-center text-[#0e0e0e] shrink-0 border border-[#0e0e0e]">
+                      <Mic size={24} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold uppercase tracking-widest text-white mb-1">Log de Voz (Cadastro)</p>
+                      <p className="text-[9px] font-mono font-black uppercase tracking-[0.3em] text-primary mb-3">RAW_VOICE_CAPTURE_STREAM</p>
                       <audio 
                           src={audioBlob ? URL.createObjectURL(audioBlob) : formData.audioUrl} 
                           controls 
-                          className="h-8 w-full outline-none mt-1 invert brightness-150 contrast-200" 
+                          className="h-8 w-full outline-none opacity-80 invert grayscale brightness-200 contrast-125" 
                       />
                     </div>
+                    <Button variant="outline" size="icon" className="h-12 w-12 text-muted-foreground border-foreground/10 rounded-none hover:bg-white/5 transition-none" onClick={() => {setAudioBlob(null); set("audioUrl", "");}}>
+                      <X size={20} />
+                    </Button>
                   </div>
                 )}
                 
                 {/* Validation Error */}
                 {validationError && !supportError && (
-                  <div className="px-5 md:px-6 py-4 bg-red-500/10 border-b border-white/[0.08]">
-                    <p className="text-sm font-bold text-red-400">{validationError}</p>
+                  <div className="px-6 py-5 bg-red-950/20 border-b border-red-500/30 relative z-10">
+                    <div className="flex items-center gap-3">
+                      <div className="w-1.5 h-4 bg-red-500" />
+                      <p className="text-[10px] font-mono font-black text-red-500 uppercase tracking-widest leading-none">ERROR_REPORT:// {validationError}</p>
+                    </div>
                   </div>
                 )}
 
-                <ErrorNotice
-                  error={supportError}
-                  onReport={handleSupportReport}
-                  reporting={reportingSupport}
-                />
+                <div className="px-6 relative z-10 mt-6">
+                  <ErrorNotice
+                    error={supportError}
+                    onReport={handleSupportReport}
+                    reporting={reportingSupport}
+                  />
+                </div>
 
-                {/* Status */}
-                <div className="border-b border-white/[0.08]">
-                  <div className="px-5 md:px-6 pt-5 pb-1">
-                    <p className="text-base font-black uppercase tracking-widest text-zinc-200 mb-3">Status</p>
-                    <div className="flex gap-0 border border-white/[0.08]">
-                      {STATUS_OPTIONS.map((s, i) => (
-                        <button
+                {/* Form Fields */}
+                <div className="p-8 space-y-12 relative z-10">
+                  {/* Status Selection */}
+                  <div className="space-y-5">
+                    <div className="flex items-center gap-3">
+                      <div className="w-1.5 h-3 bg-primary/40" />
+                      <Label className="text-[10px] font-display font-black uppercase tracking-[0.25em] text-muted-foreground">ATIVO_STATUS_SYSTEM</Label>
+                    </div>
+                    <ToggleGroup 
+                      type="single" 
+                      value={formData.status} 
+                      onValueChange={(val) => val && set("status", val)} 
+                      className="justify-start gap-px bg-foreground/10 border border-foreground/10 flex-wrap rounded-none overflow-hidden"
+                    >
+                      {STATUS_OPTIONS.map((s) => (
+                        <ToggleGroupItem
                           key={s}
-                          type="button"
-                          onClick={() => set("status", s)}
-                          className={`flex-1 py-2 text-base font-black uppercase tracking-wider transition-colors ${
-                            i < STATUS_OPTIONS.length - 1 ? "border-r border-white/[0.08]" : ""
-                          } ${
-                            formData.status === s
-                              ? "bg-white text-[#141414]"
-                              : "text-zinc-200 hover:text-zinc-200 hover:bg-white/[0.03]"
-                          }`}
+                          value={s}
+                          className="px-6 h-12 text-[10px] font-display font-black uppercase tracking-[0.1em] rounded-none border-0 bg-[#0e0e0e] border-r border-foreground/5 data-[state=on]:bg-primary data-[state=on]:text-[#0e0e0e] hover:bg-white/5 transition-none flex-1"
                         >
                           {s}
-                        </button>
+                        </ToggleGroupItem>
                       ))}
-                    </div>
+                    </ToggleGroup>
                   </div>
 
-                  {/* Fields grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 px-5 md:px-6 pb-5 mt-5">
+                  {/* Main Fields */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                     {[
-                      { id: "type",                 label: "Tipo de Equipamento",  placeholder: "Ex: Inversor de Frequência" },
-                      { id: "brand",                label: "Fabricante / Marca",    placeholder: "Ex: Siemens, WEG" },
-                      { id: "model",                label: "Modelo",                placeholder: "Ex: CFW11" },
-                      { id: "partNumber",           label: "Part Number",           placeholder: "Código de identificação", mono: true },
+                      { id: "type",                 label: "TIPO_EQUIP",  placeholder: "DRIVE / PLC / SENSOR" },
+                      { id: "brand",                label: "MANUFACTURER",    placeholder: "SIEMENS / WEG / ABB" },
+                      { id: "model",                label: "MODEL_REF",                placeholder: "SYS_REFERENCE" },
+                      { id: "partNumber",           label: "SERIAL_PN",           placeholder: "S/N ID", mono: true },
                     ].map(field => (
-                      <div key={field.id} className="py-3 md:odd:pr-4 md:even:pl-4 md:odd:border-r md:odd:border-white/[0.06]">
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="text-base font-black uppercase tracking-widest text-zinc-200">{field.label}</label>
+                      <div key={field.id} className="space-y-4">
+                        <div className="flex items-center justify-between px-1">
+                          <div className="flex items-center gap-2">
+                            <div className="w-1 h-3 bg-primary/30" />
+                            <Label htmlFor={field.id} className="text-[10px] font-display font-black uppercase tracking-[0.2em] text-muted-foreground">
+                              {field.label}
+                            </Label>
+                          </div>
                           {isAI(field.id) && (
-                            <span className="flex items-center gap-0.5 text-base font-black uppercase tracking-wider text-white/50">
-                              <Sparkles size={7} /> IA
-                            </span>
+                            <div className="px-2 py-0.5 border border-primary/20 bg-primary/5 text-[8px] font-mono font-black text-primary uppercase tracking-tighter flex items-center gap-1.5">
+                              <Sparkles size={8} /> IA_SUGG
+                            </div>
                           )}
                         </div>
-                        <input
-                          type={field.type || "text"}
-                          className={`${INPUT} ${field.mono ? "font-mono text-base" : ""} ${isAI(field.id) ? "border-white/30" : ""}`}
+                        <Input
+                          id={field.id}
+                          className={`h-12 rounded-none border-foreground/10 bg-[#131313]/60 focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary transition-none border-[1px] ${field.mono ? "font-mono text-sm tracking-tight" : "font-display font-black text-xs uppercase tracking-wider"} ${isAI(field.id) ? "border-primary/40 bg-primary/[0.02]" : ""}`}
                           placeholder={field.placeholder}
                           value={formData[field.id]}
-                          onChange={e => set(field.id, field.type === "number" ? e.target.value : e.target.value.toUpperCase())}
+                          onChange={e => set(field.id, (e.target.value || "").toUpperCase())}
                         />
                       </div>
                     ))}
                   </div>
-                </div>
 
-                {/* Specs */}
-                <div className="px-5 md:px-6 py-4 border-b border-white/[0.08]">
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-base font-black uppercase tracking-widest text-zinc-200">Especificações Técnicas</label>
-                    {isAI("specifications") && (
-                      <span className="flex items-center gap-0.5 text-base font-black uppercase tracking-wider text-white/50">
-                        <Sparkles size={7} /> IA
-                      </span>
-                    )}
+                  {/* Specs */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between px-1">
+                      <div className="flex items-center gap-2">
+                        <div className="w-1 h-3 bg-primary/30" />
+                        <Label className="text-[10px] font-display font-black uppercase tracking-[0.2em] text-muted-foreground">MOD_SPECIFICATIONS</Label>
+                      </div>
+                      {isAI("specifications") && (
+                        <div className="px-2 py-0.5 border border-primary/20 bg-primary/5 text-[8px] font-mono font-black text-primary uppercase tracking-tighter flex items-center gap-1.5">
+                          <Sparkles size={8} /> IA_GENERATED
+                        </div>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <div className="absolute top-3 right-3 font-mono text-[8px] text-muted-foreground pointer-events-none opacity-40 uppercase tracking-widest">RAW_TEXT_BLOCK</div>
+                      <Textarea
+                        className={`font-mono text-xs min-h-[160px] rounded-none border-foreground/10 bg-[#131313]/60 focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary border-[1px] leading-relaxed resize-none p-5 transition-none break-all ${isAI("specifications") ? "border-primary/40 bg-primary/[0.02]" : ""}`}
+                        placeholder="POTÊNCIA // TENSÃO // CORRENTE // DIMENSÕES"
+                        value={formData.specifications}
+                        onChange={e => set("specifications", (e.target.value || "").toUpperCase())}
+                      />
+                    </div>
                   </div>
-                  <textarea
-                    className={`${INPUT} font-mono text-base min-h-[80px] resize-none ${isAI("specifications") ? "border-white/30" : ""}`}
-                    placeholder="Potência, Tensão, Corrente..."
-                    value={formData.specifications}
-                    onChange={e => set("specifications", e.target.value.toUpperCase())}
-                  />
                 </div>
 
                 {/* AI Confirmation */}
                 <AnimatePresence>
                   {hasPendingConfirmation && (
                     <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="overflow-hidden border-b border-white/[0.08]"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.1 }}
+                      className="bg-primary shadow-[inset_0_0_20px_rgba(0,0,0,0.1)] relative z-20"
                     >
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 px-5 md:px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <Check size={13} className="text-white shrink-0" />
+                      <div className="flex flex-col sm:flex-row items-center gap-8 px-8 py-8">
+                        <div className="flex items-center gap-5">
+                          <div className="w-14 h-14 rounded-none bg-[#0e0e0e] flex items-center justify-center text-primary shrink-0 border border-black/40 shadow-lg">
+                            <Sparkles size={28} />
+                          </div>
                           <div>
-                            <p className="text-base font-black uppercase tracking-wider text-white">Revisar dados extraídos</p>
-                            <p className="text-base text-zinc-200">Confirme as informações preenchidas pela IA</p>
+                            <p className="text-xs font-display font-black uppercase tracking-[0.25em] text-[#0e0e0e] leading-none mb-2">REVISÃO_PENDENTE</p>
+                            <p className="text-[9px] font-mono text-[#0e0e0e]/70 uppercase tracking-widest font-bold">ANALYTICS_COMPLETE // CONFIRM_REQUIRED</p>
                           </div>
                         </div>
-                        <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">
-                          <button
-                            type="button"
+                        <div className="flex gap-px bg-black/10 border border-black/10 w-full sm:w-auto sm:ml-auto">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="flex-1 sm:flex-none text-[10px] font-display font-black uppercase tracking-[0.2em] rounded-none border-0 bg-[#0e0e0e] text-white hover:bg-black/80 py-6 h-auto px-8 transition-none"
                             onClick={() => { setFormData(EMPTY_FORM); setAudioBlob(null); setValidationError(""); setSupportError(null); }}
-                            className="flex-1 sm:flex-none px-4 py-2 text-base font-black uppercase tracking-widest text-zinc-200 border border-white/[0.1] hover:bg-white/[0.05] transition-colors"
                           >
-                            Recomeçar
-                          </button>
-                          <button
-                            type="button"
+                            DESCARTAR
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            className="flex-1 sm:flex-none text-[10px] font-display font-black uppercase tracking-[0.25em] rounded-none border-0 bg-white text-black hover:bg-white/90 py-6 h-auto px-10 transition-none"
                             onClick={() => { setValidationError(""); setSupportError(null); confirmSuggestions(); }}
-                            className="flex-1 sm:flex-none px-4 py-2 text-base font-black uppercase tracking-widest bg-white text-[#141414] hover:bg-zinc-200 transition-colors"
                           >
-                            Confirmar
-                          </button>
+                            SINCRONIZAR
+                          </Button>
                         </div>
                       </div>
                     </motion.div>
@@ -720,36 +746,37 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
               </div>
 
               {/* Final Actions */}
-              <div className="flex border-t border-white/[0.08] shrink-0">
-                <button
-                  type="button"
+              <div className="flex p-px bg-foreground/10 border-t border-foreground/10 shrink-0 bg-[#0e0e0e] relative z-10">
+                <Button
+                  variant="ghost"
+                  className="flex-1 font-display font-black uppercase tracking-[0.3em] text-[10px] h-20 rounded-none bg-[#131313] hover:bg-white/5 text-muted-foreground transition-none"
                   onClick={() => { setValidationError(""); setSupportError(null); onClose(); }}
-                  className="flex-1 py-4 text-base font-black uppercase tracking-widest text-zinc-200 hover:text-white border-r border-white/[0.08] hover:bg-white/[0.03] transition-colors"
                 >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
+                  ABORT_SESSION
+                </Button>
+                <Button
                   disabled={saving || isExtracting || hasPendingConfirmation}
                   onClick={handleSubmit}
-                  className={`flex-[2] flex items-center justify-center gap-2 py-4 text-base font-black uppercase tracking-widest transition-colors ${
-                    hasPendingConfirmation || saving
-                      ? "text-zinc-200 cursor-not-allowed"
-                      : "bg-white text-[#141414] hover:bg-zinc-200"
-                  }`}
+                  className="flex-[2] font-display font-black uppercase tracking-[0.3em] text-[10px] h-20 rounded-none bg-primary hover:bg-primary/90 text-primary-foreground shadow-none transition-none border-l border-white/10"
                 >
-                  {saving
-                    ? <Loader2 className="animate-spin" size={14} />
-                    : hasPendingConfirmation ? "Aguardando revisão"
-                    : editItem ? "Salvar alterações"
-                    : "Cadastrar item"
-                  }
-                </button>
+                  {saving ? (
+                    <>
+                      <Loader2 className="animate-spin mr-3" size={16} />
+                      MOD_SYNC_ACTIVE...
+                    </>
+                  ) : hasPendingConfirmation ? (
+                    "REVISÃO_REQUERIDA"
+                  ) : editItem ? (
+                    "COMMIT_CHANGES"
+                  ) : (
+                    "INIT_DATA_COMMIT"
+                  )}
+                </Button>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
-      </motion.div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

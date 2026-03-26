@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot } from "firebase/firestore";
-import { TrendingUp, Activity, DollarSign, Brain, Zap } from "lucide-react";
+import { TrendingUp, Activity, DollarSign, Brain } from "lucide-react";
 import { motion } from "framer-motion";
+import { Badge } from "@/components/ui/badge";
 
 export default function AdminUsageStats() {
   const [stats, setStats] = useState(null);
@@ -35,55 +36,74 @@ export default function AdminUsageStats() {
   const totalTasks = stats?.totalRequests || 0;
   const avgCostPerTask = totalTasks > 0 ? mtdCost / totalTasks : 0;
 
-  const cards = [
+  const metrics = [
     {
-      label: "Gasto IA (Mês)",
+      label: "AI_MONTHLY_EXPENDITURE",
       value: `US$ ${mtdCost.toFixed(3)}`,
       icon: DollarSign,
-      color: "text-emerald-400",
-      detail: `MTD Real-time`
+      color: "text-emerald-500",
+      detail: "MTD_REALTIME_SYNC",
+      live: true
     },
     {
-      label: "Projeção (Run-rate)",
+      label: "PROJECTED_RUNRATE",
       value: `US$ ${runRate.toFixed(2)}`,
       icon: TrendingUp,
-      color: "text-blue-400",
-      detail: `Estimativa p/ final de ${now.toLocaleString('pt-BR', { month: 'short' })}`
+      color: "text-primary",
+      detail: `EST_END_${now.toLocaleString('en-US', { month: 'short' }).toUpperCase()}`
     },
     {
-      label: "Custo Médio / Tarefa",
+      label: "AVG_TASK_UNIT_COST",
       value: `US$ ${avgCostPerTask.toFixed(4)}`,
       icon: Brain,
-      color: "text-purple-400",
-      detail: `${totalTasks} execuções automáticas`
+      color: "text-primary/60",
+      detail: `${totalTasks}_LOGGED_EXECUTIONS`
     }
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-1 border-b border-white/[0.07] bg-white/[0.02]">
-      {cards.map((card, i) => (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+      {metrics.map((metric, i) => (
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: i * 0.1 }}
-          key={card.label}
-          className={`px-4 md:px-6 py-6 border-white/[0.07] ${i < 2 ? "md:border-r" : ""}`}
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: i * 0.05 }}
+          key={metric.label}
+          className="bg-[#131313] p-6 rounded-none relative overflow-hidden group border-l-2 border-foreground/5 hover:border-primary/40 transition-colors"
         >
-          <div className="flex items-start justify-between mb-3">
-            <div className={`p-2 rounded-lg bg-white/[0.03] ${card.color}`}>
-              <card.icon size={18} />
+          <div className="flex justify-between items-start mb-6">
+            <div className={`p-2 bg-foreground/5 ${metric.color}`}>
+              <metric.icon size={16} />
             </div>
-            {i === 0 && (
-              <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-emerald-400 animate-pulse">
-                <Activity size={10} /> Live
-              </span>
+            {metric.live && (
+              <div className="flex items-center gap-1.5 bg-emerald-500/10 px-2 py-0.5 border border-emerald-500/20">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                </span>
+                <span className="text-[8px] font-display font-black tracking-widest text-emerald-500 uppercase">Live</span>
+              </div>
             )}
           </div>
-          <p className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-1">{card.label}</p>
-          <p className="text-2xl font-black text-white">{card.value}</p>
-          <p className="text-[10px] uppercase tracking-widest text-zinc-500 mt-2 font-bold">{card.detail}</p>
+          
+          <div className="space-y-1">
+            <p className="text-[10px] font-display font-black uppercase tracking-[0.2em] text-muted-foreground/60">{metric.label}</p>
+            <p className="text-3xl font-display font-black text-foreground tracking-tighter">
+              {metric.value}
+            </p>
+          </div>
+          
+          <div className="mt-4 pt-4 border-t border-foreground/5">
+            <p className="text-[9px] font-mono uppercase tracking-[0.15em] text-muted-foreground/40 font-bold">
+              {metric.detail}
+            </p>
+          </div>
+
+          {/* Decorative scanner line on hover */}
+          <div className="absolute bottom-0 left-0 w-full h-[1px] bg-primary/0 group-hover:bg-primary/20 transition-all duration-500 shadow-[0_0_15px_rgba(var(--primary),0.5)]" />
         </motion.div>
       ))}
     </div>
   );
 }
+

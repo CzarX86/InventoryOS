@@ -358,7 +358,7 @@ Meta da fase:
 
 ### Story 1.1.1 - Criar UI da fila de revisao com `shadcn/ui`
 
-- Prioridade: `P1`
+- Prioridade: `CONCLUÍDO`
 - Branch sugerida: `codex/contact-review-queue-ui`
 
 Escopo:

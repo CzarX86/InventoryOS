@@ -12,6 +12,14 @@ import AdminDashboard from "@/components/AdminDashboard";
 import SettingsView from "@/components/SettingsView";
 import WhatsappView from "@/components/WhatsappView";
 import SplashScreen from "@/components/SplashScreen";
+import PWAInstallPrompt from "@/components/PWAInstallPrompt"; // Added PWAInstallPrompt import
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import useAuth from "@/hooks/useAuth";
 import useInventory from "@/hooks/useInventory";
 import { buildActivityEvent, logInventoryActivity } from "@/lib/audit";
@@ -20,10 +28,26 @@ import { db } from "@/lib/firebase";
 import { getBrandMeta } from "@/lib/utils";
 
 const STATUS_CONFIG = {
-  "IN STOCK":  { cls: "text-emerald-400",  dot: "bg-emerald-400" },
-  "SOLD":      { cls: "text-zinc-300",     dot: "bg-zinc-500" },
-  "REPAIR":    { cls: "text-amber-400",    dot: "bg-amber-400" },
-  "RESERVED":  { cls: "text-blue-400",     dot: "bg-blue-400" },
+  "IN STOCK":  { 
+    cls: "text-[#acc3ce]", // on_secondary_container
+    dot: "bg-[#8ba1ac]", // secondary
+    bg: "bg-[#293e48]"   // secondary_container
+  },
+  "SOLD":      { 
+    cls: "text-[#acabaa]", // on_surface_variant
+    dot: "bg-[#484848]", // outline_variant
+    bg: "bg-[#191a1a]"   // surface_container
+  },
+  "REPAIR":    { 
+    cls: "text-[#ee7d77]", // error
+    dot: "bg-[#7f2927]", // error_container
+    bg: "bg-[#7f2927]/20"
+  },
+  "RESERVED":  { 
+    cls: "text-[#97a5ff]", // tertiary
+    dot: "bg-[#8596ff]", // tertiary_container
+    bg: "bg-[#8596ff]/10"
+  },
 };
 
 export default function Dashboard() {
@@ -70,28 +94,28 @@ export default function Dashboard() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#141414]">
-        <div className="w-5 h-5 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-5 h-5 border-2 border-muted border-t-primary animate-spin" />
       </div>
     );
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#141414] p-6">
+      <div className="min-h-screen flex items-center justify-center bg-background p-6">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-xs"
         >
-          <h1 className="text-4xl font-black uppercase tracking-tight text-white mb-2">
+          <h1 className="text-4xl font-black uppercase tracking-tight text-foreground mb-2 font-display">
             Inventory<br />OS
           </h1>
           <p className="text-base text-zinc-300 mb-1 leading-relaxed">
             Gestão de estoque com extração inteligente por IA.
           </p>
           {process.env.NEXT_PUBLIC_APP_VERSION && (
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-10">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-10 font-mono">
               Versão {process.env.NEXT_PUBLIC_APP_VERSION}
             </p>
           )}
@@ -239,174 +263,214 @@ export default function Dashboard() {
   };
 
   return (
-    <>
+    <TooltipProvider>
       <AnimatePresence>
         {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
       </AnimatePresence>
 
-      <div className="flex h-screen overflow-hidden bg-[#141414] text-white selection:bg-white selection:text-black">
-      {/* Global CSS to prevent mobile bounce/scroll on main body if needed */}
-      <style jsx global>{`
-        html, body {
-          overflow: hidden;
-          position: fixed;
-          width: 100%;
-          height: 100%;
-          -webkit-overflow-scrolling: touch;
-          touch-action: none;
-        }
-        #__next, main, .overflow-y-auto {
-          touch-action: pan-y;
-        }
-      `}</style>
+      <div className="flex h-screen overflow-hidden bg-background text-foreground selection:bg-primary/20 selection:text-primary">
+        <style jsx global>{`
+          html, body {
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            -webkit-overflow-scrolling: touch;
+            touch-action: none;
+          }
+          #__next, main, .overflow-y-auto {
+            touch-action: pan-y;
+          }
+        `}</style>
 
-      {/* ── Sidebar (desktop) ── */}
-      <aside className="hidden md:flex flex-col w-48 shrink-0 border-r border-white/[0.07] bg-[#111]">
-        {/* Logo */}
-        <div className="px-5 pt-6 pb-5 border-b border-white/[0.07]">
-          <span className="text-base font-black uppercase tracking-[0.2em] text-white">
-            Inventory<br />OS
-          </span>
-        </div>
+        {/* ── Sidebar (desktop) ── */}
+        <aside className="hidden md:flex flex-col w-44 shrink-0 border-r border-[#484848]/20 bg-[#0e0e0e]">
+          {/* Logo */}
+          <div className="px-6 pt-8 pb-6 border-b border-[#484848]/20">
+            <h1 className="text-lg font-black uppercase tracking-tighter text-[#e7e5e5] leading-none font-display">
+              IOS<span className="text-[#97a5ff]">.</span>
+              <br />
+              <span className="text-[8px] tracking-[0.3em] opacity-30 uppercase font-bold font-display">INVENTORY_OS</span>
+            </h1>
+          </div>
 
-        {/* Nav */}
-        <nav className="flex-1 py-4">
-          {navItems.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => setActiveTab(id)}
-              className={`w-full flex items-center gap-3 px-5 py-2.5 text-base font-bold uppercase tracking-widest transition-colors ${
-                activeTab === id ? "text-white" : "text-zinc-200 hover:text-zinc-200"
-              }`}
-            >
-              <Icon size={13} strokeWidth={activeTab === id ? 2.5 : 2} />
-              {label}
-            </button>
-          ))}
-        </nav>
+          {/* Nav */}
+          <nav className="flex-1 py-6 px-3 space-y-1">
+            {navItems.map(({ id, label, icon: Icon }) => (
+              <Button
+                key={id}
+                variant={activeTab === id ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setActiveTab(id)}
+                className={`w-full justify-start gap-3 h-10 font-bold uppercase tracking-widest text-[9px] rounded-none transition-none font-display ${
+                  activeTab === id 
+                    ? "bg-[#1f2020] text-[#e7e5e5]" 
+                    : "text-[#acabaa]/60 hover:text-[#e7e5e5] hover:bg-[#131313]"
+                }`}
+              >
+                <Icon size={14} className={activeTab === id ? "text-[#97a5ff]" : ""} />
+                {label}
+              </Button>
+            ))}
+          </nav>
 
-        {/* User */}
-        <div className="px-5 py-4 border-t border-white/[0.07]">
-          <div className="flex items-center gap-2.5 mb-3">
-            <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center text-[#111] font-black text-base shrink-0">
-              {user.email?.[0].toUpperCase()}
+          {/* User Account */}
+          <div className="p-4 border-t border-[#484848]/20 bg-[#131313]">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-8 h-8 rounded-none bg-[#1f2020] border border-[#484848]/20 flex items-center justify-center text-[#97a5ff] font-black text-xs shrink-0">
+                {user.email?.[0].toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-[#e7e5e5] truncate font-display">
+                  {user.displayName || user.email?.split("@")[0]}
+                </p>
+                <Badge variant="outline" className="h-4 px-1.5 py-0 border-[#97a5ff]/20 text-[#97a5ff] bg-[#97a5ff]/5 text-[7px] font-bold uppercase tracking-widest shadow-none rounded-none font-display">
+                  USR_ROOT
+                </Badge>
+              </div>
             </div>
-            <p className="text-base text-zinc-300 truncate flex-1">{user.email?.split("@")[0]}</p>
-          </div>
-          <button
-            onClick={logout}
-            className="flex items-center gap-1.5 text-base font-bold uppercase tracking-widest text-zinc-200 hover:text-zinc-200 transition-colors"
-          >
-            <LogOut size={11} /> Sair
-          </button>
-        </div>
-      </aside>
-
-      {/* ── Main ── */}
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-
-        {/* Top bar */}
-        <header className="flex items-center gap-3 px-4 md:px-6 py-3 border-b border-white/[0.07] shrink-0">
-          {/* Mobile brand */}
-          <span className="md:hidden text-base font-black uppercase tracking-widest text-white shrink-0">IOS</span>
-
-          {/* Search */}
-          <div className="flex-1 flex items-center gap-2 max-w-sm">
-            <Search size={13} className="text-zinc-200 shrink-0" />
-            <input
-              type="text"
-              placeholder="Buscar modelo, marca, part number..."
-              className="flex-1 bg-transparent text-base text-white placeholder:text-zinc-200 outline-none"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-            />
-            {searchQuery && (
-              <button onClick={() => setSearchQuery("")}>
-                <X size={12} className="text-zinc-200 hover:text-zinc-200" />
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center gap-1 ml-auto shrink-0">
-            <button
-              onClick={() => setIsVoiceOpen(true)}
-              className="p-2 text-zinc-200 hover:text-white transition-colors"
-              title="Busca por voz"
-            >
-              <Mic size={15} />
-            </button>
-            <button
-              onClick={() => { setItemToEdit(null); setIsModalOpen(true); }}
-              className="flex items-center gap-1.5 bg-white hover:bg-zinc-200 text-[#141414] text-base font-black uppercase tracking-wider px-3 py-2 transition-colors"
-            >
-              <Plus size={13} />
-              <span className="hidden sm:inline">Novo</span>
-            </button>
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={logout}
-              className="md:hidden p-2 text-zinc-200 hover:text-red-400 transition-colors ml-1"
-              title="Sair"
+              className="w-full justify-center gap-2 h-8 text-[8px] font-bold uppercase tracking-widest border-[#ee7d77]/10 text-[#ee7d77] hover:bg-[#ee7d77]/10 hover:border-[#ee7d77]/20 transition-none rounded-none font-display"
             >
-              <LogOut size={15} />
-            </button>
+              <LogOut size={12} /> TERMINATE_SESSION
+            </Button>
           </div>
-        </header>
+        </aside>
 
-        {/* Content */}
-        <main className="flex-1 overflow-y-auto">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.1 }}
-              className="h-full"
-            >
-              {activeTab === "ADMIN" && isAdmin ? (
-                <AdminDashboard items={items} user={user} />
-              ) : activeTab === "WHATSAPP" ? (
-                <WhatsappView />
-              ) : activeTab === "SETTINGS" ? (
-                <SettingsView />
-              ) : (
-                <InventoryContent
-                  items={items.filter(i => !removedItems.has(i.id))}
-                  filteredItems={filteredItems.filter(i => !removedItems.has(i.id))}
-                  stats={stats}
-                  loading={invLoading}
-                  searchQuery={searchQuery}
-                  activeMenuId={activeMenuId}
-                  setActiveMenuId={setActiveMenuId}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  onView={setSelectedItem}
-                  onShare={handleShare}
-                />
+        {/* ── Main content area ── */}
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0 bg-background relative">
+          
+          {/* Top Bar / Header */}
+          <header className="flex items-center h-14 gap-4 px-4 md:px-6 border-b border-[#484848]/10 shrink-0 bg-[#0e0e0e] z-30">
+            {/* Mobile Brand indicator */}
+            <span className="md:hidden text-lg font-black uppercase tracking-tighter text-[#e7e5e5] bg-[#1f2020] px-2 py-0.5 rounded-none font-display">IOS</span>
+
+            {/* Search Input */}
+            <div className="flex-1 max-w-md relative group">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#acabaa]/30 group-focus-within:text-[#97a5ff] transition-none" />
+              <Input
+                type="text"
+                placeholder="SEARCH_MANIFEST_DB..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="pl-10 h-9 bg-[#131313] border-none shadow-none focus-visible:ring-1 focus-visible:ring-[#97a5ff]/20 placeholder:text-[#acabaa]/20 text-[9px] font-bold uppercase tracking-[0.1em] transition-none rounded-none font-display"
+              />
+              {searchQuery && (
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-[#acabaa]/30 hover:text-[#e7e5e5] transition-none rounded-none"
+                >
+                  <X size={14} />
+                </Button>
               )}
-            </motion.div>
-          </AnimatePresence>
-        </main>
+            </div>
 
-        {/* Mobile bottom nav */}
-        <div className="md:hidden flex border-t border-white/[0.07] shrink-0 bg-[#111]">
-          {navItems.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => setActiveTab(id)}
-              className={`flex-1 flex flex-col items-center gap-1 py-3 text-base font-black uppercase tracking-widest transition-colors ${
-                activeTab === id ? "text-white" : "text-zinc-200"
-              }`}
-            >
-              <Icon size={16} strokeWidth={activeTab === id ? 2.5 : 2} />
-              {label}
-            </button>
-          ))}
-        </div>
+            <div className="flex items-center gap-2 ml-auto shrink-0">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setIsVoiceOpen(true)}
+                    className="h-9 w-9 text-muted-foreground/30 hover:text-primary hover:bg-primary/5 transition-all rounded-none"
+                  >
+                    <Mic size={16} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="rounded-none">
+                  <p className="text-[10px] font-black uppercase">Busca por Voz</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Button
+                onClick={() => { setItemToEdit(null); setIsModalOpen(true); }}
+                className="gap-2 bg-[#e7e5e5] hover:bg-[#c6c6c7] text-[#0e0e0e] text-[9px] font-bold uppercase tracking-widest h-9 px-4 shadow-none rounded-none transition-none font-display border border-[#484848]/10"
+              >
+                <Plus size={16} />
+                <span className="hidden sm:inline">ADD_NEW_ENTRY</span>
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={logout}
+                className="md:hidden h-9 w-9 text-destructive/40 bg-destructive/5 hover:bg-destructive/20 hover:text-destructive transition-all border border-destructive/10 rounded-none"
+              >
+                <LogOut size={16} />
+              </Button>
+            </div>
+          </header>
+
+          {/* Main area scrollable */}
+          <main className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, scale: 0.99, y: 4 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 1.01, y: -4 }}
+                transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+                className="h-full"
+              >
+                {activeTab === "ADMIN" && isAdmin ? (
+                  <AdminDashboard items={items} user={user} />
+                ) : activeTab === "WHATSAPP" ? (
+                  <WhatsappView />
+                ) : activeTab === "SETTINGS" ? (
+                  <SettingsView />
+                ) : (
+                  <InventoryContent
+                    items={items.filter(i => !removedItems.has(i.id))}
+                    filteredItems={filteredItems.filter(i => !removedItems.has(i.id))}
+                    stats={stats}
+                    loading={invLoading}
+                    searchQuery={searchQuery}
+                    activeMenuId={activeMenuId}
+                    setActiveMenuId={setActiveMenuId}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    onView={setSelectedItem}
+                    onShare={handleShare}
+                  />
+                )}
+              </motion.div>
+            </AnimatePresence>
+            {/* Optional PWA Install Prompt - Only after splash */}
+            <PWAInstallPrompt />
+          </main>
+
+          {/* Mobile bottom nav using shadcn/ui buttons */}
+          <div className="md:hidden flex border-t border-foreground/2 shrink-0 bg-background h-16 items-center justify-around px-2 z-40">
+            {navItems.map(({ id, label, icon: Icon }) => (
+              <Button
+                key={id}
+                variant="ghost"
+                onClick={() => setActiveTab(id)}
+                className={`flex-1 flex flex-col items-center justify-center gap-1.5 h-16 py-0 hover:bg-transparent rounded-none ${
+                  activeTab === id ? "text-primary" : "text-muted-foreground/40"
+                }`}
+              >
+                <Icon size={16} strokeWidth={activeTab === id ? 3 : 2} className={activeTab === id ? "drop-shadow-[0_0_8px_rgba(var(--primary),0.5)]" : ""} />
+                <span className="text-[6.5px] font-bold uppercase tracking-[0.15em]">{label}</span>
+                {activeTab === id && (
+                  <motion.div 
+                    layoutId="activeTabDot" 
+                    className="w-1.5 h-1.5 rounded-none bg-primary"
+                    transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                  />
+                )}
+              </Button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Retro-Premium Notification Toast */}
+      {/* ── Notifications & Modals ── */}
       <AnimatePresence>
         {notification && (
           <motion.div
@@ -415,11 +479,11 @@ export default function Dashboard() {
             exit={{ y: 100, opacity: 0 }}
             className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-32px)] max-w-sm"
           >
-            <div className="bg-[#1a1a1a] border border-white/[0.1] shadow-2xl p-4">
+            <div className="bg-[#1a1a1a] border border-white/[0.1] shadow-2xl p-4 rounded-none">
               {notification.error ? (
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                    <div className="w-1.5 h-1.5 rounded-none bg-red-500 animate-pulse" />
                     <span className="text-xs font-black uppercase tracking-widest text-zinc-300">
                       {notification.error.humanMessage}
                     </span>
@@ -430,7 +494,7 @@ export default function Dashboard() {
                   <div className="flex flex-wrap gap-2">
                     <button
                       onClick={notification.onAction || (() => setNotification(null))}
-                      className="text-[10px] font-black uppercase tracking-[0.2em] text-white bg-white/10 px-3 py-1.5 hover:bg-white/20 transition-colors"
+                      className="text-[10px] font-black uppercase tracking-[0.2em] text-white bg-white/10 px-3 py-1.5 hover:bg-white/20 transition-colors rounded-none"
                     >
                       {notification.actionLabel || "Fechar"}
                     </button>
@@ -438,7 +502,7 @@ export default function Dashboard() {
                       <button
                         onClick={handleNotificationSupport}
                         disabled={reportingNotification}
-                        className="text-[10px] font-black uppercase tracking-[0.2em] text-white bg-red-500/20 px-3 py-1.5 hover:bg-red-500/30 disabled:opacity-50 transition-colors"
+                        className="text-[10px] font-black uppercase tracking-[0.2em] text-white bg-red-500/20 px-3 py-1.5 hover:bg-red-500/30 disabled:opacity-50 transition-colors rounded-none"
                       >
                         {reportingNotification ? "Enviando..." : "Enviar log para suporte"}
                       </button>
@@ -453,14 +517,14 @@ export default function Dashboard() {
               ) : (
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                    <div className="w-1.5 h-1.5 rounded-none bg-red-500 animate-pulse" />
                     <span className="text-xs font-black uppercase tracking-widest text-zinc-300">
                       {notification.message}
                     </span>
                   </div>
                   <button
-                    onClick={notification.onAction || (() => undoDelete(notification.id))}
-                    className="text-[10px] font-black uppercase tracking-[0.2em] text-white bg-white/10 px-3 py-1.5 hover:bg-white/20 transition-colors"
+                    onClick={notification.onAction || (() => undoDelete?.(notification.id))}
+                    className="text-[10px] font-black uppercase tracking-[0.2em] text-white bg-white/10 px-3 py-1.5 hover:bg-white/20 transition-colors rounded-none"
                   >
                     {notification.actionLabel || "Fechar"}
                   </button>
@@ -493,7 +557,7 @@ export default function Dashboard() {
         onClose={() => setIsVoiceOpen(false)}
         onResult={text => setSearchQuery(text)}
       />
-    </>
+    </TooltipProvider>
   );
 }
 
@@ -523,112 +587,96 @@ function InventoryContent({ items, filteredItems, stats, loading, searchQuery, a
 
   if (loading && items.length === 0) {
     return (
-      <div className="flex items-center justify-center h-48 gap-3">
-        <Loader2 className="animate-spin text-zinc-300" size={18} />
-        <p className="text-base text-zinc-200 uppercase tracking-widest font-bold">Carregando...</p>
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <Loader2 className="animate-spin text-primary/40" size={32} />
+        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.3em]">Sincronizando Ativos...</p>
       </div>
     );
   }
 
   return (
-    <div>
-      {/* Page title */}
-      <div className="px-4 md:px-6 pt-8 pb-6 border-b border-white/[0.07]">
-        <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tight text-white leading-none">
-          Inventário
+    <div className="space-y-0.5">
+      {/* Page Title & Context */}
+      <div className="px-4 md:px-6 pt-10 pb-8 bg-[#0e0e0e]">
+        <div className="flex items-center gap-3 mb-4">
+          <Badge variant="outline" className="h-5 px-2 bg-[#1f2020] text-[#97a5ff] border-[#484848]/20 text-[9px] font-bold uppercase tracking-[0.2em] shadow-none rounded-none font-display">
+            STATUS_OPERACIONAL.SYS
+          </Badge>
+        </div>
+        <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter text-[#e7e5e5] leading-none font-display">
+          CENTRAL_DE_<span className="text-[#acabaa]/30">INVENTÁRIO</span>
         </h1>
       </div>
 
-      {/* Stats row */}
-      <div className="flex border-b border-white/[0.07]">
+      {/* Industrial Stats Grid */}
+      <div className="grid grid-cols-3 border-y border-[#484848]/20 bg-[#131313] divide-x divide-[#484848]/20">
         {[
-          { label: "Total",      value: stats.total,   cls: "text-white" },
-          { label: "Em Estoque", value: stats.inStock,  cls: "text-white" },
-          { label: "Vendidos",   value: stats.sold,     cls: "text-white" },
-        ].map(({ label, value, cls }, i, arr) => (
-          <div
-            key={label}
-            className={`flex-1 px-4 md:px-6 py-5 ${i < arr.length - 1 ? "border-r border-white/[0.07]" : ""}`}
-          >
-            <p className="text-base font-bold uppercase tracking-widest text-zinc-300 mb-1">{label}</p>
-            <p className={`text-3xl font-black ${cls}`}>{value}</p>
+          { label: "TOTAL_ATV",      value: stats.total,   color: "text-[#e7e5e5]" },
+          { label: "EM_ESTOQUE",    value: stats.inStock,  color: "text-[#acc3ce]" },
+          { label: "VENDIDOS_LOG",   value: stats.sold,     color: "text-[#acabaa]/40" },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="p-3 md:p-5 space-y-1">
+            <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-[#acabaa]/50 font-display">{label}</p>
+            <p className={`text-xl md:text-2xl font-bold tracking-tighter font-mono ${color}`}>{value}</p>
           </div>
         ))}
       </div>
 
-      {/* Brand Filters */}
-      <div className="flex items-center gap-2 px-4 md:px-6 py-4 overflow-x-auto border-b border-white/[0.07] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
-        {availableBrands.map((brand) => {
-          const isSelected = selectedBrandKey === brand.key;
-          const isDimmed = selectedBrandKey && !isSelected;
-
-          return (
-          <button
+      {/* Brand Filter Pills */}
+      <div className="sticky top-0 z-20 bg-[#0e0e0e]/95 backdrop-blur-md border-b border-[#484848]/20 py-4 px-4 md:px-6 flex items-center gap-2 overflow-x-auto no-scrollbar">
+        {availableBrands.map(brand => (
+          <Button
             key={brand.key}
-            onClick={() => setSelectedBrandKey(isSelected ? null : brand.key)}
-            className={`shrink-0 flex items-center justify-center min-w-16 h-12 px-3 rounded-2xl border transition-all ${
-              isSelected
-                ? "bg-white/[0.08] border-white/[0.18] shadow-[0_0_22px_rgba(255,255,255,0.12)]"
-                : "bg-white/[0.03] border-white/[0.05] hover:bg-white/[0.08]"
+            variant={selectedBrandKey === brand.key ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSelectedBrandKey(selectedBrandKey === brand.key ? null : brand.key)}
+            className={`h-8 rounded-none text-[9px] font-bold uppercase tracking-[0.15em] transition-none font-display shrink-0 ${
+              selectedBrandKey === brand.key 
+                ? "bg-[#e7e5e5] text-[#0e0e0e] shadow-none" 
+                : "bg-[#191a1a] border-[#484848]/10 text-[#acabaa] hover:bg-[#1f2020] hover:text-[#e7e5e5]"
             }`}
-            aria-pressed={isSelected}
-            aria-label={`Filtrar por ${brand.label}`}
           >
-            {brand.logo ? (
-              <img
-                src={brand.logo}
-                alt={brand.label}
-                className={`h-6 w-auto object-contain transition-all ${
-                  isDimmed ? "grayscale opacity-45" : "grayscale-0 opacity-100"
-                }`}
-              />
-            ) : (
-              <span
-                className={`text-[10px] sm:text-xs font-black uppercase tracking-[0.15em] transition-colors ${
-                  isDimmed ? "text-zinc-600" : isSelected ? "text-white" : "text-zinc-300"
-                }`}
-              >
-                {brand.label}
-              </span>
-            )}
-          </button>
-          );
-        })}
+            {brand.label}
+          </Button>
+        ))}
       </div>
 
-      {/* Items */}
-      {displayItems.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-3">
-          <Package size={24} className="text-zinc-300" />
-          <p className="text-base font-bold uppercase tracking-widest text-zinc-200">
-            {searchQuery ? "Nenhum resultado." : "Inventário vazio."}
-          </p>
-        </div>
-      ) : (
-        <div>
-          {/* Column headers */}
-          <div className="hidden md:flex items-center gap-4 px-6 py-2 border-b border-white/[0.07]">
-            <span className="flex-1 text-base font-bold uppercase tracking-widest text-zinc-200">Item</span>
-            <span className="w-32 text-base font-bold uppercase tracking-widest text-zinc-200">Tipo</span>
-            <span className="w-24 text-base font-bold uppercase tracking-widest text-zinc-200">Status</span>
-            <span className="w-8" />
-          </div>
 
-              {displayItems.map((item, idx) => (
-                <ItemRow
-                  key={item.id}
-                  item={item}
-                  idx={idx}
-                  isMenuOpen={activeMenuId === item.id}
-                  onMenuToggle={() => setActiveMenuId(activeMenuId === item.id ? null : item.id)}
-                  onEdit={onEdit}
-                  onDelete={onDelete}
-                  onView={onView}
-                  onShare={onShare}
-                />
-              ))}
-        </div>
-      )}
+      {/* Inventory List Layout */}
+      <div className="min-h-screen pb-32">
+        {displayItems.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-32 space-y-4 opacity-30">
+            <Package size={48} strokeWidth={1} />
+            <p className="text-[11px] font-black uppercase tracking-[0.4em]">
+              {searchQuery ? "Nenhum Ativo Encontrado" : "Base de Dados Vazia"}
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-foreground/[0.01]">
+            {/* Desktop Table Header */}
+            <div className="hidden md:flex items-center gap-6 px-8 py-3 bg-[#131313] text-[8px] font-bold uppercase tracking-[0.3em] text-[#acabaa]/40 border-b border-[#484848]/10 font-display">
+              <span className="flex-1">ESPECIFICAÇÕES_DO_ATIVO</span>
+              <span className="w-32">CATEGORIA_IDX</span>
+              <span className="w-32 px-4">STATUS_FLG</span>
+              <span className="w-10 text-right">ACT</span>
+            </div>
+
+            {displayItems.map((item, idx) => (
+              <ItemRow
+                key={item.id}
+                item={item}
+                idx={idx}
+                isMenuOpen={activeMenuId === item.id}
+                onMenuToggle={() => setActiveMenuId(activeMenuId === item.id ? null : item.id)}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onView={onView}
+                onShare={onShare}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -639,170 +687,119 @@ function ItemRow({ item, idx, isMenuOpen, onMenuToggle, onEdit, onDelete, onView
   const controls = useAnimation();
   const brandMeta = getBrandMeta(item.brand || "Sem marca");
 
-  // Delete (swipe left): revealed on the right
-  const deleteOpacity = useTransform(x, [-80, -40, 0], [1, 0.6, 0]);
-  const deleteScale  = useTransform(x, [-80, -40, 0], [1, 0.85, 0.7]);
-
-  // Share (swipe right): revealed on the left
-  const shareOpacity = useTransform(x, [0, 40, 80], [0, 0.6, 1]);
-  const shareScale   = useTransform(x, [0, 40, 80], [0.7, 0.85, 1]);
+  // Swipe animations with framer-motion
+  // Swipe animations with framer-motion - using a dead zone in center to avoid "noise"
+  const deleteOpacity = useTransform(x, [-80, -40, -10], [1, 0.6, 0]);
+  const shareOpacity = useTransform(x, [10, 40, 80], [0, 0.6, 1]);
 
   return (
-    <div className="relative overflow-hidden border-b border-white/[0.04]">
-      {/* Share background — left side, revealed on swipe right */}
-      <div 
-        className="absolute left-0 top-0 bottom-0 w-24 bg-emerald-600 flex items-center justify-center cursor-pointer"
-        onClick={() => {
-          controls.start({ x: 0 });
-          onShare(item);
-        }}
+    <div className="relative overflow-hidden group">
+      {/* Quick Action backgrounds */}
+      <motion.div 
+        style={{ opacity: shareOpacity }}
+        className="absolute left-0 inset-y-0 w-24 bg-emerald-600 flex items-center justify-center cursor-pointer z-0"
+        onClick={() => { controls.start({ x: 0 }); onShare(item); }}
       >
-        <motion.div style={{ opacity: shareOpacity, scale: shareScale }} className="flex flex-col items-center gap-1 text-white">
-          <Share2 size={20} />
-          <span className="text-[10px] font-black uppercase tracking-widest text-white/80">Compartilhar</span>
-        </motion.div>
-      </div>
+        <div className="flex flex-col items-center gap-1 text-white">
+          <Share2 size={18} />
+          <span className="text-[8px] font-black uppercase tracking-tighter">SHARE</span>
+        </div>
+      </motion.div>
 
-      {/* Delete background — right side, revealed on swipe left */}
-      <div 
-        className="absolute right-0 top-0 bottom-0 w-24 bg-red-600 flex items-center justify-center cursor-pointer"
-        onClick={() => {
-          controls.start({ x: 0 });
-          onDelete(item);
-        }}
+      <motion.div 
+        style={{ opacity: deleteOpacity }}
+        className="absolute right-0 inset-y-0 w-24 bg-destructive flex items-center justify-center cursor-pointer z-0"
+        onClick={() => { controls.start({ x: 0 }); onDelete(item); }}
       >
-        <motion.div style={{ opacity: deleteOpacity, scale: deleteScale }} className="flex flex-col items-center gap-1 text-white">
-          <Trash2 size={20} />
-          <span className="text-[10px] font-black uppercase tracking-widest text-white/80">Excluir</span>
-        </motion.div>
-      </div>
+        <div className="flex flex-col items-center gap-1 text-white">
+          <Trash2 size={18} />
+          <span className="text-[8px] font-black uppercase tracking-tighter">DELETE</span>
+        </div>
+      </motion.div>
 
       <motion.div
         drag="x"
         style={{ x }}
         dragConstraints={{ left: -100, right: 100 }}
-        dragElastic={0.15}
+        dragElastic={0.1}
         animate={controls}
         onDragEnd={(_, info) => {
-          if (info.offset.x < -50) {
-            controls.start({ x: -100 });
-          } else if (info.offset.x > 50) {
-            controls.start({ x: 100 });
-          } else {
-            controls.start({ x: 0 });
-          }
+          if (info.offset.x < -60) controls.start({ x: -100 });
+          else if (info.offset.x > 60) controls.start({ x: 100 });
+          else controls.start({ x: 0 });
         }}
-        initial={{ opacity: 0, x: 0 }}
-        whileInView={{ opacity: 1 }}
-        viewport={{ once: true }}
-        whileTap={{ cursor: "grabbing" }}
-        transition={{ type: "spring", stiffness: 300, damping: 25 }}
-        className="relative z-10 bg-[#141414] touch-pan-y"
+        className="relative z-10 w-full min-w-full bg-[#09090b] touch-pan-y"
       >
         <div 
-          className="flex items-center gap-4 px-4 md:px-6 py-4 hover:bg-white/[0.02] active:bg-white/[0.04] transition-colors cursor-pointer"
-          onClick={() => {
-            if (x.get() !== 0) {
-              controls.start({ x: 0 });
-            } else {
-              onView(item);
-            }
-          }}
+          className="flex items-center gap-4 px-4 md:px-8 py-5 hover:bg-[#131313] active:bg-[#191a1a] transition-none cursor-pointer border-b border-[#484848]/5"
+          onClick={() => x.get() === 0 ? onView(item) : controls.start({ x: 0 })}
         >
-          {/* Thumbnail */}
-          <div className="w-12 h-12 rounded-lg bg-white/[0.03] border border-white/[0.05] flex items-center justify-center overflow-hidden shrink-0 shadow-lg">
+          {/* Avatar / Thumbnail */}
+          <div className="w-10 h-10 md:w-12 md:h-12 rounded-none bg-[#131313] border border-[#484848]/20 p-1 overflow-hidden shrink-0 flex items-center justify-center shadow-none group-hover:scale-100 transition-none">
             {item.productImageUrl ? (
-              <img src={item.productImageUrl} alt={item.model} className="w-full h-full object-cover" />
+              <img src={item.productImageUrl} alt={item.model} className="w-full h-full object-cover rounded-none grayscale group-hover:grayscale-0" />
             ) : (
-              <Package size={20} className="text-zinc-600" />
+              <Package size={20} className="text-[#484848]" />
             )}
           </div>
 
-          {/* Main info */}
-          <div className="flex-1 min-w-0">
+          {/* Item Bio */}
+          <div className="flex-1 min-w-0 py-0.5">
             <div className="flex items-center gap-2 mb-0.5">
-              <span className="text-base font-bold text-white truncate">{item.model}</span>
+              <span className="text-sm md:text-base font-bold text-[#e7e5e5] truncate uppercase tracking-tight font-display">{item.model}</span>
             </div>
-            <div className="flex items-center gap-1.5 text-base text-zinc-400">
-              {brandMeta.logo ? (
-                <img src={brandMeta.logo} alt={brandMeta.label} className="h-4 w-auto object-contain shrink-0" />
-              ) : (
-                <span className="font-medium text-zinc-300 truncate">{brandMeta.label}</span>
-              )}
+            <div className="flex items-center gap-2 text-[9px] md:text-[10px] font-mono">
+              <span className="font-semibold text-[#acabaa] uppercase">{item.brand}</span>
+
               {item.partNumber && (
                 <>
-                  <span className="text-zinc-600">·</span>
-                  <span className="font-mono text-xs text-zinc-500 uppercase tracking-tighter">{item.partNumber}</span>
+                  <span className="text-[#484848]">/</span>
+                  <span className="text-[#acabaa]/30">{item.partNumber}</span>
                 </>
               )}
             </div>
           </div>
 
-          {/* Type (Desktop) */}
+          {/* Metadata Desktop */}
           <div className="hidden md:block w-32 shrink-0">
-            <span className="text-xs font-black uppercase tracking-widest text-zinc-500 truncate block">
-              {item.type || "Geral"}
-            </span>
+            <Badge variant="secondary" className="bg-[#191a1a] text-[#acabaa] border border-[#484848]/20 font-mono text-[8px] font-black px-2 py-0.5 shadow-none rounded-none uppercase tracking-widest">
+              {item.type || "GERAL"}
+            </Badge>
           </div>
 
-          {/* Status */}
-          <div className="w-24 shrink-0 flex items-center gap-2">
-            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${status.dot}`} />
-            <span className={`text-[10px] font-black uppercase tracking-widest ${status.cls}`}>
+          {/* Status Pillar */}
+          <div className="w-24 shrink-0 flex items-center gap-2 px-2 font-mono">
+            <div className={`w-1 h-1 rounded-none ${status.dot}`} />
+            <span className={`text-[8px] font-bold uppercase tracking-[0.1em] ${status.cls}`}>
               {item.status}
             </span>
           </div>
 
-          {/* Menu */}
-          <div className="relative w-8 shrink-0 flex justify-end">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onMenuToggle();
-              }}
-              className={`p-1 text-zinc-500 hover:text-white transition-opacity ${isMenuOpen ? "opacity-100" : "md:opacity-0 md:group-hover:opacity-100"}`}
-            >
-              <MoreHorizontal size={15} />
-            </button>
-
-            <AnimatePresence>
-              {isMenuOpen && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  className="absolute right-0 top-8 z-50 bg-[#1a1a1a] border border-white/[0.1] shadow-2xl min-w-[140px] overflow-hidden"
-                >
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onEdit(item); }}
-                    className="w-full text-left px-4 py-3 text-xs font-black uppercase tracking-widest text-zinc-300 hover:bg-white/[0.05] hover:text-white transition-colors"
-                  >
-                    Editar
-                  </button>
-                  <div className="h-px bg-white/[0.07]" />
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onShare(item, "whatsapp"); }}
-                    className="w-full text-left px-4 py-3 text-xs font-black uppercase tracking-widest text-[#25D366] hover:bg-[#25D366]/10 transition-colors"
-                  >
-                    WhatsApp
-                  </button>
-                  <div className="h-px bg-white/[0.07]" />
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onShare(item); }}
-                    className="w-full text-left px-4 py-3 text-xs font-black uppercase tracking-widest text-emerald-400 hover:bg-emerald-500/10 transition-colors"
-                  >
-                    Outros (Sistema)
-                  </button>
-                  <div className="h-px bg-white/[0.07]" />
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}
-                    className="w-full text-left px-4 py-3 text-xs font-black uppercase tracking-widest text-red-400 hover:bg-red-500/10 transition-colors"
-                  >
-                    Excluir
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
+          {/* Menu Dropdown */}
+          <div className="w-10 shrink-0 flex justify-end">
+            <DropdownMenu open={isMenuOpen} onOpenChange={onMenuToggle}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-[#484848] hover:text-[#e7e5e5] transition-none rounded-none">
+                  <MoreHorizontal size={16} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 bg-[#1f2020] border-[#484848] rounded-none shadow-none">
+                <DropdownMenuItem onClick={() => onEdit(item)} className="text-[9px] font-bold uppercase tracking-widest py-3 cursor-pointer transition-none font-display">
+                  EDIT_ACTIVE_RECORD
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-[#484848]/20" />
+                <DropdownMenuItem onClick={() => onShare(item, "whatsapp")} className="text-[9px] font-bold uppercase tracking-widest py-3 text-[#acc3ce] cursor-pointer transition-none font-display">
+                  WHATSAPP_EXPORT
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onShare(item)} className="text-[9px] font-bold uppercase tracking-widest py-3 cursor-pointer transition-none font-display">
+                  PDF_TELEMETRY
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-[#484848]/20" />
+                <DropdownMenuItem onClick={() => onDelete(item)} className="text-[9px] font-bold uppercase tracking-widest py-3 text-[#ee7d77] cursor-pointer transition-none font-display">
+                  WIPE_DATA_ENTRY
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </motion.div>
@@ -820,3 +817,5 @@ function GoogleIcon() {
     </svg>
   );
 }
+
+
