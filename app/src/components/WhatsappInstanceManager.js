@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 import { functions } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
-import { Loader2, QrCode, Smartphone, Wifi, WifiOff, Trash2, LogOut, Plus, RefreshCw, CheckCircle2, Info } from "lucide-react";
+import { Loader2, QrCode, Smartphone, Wifi, WifiOff, Trash2, LogOut, Plus, RefreshCw, CheckCircle2, Info, PauseCircle, PlayCircle, ChevronDown, ChevronUp, Copy, Bot, AlertCircle, Eye, PowerOff, Users, User } from "lucide-react";
 
 export default function WhatsappInstanceManager() {
   const [instances, setInstances] = useState([]);
@@ -13,6 +13,105 @@ export default function WhatsappInstanceManager() {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [events, setEvents] = useState([]);
   const [notification, setNotification] = useState(null); // { message: string, type: 'success' | 'error' }
+  const [pausedInstances, setPausedInstances] = useState(() => {
+    try {
+      const stored = localStorage.getItem("whatsapp_paused_instances");
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const toggleInstancePause = async (instanceName) => {
+    setActionLoading(`pause-${instanceName}`);
+    // Simulate network delay to give user precise UI feedback on their click action
+    await new Promise(r => setTimeout(r, 600));
+    
+    setPausedInstances(prev => {
+      const newState = { ...prev, [instanceName]: !prev[instanceName] };
+      try {
+        localStorage.setItem("whatsapp_paused_instances", JSON.stringify(newState));
+      } catch {}
+      
+      showNotification(
+        newState[instanceName]
+          ? `Digestion pausada na instância [${instanceName}].`
+          : `Digestion retomada na instância [${instanceName}].`
+      );
+      
+      return newState;
+    });
+    setActionLoading(null);
+  };
+  const [expandedEvent, setExpandedEvent] = useState(null);
+
+  const [ignoredGroups, setIgnoredGroups] = useState(() => {
+    try {
+      const stored = localStorage.getItem("whatsapp_ignored_groups");
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const toggleGroupIgnore = async (groupId, groupName) => {
+    setActionLoading(`group-${groupId}`);
+    await new Promise(r => setTimeout(r, 600)); // fake delay
+    setIgnoredGroups(prev => {
+      const newState = { ...prev, [groupId]: !prev[groupId] };
+      try { localStorage.setItem("whatsapp_ignored_groups", JSON.stringify(newState)); } catch {}
+      showNotification(newState[groupId] 
+        ? `Grupo "${groupName}" silenciado. A IA não processará mais mensagens dele.`
+        : `Grupo "${groupName}" monitorado. A IA voltará a escutá-lo.`
+      );
+      return newState;
+    });
+    setActionLoading(null);
+  };
+
+  const getContactInfo = (payload) => {
+    if (!payload?.data?.message?.key && !payload?.data?.key) return { name: "Sistema", id: "---", isGroup: false };
+    const key = payload.data.message?.key || payload.data.key;
+    const remoteJid = key?.remoteJid || "";
+    const isGroup = remoteJid.includes("@g.us");
+    const id = isGroup ? (key?.participant || remoteJid) : remoteJid;
+    const senderName = payload.data.pushName || id?.split("@")[0] || "Desconhecido";
+    
+    // Evolution API v2 often has group name in payload.data.groupContext.groupName
+    let groupName = payload.data?.groupContext?.groupName || 
+                    payload.data?.sender?.name;
+    
+    if (isGroup && !groupName) {
+      groupName = remoteJid.split("@")[0]; // Fallback to JID part
+    }
+
+    return { 
+      name: senderName, 
+      groupName: isGroup ? groupName : null,
+      id: id?.split("@")[0], 
+      isGroup, 
+      groupId: remoteJid
+    };
+  };
+
+  const getMessagePreview = (payload) => {
+    const data = payload?.data;
+    const msg = data?.message;
+    
+    if (!msg) {
+      if (payload.eventType === "groups.upsert" || payload.eventType === "groups.update") {
+        return `Configuração de Grupo: ${data?.subject || data?.name || "Alterada"}`;
+      }
+      return "(Sem conteúdo/Evento de sistema)";
+    }
+    
+    return msg.conversation || 
+           msg.extendedTextMessage?.text || 
+           (msg.imageMessage ? "[Imagem anexada]" : null) || 
+           (msg.audioMessage ? "[Áudio anexado]" : null) || 
+           (msg.videoMessage ? "[Vídeo anexado]" : null) || 
+           (msg.documentMessage ? "[Documento anexado]" : "[Arquivo/Mídia]");
+  };
 
   const showNotification = (message, type = "success") => {
     setNotification({ message, type });
@@ -141,6 +240,27 @@ export default function WhatsappInstanceManager() {
     }
   };
 
+  const handleSyncGroups = async (instanceName) => {
+    setActionLoading(`sync-${instanceName}`);
+    try {
+      const syncGroups = httpsCallable(functions, "syncWhatsappGroups");
+      const result = await syncGroups({ instanceName });
+      
+      if (result.data.status === 200) {
+        showNotification(result.data.message || "Grupos sincronizados com sucesso!");
+        await fetchInstances();
+        await fetchEvents(); // Refresh to resolve names
+      } else {
+        throw new Error(result.data.message || "Falha na sincronização");
+      }
+    } catch (error) {
+      console.error("Failed to sync groups:", error);
+      showNotification(`Erro ao sincronizar grupos: ${error.message}`, "error");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   if (loading && instances.length === 0) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -246,14 +366,30 @@ export default function WhatsappInstanceManager() {
                       ) : (
                         <>
                           <button 
+                            onClick={() => toggleInstancePause(instanceName)}
+                            title={pausedInstances[instanceName] ? "Retomar Digestão de IA" : "Pausar Digestão de IA"}
+                            className={`p-2 transition-all ${pausedInstances[instanceName] ? "text-amber-500 hover:text-amber-400 bg-amber-500/10 rounded-sm shadow-sm" : "text-zinc-500 hover:text-white"}`}
+                          >
+                            {actionLoading === `pause-${instanceName}` ? <Loader2 size={16} className="animate-spin" /> : (pausedInstances[instanceName] ? <PlayCircle size={16} /> : <PauseCircle size={16} />)}
+                          </button>
+                          <button 
                             onClick={() => handleSetWebhook(instanceName)}
                             title="Configurar Webhook (Necessário para o Monitor de Atividade)"
                             className={`p-2 transition-all ${isConnected ? "text-emerald-500 hover:text-emerald-400" : "text-zinc-500 hover:text-white"}`}
                           >
-                            <CheckCircle2 size={16} />
+                            {actionLoading === `webhook-${instanceName}` ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                          </button>
+
+                          <button 
+                            onClick={() => handleSyncGroups(instanceName)}
+                            title="Sincronizar metadados de grupos"
+                            className="p-2 text-zinc-500 hover:text-emerald-400 hover:bg-emerald-400/5 transition-all"
+                          >
+                            {actionLoading === `sync-${instanceName}` ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
                           </button>
                           <button 
                             onClick={() => fetchInstances()}
+                            title="Atualizar status da conexão"
                             className="p-2 text-zinc-500 hover:text-white hover:bg-white/5 transition-all"
                           >
                             <RefreshCw size={16} className={isActionLoading ? "animate-spin" : ""} />
@@ -305,13 +441,13 @@ export default function WhatsappInstanceManager() {
                         <div className="bg-zinc-900/50 p-3 border border-white/5 rounded-lg flex flex-col gap-1">
                           <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Bateria</span>
                           <span className="text-sm font-bold text-white">
-                            {inst.battery !== undefined && inst.battery !== null ? `${inst.battery}%` : "---"}
+                            {inst.battery !== undefined && inst.battery !== null ? `${inst.battery}%` : (inst.instance?.batteryLevel ?? "---")}
                           </span>
                         </div>
                         <div className="bg-zinc-900/50 p-3 border border-white/5 rounded-lg flex flex-col gap-1">
                           <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Plataforma</span>
                           <span className="text-sm font-bold text-white capitalize">
-                            {inst.platform || "---"}
+                            {inst.platform || inst.instance?.platform || "---"}
                           </span>
                         </div>
                         <button
@@ -348,10 +484,12 @@ export default function WhatsappInstanceManager() {
       {/* Activity Monitor Section */}
       <div className="mt-4 flex flex-col gap-4">
         <div className="flex items-center justify-between border-b border-white/5 pb-2">
-          <h2 className="text-sm font-black uppercase tracking-[0.2em] text-zinc-500">Monitor de Atividade (Digestão/IA)</h2>
+          <h2 className="text-sm font-black uppercase tracking-[0.2em] text-zinc-500">
+            Monitor de Atividade Global
+          </h2>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Live</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Live</span>
           </div>
         </div>
         
@@ -359,49 +497,166 @@ export default function WhatsappInstanceManager() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-zinc-900/50">
+                <th className="p-3 w-8 border-b border-white/5"></th>
                 <th className="p-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5">Evento</th>
-                <th className="p-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5">Instância</th>
-                <th className="p-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5">Status</th>
+                <th className="p-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5">Origem / Contato</th>
+                <th className="p-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5">Sincronização / IA</th>
                 <th className="p-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5 text-right">Data/Hora</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
               {events.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="p-8 text-center text-[10px] font-bold uppercase tracking-widest text-zinc-700">
+                  <td colSpan={5} className="p-8 text-center text-[10px] font-bold uppercase tracking-widest text-zinc-700">
                     Aguardando eventos do WhatsApp...
                   </td>
                 </tr>
               ) : (
-                events.map((event) => (
-                  <tr key={event.id} className="hover:bg-white/[0.02] transition-colors group">
-                    <td className="p-3">
-                      <div className="flex flex-col">
-                        <span className="text-[11px] font-black uppercase tracking-tight text-white group-hover:text-emerald-400 transition-colors">
-                          {event.eventType || "MESSAGES_UPSERT"}
-                        </span>
-                        <span className="text-[9px] font-medium text-zinc-600">ID: {event.id.slice(-8)}</span>
-                      </div>
-                    </td>
-                    <td className="p-3">
-                      <span className="text-[10px] font-bold text-zinc-400">{event.instanceId || "---"}</span>
-                    </td>
-                    <td className="p-3">
-                      <span className={`px-2 py-0.5 text-[9px] font-black uppercase tracking-widest rounded-full ${
-                        event.status === "processed" ? "bg-emerald-500/10 text-emerald-400" :
-                        event.status === "failed" ? "bg-red-500/10 text-red-400" :
-                        "bg-amber-500/10 text-amber-400"
-                      }`}>
-                        {event.status || "recebido"}
-                      </span>
-                    </td>
-                    <td className="p-3 text-right">
-                      <span className="text-[10px] font-medium text-zinc-500">
-                        {event.occurredAt ? new Date(event.occurredAt).toLocaleTimeString() : "---"}
-                      </span>
-                    </td>
-                  </tr>
-                ))
+                events.map((event) => {
+                  const isExpanded = expandedEvent === event.id;
+                  const previewText = getMessagePreview(event.payload);
+                  const contact = getContactInfo(event.payload);
+                  
+                  return (
+                    <Fragment key={event.id}>
+                      <tr 
+                        className="hover:bg-white/[0.02] transition-colors group cursor-pointer"
+                        onClick={() => setExpandedEvent(isExpanded ? null : event.id)}
+                      >
+                        <td className="p-3 text-zinc-600 group-hover:text-white transition-colors">
+                          {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        </td>
+                        <td className="p-3">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[11px] font-black uppercase tracking-tight text-white group-hover:text-emerald-400 transition-colors">
+                              {event.eventType || "MESSAGES_UPSERT"}
+                            </span>
+                            <span className="text-[9px] font-medium text-zinc-600">ID: {event.id.slice(-8)}</span>
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <div className="flex flex-col items-start gap-1">
+                            {contact.isGroup ? (
+                              <>
+                                <span className="text-[11px] font-black uppercase tracking-tight text-emerald-400 flex items-center gap-1.5 leading-none">
+                                  <Users size={10}/> {contact.groupName.toLowerCase()}
+                                </span>
+                                <span className="text-[9px] font-bold text-zinc-500 flex items-center gap-1 opacity-70">
+                                  <User size={8}/> {contact.name.toLowerCase()}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5 capitalize">
+                                <User size={10} className="text-zinc-500"/> {contact.name.toLowerCase()}
+                              </span>
+                            )}
+                            <span className="text-[9px] font-black uppercase tracking-widest text-zinc-600 mt-0.5">
+                              via {event.instanceId || "---"}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <div className="flex flex-col items-start gap-1.5">
+                            {/* Webhook/Sync Status */}
+                            <span className={`px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.1em] flex items-center gap-1 rounded-sm border ${
+                              event.status === "processed" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
+                              event.status === "failed" ? "bg-red-500/10 text-red-400 border-red-500/20" :
+                              "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                            }`}>
+                              {event.status === "processed" ? "SINCRONIZADO" : (event.status || "recebido")}
+                            </span>
+                            
+                            {/* AI Processing Status */}
+                            {event.payload?.data?.message && (
+                              <span className={`px-1.5 py-0.5 rounded-sm text-[8px] font-black uppercase tracking-widest border flex items-center gap-1 ${
+                                event.aiExtractionStatus === "processed" ? "bg-purple-500/10 text-purple-400 border-purple-500/20" :
+                                event.aiExtractionStatus === "failed" ? "bg-red-500/10 text-red-300 border-red-500/10" :
+                                "bg-zinc-800 text-zinc-500 border-white/5"
+                              }`}>
+                                <Bot size={8} />
+                                {event.aiExtractionStatus === "processed" ? (event.aiClassification || "PROCESSADO") : 
+                                 event.aiExtractionStatus === "failed" ? "ERRO IA" : "FILA IA"}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        <td className="p-3 text-right">
+                          <div className="flex flex-col items-end">
+                            <span className="text-[10px] font-medium text-zinc-400">
+                              {event.occurredAt ? new Date(event.occurredAt).toLocaleDateString("pt-BR") : "---"}
+                            </span>
+                            <span className="text-[9px] font-black text-zinc-500">
+                              {event.occurredAt ? new Date(event.occurredAt).toLocaleTimeString("pt-BR") : "---"}
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr className="bg-zinc-950/50">
+                          <td colSpan={5} className="p-4 border-l-2 border-emerald-500/50">
+                            <div className="flex flex-col gap-2">
+                              {previewText && (
+                                <div className="mb-2 p-3 bg-zinc-900 border border-white/5 rounded-md">
+                                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500 mb-1 block">Preview da Mensagem:</span>
+                                  <p className="text-sm text-zinc-300 font-medium">&quot;{previewText}&quot;</p>
+                                </div>
+                              )}
+                              
+                              <div className="mt-1 mb-2 p-3 bg-zinc-900 border border-white/5 rounded-md flex items-center justify-between">
+                                <div className="flex gap-2 items-center">
+                                  <Bot size={14} className="text-zinc-500"/>
+                                  <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Dados Extraídos (IA): <span className="text-zinc-400 font-medium ml-1">{event.aiExtraction ? "Processado" : "Aguardando fila assíncrona..."}</span></span>
+                                </div>
+                                <button className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest bg-white/5 hover:bg-white/10 text-white px-2 py-1.5 rounded-sm transition-colors">
+                                  <Eye size={12} />
+                                  Detalhes
+                                </button>
+                              </div>
+
+                              {contact.isGroup && (
+                                <div className="mb-2 p-3 bg-emerald-950/20 border border-emerald-500/10 rounded-md flex items-center justify-between">
+                                  <div className="flex gap-2 items-center">
+                                    <Users size={14} className="text-emerald-500/50"/>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500/80">
+                                      Grupo Detectado: {contact.groupName?.toLowerCase() || "Sem Nome"}
+                                    </span>
+                                  </div>
+                                  <button 
+                                    onClick={(e) => { e.stopPropagation(); toggleGroupIgnore(contact.groupId, contact.name); }}
+                                    className={`flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest px-3 py-1.5 transition-colors shadow-sm ${
+                                      ignoredGroups[contact.groupId] ? "bg-amber-500 hover:bg-amber-400 text-black rounded-full" : "bg-white/5 hover:bg-white/10 text-white rounded-sm"
+                                    }`}
+                                  >
+                                    {actionLoading === `group-${contact.groupId}` ? <Loader2 size={12} className="animate-spin" /> : <PowerOff size={12} />}
+                                    {ignoredGroups[contact.groupId] ? "Grupo Silenciado" : "Silenciar IA para este grupo"}
+                                  </button>
+                                </div>
+                              )}
+
+                              <div className="flex justify-between items-center mb-1 mt-2">
+
+                                <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Payload Completo:</span>
+                                <button 
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(JSON.stringify(event.payload || event, null, 2));
+                                    showNotification("Payload copiado com sucesso!");
+                                  }}
+                                  className="flex items-center gap-1 p-1 text-zinc-500 hover:text-white transition-colors text-[9px] font-bold uppercase tracking-widest"
+                                >
+                                  <Copy size={12} /> Copiar
+                                </button>
+                              </div>
+                              <pre className="text-[10px] text-zinc-400 whitespace-pre-wrap overflow-x-auto p-3 bg-black border border-white/5 font-mono max-h-64 overflow-y-auto">
+                                {JSON.stringify(event.payload || event, null, 2)}
+                              </pre>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })
               )}
             </tbody>
           </table>

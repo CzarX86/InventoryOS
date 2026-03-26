@@ -114,18 +114,22 @@ exports.listWhatsappInstances = onCall({
     const updatedData = await Promise.all(instances.map(async (inst) => {
       if (inst.connectionStatus === "open") {
         try {
-          // Timeout menor para chamadas individuais (10s) para evitar cascata de lags
           const stateResult = await evolutionProxy("GET", `/instance/connectionState/${inst.name}`, null, 10000);
+          
+          // Debugging log to see the real structure
+          logger.info("Evolution connectionState result", { instance: inst.name, data: JSON.stringify(stateResult.data) });
+
           if (stateResult.status === 200 && stateResult.data) {
+            // Check common paths for both v1 and v2
+            const instanceData = stateResult.data.instance || stateResult.data;
             return {
               ...inst,
-              battery: stateResult.data.instance?.batteryLevel ?? stateResult.data.battery ?? null,
-              platform: stateResult.data.instance?.platform ?? stateResult.data.platform ?? null
+              battery: instanceData.batteryLevel ?? instanceData.battery ?? inst.instance?.batteryLevel ?? null,
+              platform: instanceData.platform ?? inst.instance?.platform ?? null
             };
           }
         } catch (err) {
           logger.warn("Falha ao buscar status detalhado para instância", { name: inst.name, error: err.message });
-          // Não falhamos a lista inteira se uma instância falhar no status detalhado
         }
       }
       return inst;
@@ -245,11 +249,15 @@ exports.getWhatsappEvents = onCall(async (request) => {
     .orderBy("occurredAt", "desc")
     .limit(10)
     .get();
-    
-  return eventsSnap.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  }));
+  return eventsSnap.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      occurredAt: data.occurredAt && data.occurredAt.toDate ? data.occurredAt.toDate().toISOString() : data.occurredAt,
+      receivedAt: data.receivedAt && data.receivedAt.toDate ? data.receivedAt.toDate().toISOString() : data.receivedAt
+    };
+  });
 });
 
 function sanitizeText(value, max = 140) {
@@ -339,19 +347,90 @@ exports.evolutionWebhook = onRequest({
 });
 
 /**
+ * Fetches all groups from the Evolution API and populates the whatsapp_groups cache.
+ */
+exports.syncWhatsappGroups = onCall({
+  secrets: ["EVOLUTION_API_URL", "EVOLUTION_API_KEY"],
+}, async (request) => {
+  const { instanceName } = request.data;
+  if (!instanceName) {
+    throw new HttpsError("invalid-argument", "Nome da instância é obrigatório.");
+  }
+
+  const db = getFirestore();
+
+  try {
+    const response = await evolutionProxy("GET", `/group/findAll/${instanceName}`, null, 30000);
+    
+    if (response.status !== 200) {
+      throw new Error(`Evolution API error: ${response.status}`);
+    }
+
+    const groups = response.data || [];
+    const batch = db.batch();
+    let count = 0;
+
+    for (const group of groups) {
+      if (!group.id || (!group.subject && !group.name)) continue;
+      
+      const groupRef = db.collection("whatsapp_groups").doc(group.id);
+      batch.set(groupRef, {
+        id: group.id,
+        name: group.subject || group.name,
+        updatedAt: FieldValue.serverTimestamp()
+      }, { merge: true });
+      count++;
+      
+      // Batch limit is 500
+      if (count % 400 === 0) {
+        await batch.commit();
+      }
+    }
+
+    if (count % 400 !== 0 && count > 0) {
+      await batch.commit();
+    }
+
+    logger.info("WhatsApp groups synced", { instanceName, count });
+    return { status: 200, message: `${count} grupos sincronizados.`, count };
+  } catch (error) {
+    logger.error("Error syncing WhatsApp groups", { error: error.message || error, instanceName });
+    throw new HttpsError("internal", error.message || "Erro desconhecido na sincronização");
+  }
+});
+
+/**
  * Trigger to process stored WhatsApp events.
  * Extracts messages and links lineage.
  */
 exports.processWhatsappEvent = onDocumentCreated("whatsapp_webhook_events/{eventId}", async (event) => {
   const eventData = event.data?.data();
-  if (!eventData || eventData.eventType !== "messages.upsert") {
+  if (!eventData) return;
+
+  const db = getFirestore();
+  const payload = eventData.payload;
+  const data = payload.data;
+
+  // 1. Handle Group Metadata Caching
+  if (eventData.eventType === "groups.upsert" || eventData.eventType === "groups.update") {
+    const groupId = data?.id;
+    const groupName = data?.subject || data?.name;
+    if (groupId && groupName) {
+      await db.collection("whatsapp_groups").doc(groupId).set({
+        id: groupId,
+        name: groupName,
+        updatedAt: FieldValue.serverTimestamp()
+      }, { merge: true });
+      logger.info("Group metadata cached", { groupId, groupName });
+    }
+  }
+
+  // 2. Handle Message Processing
+  if (eventData.eventType !== "messages.upsert") {
     return;
   }
 
-  const payload = eventData.payload;
-  const data = payload.data;
   const message = data?.message;
-
   if (!message) return;
 
   const text = message.conversation || 
@@ -361,14 +440,26 @@ exports.processWhatsappEvent = onDocumentCreated("whatsapp_webhook_events/{event
 
   if (!text && !message.imageMessage) return;
 
-  const db = getFirestore();
   const messageId = data.key.id;
 
   try {
+    const remoteJid = data.key.remoteJid;
+    const isGroup = remoteJid?.endsWith("@g.us");
+    let groupName = payload.data?.groupContext?.groupName || payload.data?.sender?.name || null;
+
+    // If not in payload, try look up in cache
+    if (isGroup && !groupName) {
+      const groupDoc = await db.collection("whatsapp_groups").doc(remoteJid).get();
+      if (groupDoc.exists) {
+        groupName = groupDoc.data().name;
+      }
+    }
+
     const messageDoc = {
       providerMessageId: messageId,
-      remoteJid: data.key.remoteJid,
+      remoteJid,
       pushName: data.pushName || "Desconhecido",
+      groupName,
       text,
       fromMe: data.key.fromMe || false,
       timestamp: data.messageTimestamp ? new Date(data.messageTimestamp * 1000) : FieldValue.serverTimestamp(),
@@ -566,7 +657,17 @@ exports.onWhatsappMessageCreated = onDocumentCreated({
       updatedAt: FieldValue.serverTimestamp()
     });
 
-    logger.info("WhatsApp transaction extracted successfully", { messageId, extractionId: extractionRef.id });
+    // Sync back to webhooks monitor
+    if (messageData.lineage?.rawSourceEventId) {
+      await db.collection("whatsapp_webhook_events").doc(messageData.lineage.rawSourceEventId).update({
+        aiClassification: extractedData.operation || "CLASSIFIED",
+        aiExtractionStatus: "processed",
+        aiSummary: extractedData.summary,
+        updatedAt: FieldValue.serverTimestamp()
+      });
+    }
+
+    logger.info("WhatsApp transaction extracted and synced", { messageId, eventId: messageData.lineage?.rawSourceEventId });
   } catch (error) {
     logger.error("Error extracting transaction from WhatsApp message", { error: error.message, messageId });
     // Update status to failed
@@ -575,6 +676,14 @@ exports.onWhatsappMessageCreated = onDocumentCreated({
       extractionError: error.message,
       updatedAt: FieldValue.serverTimestamp()
     });
+
+    if (messageData.lineage?.rawSourceEventId) {
+      await db.collection("whatsapp_webhook_events").doc(messageData.lineage.rawSourceEventId).update({
+        aiExtractionStatus: "failed",
+        aiError: error.message,
+        updatedAt: FieldValue.serverTimestamp()
+      });
+    }
   }
 });
 
