@@ -1,5 +1,62 @@
 # AGENTS.md
 
+# Agent Operating Instructions
+
+Before performing any task or answering the user, follow these steps.
+
+### 1. Load project context
+Always read the **authoritative core** files first:
+- [agent_context.md](file:///Users/juliocezar/Dev/personal/InventoryOS/docs/agent_context.md) → Project status, goals, and constraints.
+- [architecture.md](file:///Users/juliocezar/Dev/personal/InventoryOS/docs/architecture.md) → System structure, data flow, and schemas.
+- [decisions.md](file:///Users/juliocezar/Dev/personal/InventoryOS/docs/decisions.md) → Architectural Decision Records (ADR) and FinOps.
+
+#### Full Documentation Index
+For specific tasks, refer to these specialized documents:
+- **Product Evolution**: [expansion-track-plan.md](file:///Users/juliocezar/Dev/personal/InventoryOS/docs/expansion-track-plan.md) | [expansion-track-backlog.md](file:///Users/juliocezar/Dev/personal/InventoryOS/docs/expansion-track-backlog.md)
+- **Integrations**: [whatsapp-integration.md](file:///Users/juliocezar/Dev/personal/InventoryOS/docs/whatsapp-integration.md)
+- **Infrastructure & Ops**: [release-pipeline.md](file:///Users/juliocezar/Dev/personal/InventoryOS/docs/release-pipeline.md) | [branch-protection.md](file:///Users/juliocezar/Dev/personal/InventoryOS/docs/branch-protection.md)
+
+Do not rely on chat history as the primary source of information.
+
+---
+
+### 2. Interpret the context
+Use the files to understand:
+- Project goals
+- Architectural constraints
+- Prior technical decisions
+- Current implementation state
+
+If instructions from the user conflict with these files, ask for clarification before proceeding.
+
+---
+
+### 3. Updating context
+If new durable knowledge is produced during the work, update the appropriate file:
+- `agent_context.md` → Project status or goals
+- `architecture.md` → System structure changes
+- `decisions.md` → New architectural or technical decisions
+
+Do not overwrite existing information unless it is clearly obsolete.
+
+---
+
+### 4. Avoid chat-only knowledge
+Any important information must be persisted in the documentation files. Agents must not rely on conversation history to store important decisions.
+
+---
+
+### 5. Output discipline
+When generating code or changes:
+- Follow the architecture described in `architecture.md`
+- Respect constraints documented in `agent_context.md`
+- Record new decisions in `decisions.md` when relevant
+- Use the format that maximizes clarity for an LLM (Markdown for descriptions, JSON/YAML for structured data).
+
+---
+
+# Informações Técnicas e Regras Localizadas
+
 Instruções para agentes de código (Claude Code, Codex, etc.) trabalhando neste repositório.
 
 ## Estrutura do repositório
@@ -88,6 +145,7 @@ Como usar:
 - **Não altere workflows sem necessidade** — especialmente o `deploy-production.yml`.
 - **Todo desenvolvimento do `Expansion Track` deve seguir TDD**.
 - **Toda UI nova do `Expansion Track` deve usar `shadcn/ui` por padrão**.
+- **Todo código novo do `Expansion Track` deve ser escrito em TypeScript (`.ts`/`.tsx`)**.
 
 ## Stack
 
