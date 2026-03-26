@@ -29,34 +29,39 @@ function getClientInstallState() {
 
 export default function PWAInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [isInstallable, setIsInstallable] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
   const [dismissed, setDismissed] = useState(false);
-  const [isStandalone, setIsStandalone] = useState(false);
-  const [isIOS, setIsIOS] = useState(false);
+  const [clientState, setClientState] = useState({
+    isIOS: false,
+    isStandalone: false,
+    isInstallable: false,
+  });
+
+  const { isIOS, isStandalone, isInstallable } = clientState;
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     const state = getClientInstallState();
-    setIsIOS(state.isIOS);
-    setIsStandalone(state.isStandalone);
-    setIsInstallable(state.isInstallable);
-
+    setClientState(state);
 
     if (state.isStandalone) return;
 
     const handler = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      setIsInstallable(true);
+      setClientState(prev => ({ ...prev, isInstallable: true }));
     };
     
     const onAppInstalled = () => {
-      setIsInstallable(false);
-      setIsInstalling(false);
       setDeferredPrompt(null);
-      setIsStandalone(true);
+      setIsInstalling(false);
+      setClientState({
+        isIOS: clientState.isIOS,
+        isStandalone: true,
+        isInstallable: false
+      });
     };
+
 
     window.addEventListener("beforeinstallprompt", handler);
     window.addEventListener("appinstalled", onAppInstalled);
@@ -83,8 +88,9 @@ export default function PWAInstallPrompt() {
       const { outcome } = await deferredPrompt.userChoice;
       if (outcome === "accepted") {
         setDeferredPrompt(null);
-        setIsInstallable(false);
+        setClientState(prev => ({ ...prev, isInstallable: false }));
       }
+
     }
     
     if (isIOS && !deferredPrompt) {
