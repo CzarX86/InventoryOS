@@ -112,6 +112,12 @@ gcloud projects add-iam-policy-binding PROJECT_ID \
   --member=serviceAccount:DEPLOY_SA \
   --role=roles/firebase.admin \
   --condition=None
+
+# Necessário para criar/atualizar Cloud Scheduler jobs (funções agendadas)
+gcloud projects add-iam-policy-binding PROJECT_ID \
+  --member=serviceAccount:DEPLOY_SA \
+  --role=roles/cloudscheduler.admin \
+  --condition=None
 ```
 
 Se o deploy tambem publicar Cloud Functions Gen 2, aplique os bindings adicionais abaixo:
