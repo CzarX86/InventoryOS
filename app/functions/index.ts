@@ -8,6 +8,8 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { WHATSAPP_TRANSACTION_EXTRACTION_PROMPT } from "./whatsappTransactionPrompt";
 import { planAiTask, executeAiTask } from "./aiTaskPlanner";
 import { WHATSAPP_COLLECTIONS, createWhatsappExtractedTransactionRecord } from "./whatsappDomain";
+import { processPendingContactClassifications } from "./whatsappClassification";
+
 
 admin.initializeApp();
 
@@ -847,7 +849,9 @@ export const scheduledWhatsappBatchProcess = onSchedule({
 }, async (event: ScheduledEvent) => {
   logger.info("Starting scheduled whatsapp batch process");
   await processPendingWhatsappBatches();
+  await processPendingContactClassifications();
 });
+
 
 /**
  * Manual trigger for testing the batch processing
@@ -857,8 +861,19 @@ export const triggerWhatsappBatch = onCall({
 }, async (request: CallableRequest) => {
   await ensureAdmin(request.auth);
   logger.info("Manual trigger for whatsapp batch process");
-  return await processPendingWhatsappBatches();
+  
+  // 1. Process Message Batching (active contacts)
+  const extractionResult = await processPendingWhatsappBatches();
+  
+  // 2. Process Contact Classifications (pending contacts)
+  const classificationResult = await processPendingContactClassifications();
+
+  return { 
+    extraction: extractionResult, 
+    classification: classificationResult 
+  };
 });
+
 
 // FinOps - Real-time aggregated usage monitoring
 import { aggregateAiUsage } from "./finops";
