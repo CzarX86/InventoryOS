@@ -349,7 +349,9 @@ exports.evolutionWebhook = onRequest({
 /**
  * Fetches all groups from the Evolution API and populates the whatsapp_groups cache.
  */
-exports.syncWhatsappGroups = onCall(async (request) => {
+exports.syncWhatsappGroups = onCall({
+  secrets: ["EVOLUTION_API_URL", "EVOLUTION_API_KEY"],
+}, async (request) => {
   const { instanceName } = request.data;
   if (!instanceName) {
     throw new HttpsError("invalid-argument", "Nome da instância é obrigatório.");
