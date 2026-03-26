@@ -36,10 +36,12 @@ export default function PWAInstallPrompt() {
   const [isIOS, setIsIOS] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     const state = getClientInstallState();
     setIsIOS(state.isIOS);
     setIsStandalone(state.isStandalone);
     setIsInstallable(state.isInstallable);
+
 
     if (state.isStandalone) return;
 

@@ -50,11 +50,13 @@ export default function SplashScreen({ onComplete }) {
               }}
               className="relative w-40 h-40 md:w-48 md:h-48 rounded-none overflow-hidden border border-white/[0.1] shadow-2xl"
             >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img 
                 src="/icons/icon-144x144.png" 
                 alt="InventoryOS Logo" 
                 className="w-full h-full object-cover"
               />
+
               <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
             </motion.div>
           </div>
