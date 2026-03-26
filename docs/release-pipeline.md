@@ -80,15 +80,41 @@ Ao configurar um novo projeto Firebase para deploy de Cloud Functions Gen 2, é 
 
 ### 1. Habilitar APIs manualmente no GCP Console
 
-As APIs abaixo não são habilitadas automaticamente pela service account de deploy:
+Em um projeto novo, o deploy de production pode falhar em cadeia se as APIs abaixo ainda nao tiverem sido habilitadas. O caminho mais seguro e ligar todas antes do primeiro `Deploy Production`:
 
+- [Artifact Registry API](https://console.cloud.google.com/apis/library/artifactregistry.googleapis.com)
 - [Cloud Billing API](https://console.developers.google.com/apis/api/cloudbilling.googleapis.com/overview)
+- [Cloud Build API](https://console.cloud.google.com/apis/library/cloudbuild.googleapis.com)
+- [Cloud Functions API](https://console.cloud.google.com/apis/library/cloudfunctions.googleapis.com)
+- [Cloud Run Admin API](https://console.cloud.google.com/apis/library/run.googleapis.com)
 - [Eventarc API](https://console.cloud.google.com/apis/library/eventarc.googleapis.com)
 - [Firebase Extensions API](https://console.cloud.google.com/apis/library/firebaseextensions.googleapis.com)
 
 ### 2. Conceder permissões IAM
 
-Execute os comandos abaixo substituindo `PROJECT_ID` e `PROJECT_NUMBER` pelos valores do projeto:
+Considere as variaveis abaixo:
+
+- `PROJECT_ID`: id do projeto Firebase/GCP
+- `PROJECT_NUMBER`: numero do projeto GCP
+- `DEPLOY_SA`: service account usada no secret `FIREBASE_SERVICE_ACCOUNT`
+
+Execute os comandos abaixo substituindo `PROJECT_ID`, `PROJECT_NUMBER` e `DEPLOY_SA` pelos valores do projeto:
+
+```bash
+# Permite que a service account de deploy use APIs do projeto
+gcloud projects add-iam-policy-binding PROJECT_ID \
+  --member=serviceAccount:DEPLOY_SA \
+  --role=roles/serviceusage.serviceUsageConsumer \
+  --condition=None
+
+# Permite que a service account de deploy consulte/configure recursos Firebase
+gcloud projects add-iam-policy-binding PROJECT_ID \
+  --member=serviceAccount:DEPLOY_SA \
+  --role=roles/firebase.admin \
+  --condition=None
+```
+
+Se o deploy tambem publicar Cloud Functions Gen 2, aplique os bindings adicionais abaixo:
 
 ```bash
 # Permite que o Pub/Sub crie tokens de autenticação
@@ -112,12 +138,25 @@ gcloud projects add-iam-policy-binding PROJECT_ID \
 # Permite que a service account de deploy aja como a Compute SA (necessário para Functions Gen 2)
 gcloud iam service-accounts add-iam-policy-binding \
   PROJECT_NUMBER-compute@developer.gserviceaccount.com \
-  --member=serviceAccount:firebase-adminsdk-fbsvc@PROJECT_ID.iam.gserviceaccount.com \
+  --member=serviceAccount:DEPLOY_SA \
+  --role=roles/iam.serviceAccountUser \
+  --project=PROJECT_ID
+
+# Permite que a service account de deploy aja como a App Engine default SA
+# Necessário quando o Firebase CLI valida/cria recursos associados ao projeto
+gcloud iam service-accounts add-iam-policy-binding \
+  PROJECT_ID@appspot.gserviceaccount.com \
+  --member=serviceAccount:DEPLOY_SA \
   --role=roles/iam.serviceAccountUser \
   --project=PROJECT_ID
 ```
 
-Para o projeto staging (`inventoryos-effd5`, número `836596473888`) esses passos já foram executados.
+No projeto production (`inventory-os-app`, numero `1097381975276`) tambem foi necessario conceder `roles/iam.serviceAccountUser` sobre:
+
+- `1097381975276-compute@developer.gserviceaccount.com`
+- `inventory-os-app@appspot.gserviceaccount.com`
+
+Para o projeto staging (`inventoryos-effd5`, numero `836596473888`) esses passos ja tinham sido executados.
 
 ### 3. Flag `--force` no deploy
 

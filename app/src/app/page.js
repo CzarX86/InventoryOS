@@ -25,7 +25,7 @@ import useInventory from "@/hooks/useInventory";
 import { buildActivityEvent, logInventoryActivity } from "@/lib/audit";
 import { escalateErrorReport, recordAppError, toUserFacingError } from "@/lib/errorReporting";
 import { db } from "@/lib/firebase";
-import { getBrandLogo } from "@/lib/utils";
+import { getBrandMeta } from "@/lib/utils";
 
 const STATUS_CONFIG = {
   "IN STOCK":  { 
@@ -562,20 +562,28 @@ export default function Dashboard() {
 }
 
 function InventoryContent({ items, filteredItems, stats, loading, searchQuery, activeMenuId, setActiveMenuId, onEdit, onDelete, onView = () => {}, onShare = () => {} }) {
-  const [selectedCategory, setSelectedCategory] = useState("Todos");
+  const [selectedBrandKey, setSelectedBrandKey] = useState(null);
 
-  const uniqueCategories = useMemo(() => {
-    const cats = items.map(i => i.type || "Geral");
-    return ["Todos", ...Array.from(new Set(cats)).sort()];
+  const availableBrands = useMemo(() => {
+    const brands = new Map();
+
+    items.forEach((item) => {
+      const brandMeta = getBrandMeta(item.brand || "Sem marca");
+      if (!brands.has(brandMeta.key)) {
+        brands.set(brandMeta.key, brandMeta);
+      }
+    });
+
+    return Array.from(brands.values()).sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
   }, [items]);
 
   const displayItems = useMemo(() => {
     let filtered = filteredItems;
-    if (selectedCategory !== "Todos") {
-      filtered = filtered.filter(i => (i.type || "Geral") === selectedCategory);
+    if (selectedBrandKey) {
+      filtered = filtered.filter(i => getBrandMeta(i.brand || "Sem marca").key === selectedBrandKey);
     }
     return filtered;
-  }, [filteredItems, selectedCategory]);
+  }, [filteredItems, selectedBrandKey]);
 
   if (loading && items.length === 0) {
     return (
@@ -614,24 +622,25 @@ function InventoryContent({ items, filteredItems, stats, loading, searchQuery, a
         ))}
       </div>
 
-      {/* Category Filter Pills */}
+      {/* Brand Filter Pills */}
       <div className="sticky top-0 z-20 bg-[#0e0e0e]/95 backdrop-blur-md border-b border-[#484848]/20 py-4 px-4 md:px-6 flex items-center gap-2 overflow-x-auto no-scrollbar">
-        {uniqueCategories.map(cat => (
+        {availableBrands.map(brand => (
           <Button
-            key={cat}
-            variant={selectedCategory === cat ? "default" : "outline"}
+            key={brand.key}
+            variant={selectedBrandKey === brand.key ? "default" : "outline"}
             size="sm"
-            onClick={() => setSelectedCategory(cat)}
-            className={`h-8 rounded-none text-[9px] font-bold uppercase tracking-[0.15em] transition-none font-display ${
-              selectedCategory === cat 
+            onClick={() => setSelectedBrandKey(selectedBrandKey === brand.key ? null : brand.key)}
+            className={`h-8 rounded-none text-[9px] font-bold uppercase tracking-[0.15em] transition-none font-display shrink-0 ${
+              selectedBrandKey === brand.key 
                 ? "bg-[#e7e5e5] text-[#0e0e0e] shadow-none" 
                 : "bg-[#191a1a] border-[#484848]/10 text-[#acabaa] hover:bg-[#1f2020] hover:text-[#e7e5e5]"
             }`}
           >
-            {cat}
+            {brand.label}
           </Button>
         ))}
       </div>
+
 
       {/* Inventory List Layout */}
       <div className="min-h-screen pb-32">
@@ -676,6 +685,7 @@ function ItemRow({ item, idx, isMenuOpen, onMenuToggle, onEdit, onDelete, onView
   const status = STATUS_CONFIG[item.status] || STATUS_CONFIG["SOLD"];
   const x = useMotionValue(0);
   const controls = useAnimation();
+  const brandMeta = getBrandMeta(item.brand || "Sem marca");
 
   // Swipe animations with framer-motion
   // Swipe animations with framer-motion - using a dead zone in center to avoid "noise"
@@ -740,6 +750,7 @@ function ItemRow({ item, idx, isMenuOpen, onMenuToggle, onEdit, onDelete, onView
             </div>
             <div className="flex items-center gap-2 text-[9px] md:text-[10px] font-mono">
               <span className="font-semibold text-[#acabaa] uppercase">{item.brand}</span>
+
               {item.partNumber && (
                 <>
                   <span className="text-[#484848]">/</span>
