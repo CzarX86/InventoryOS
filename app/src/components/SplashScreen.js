@@ -35,7 +35,7 @@ export default function SplashScreen({ onComplete }) {
                 repeat: Infinity,
                 ease: "easeInOut"
               }}
-              className="absolute inset-0 bg-blue-500/20 blur-[60px] rounded-full"
+              className="absolute inset-0 bg-blue-500/20 blur-[60px] rounded-none"
             />
 
             {/* Logo Image */}
@@ -48,7 +48,7 @@ export default function SplashScreen({ onComplete }) {
                 damping: 20,
                 delay: 0.2
               }}
-              className="relative w-40 h-40 md:w-48 md:h-48 rounded-3xl overflow-hidden border border-white/[0.1] shadow-2xl"
+              className="relative w-40 h-40 md:w-48 md:h-48 rounded-none overflow-hidden border border-white/[0.1] shadow-2xl"
             >
               <img 
                 src="/icons/icon-144x144.png" 
@@ -94,7 +94,7 @@ export default function SplashScreen({ onComplete }) {
             transition={{ delay: 1.8 }}
             className="absolute bottom-12 flex items-center gap-3"
           >
-            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+            <div className="w-1.5 h-1.5 rounded-none bg-blue-500 animate-pulse" />
             <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600">
               System Ready {process.env.NEXT_PUBLIC_APP_VERSION && `v${process.env.NEXT_PUBLIC_APP_VERSION}`}
             </span>

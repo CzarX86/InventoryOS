@@ -64,14 +64,17 @@ function UpdateToast({ onClose }) {
 }
 
 export default function ServiceWorkerUpdater() {
-  const [isOffline, setIsOffline] = useState(() => {
-    if (typeof navigator !== "undefined") return !navigator.onLine;
-    return false;
-  });
+  const [isOffline, setIsOffline] = useState(false);
   const [showUpdateToast, setShowUpdateToast] = useState(false);
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
   const [waitingWorker, setWaitingWorker] = useState(null);
   const registrationRef = useRef(null);
+
+  useEffect(() => {
+    if (typeof navigator !== "undefined") {
+      setIsOffline(!navigator.onLine);
+    }
+  }, []);
 
   useEffect(() => {
     const currentVersion = (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_APP_VERSION);

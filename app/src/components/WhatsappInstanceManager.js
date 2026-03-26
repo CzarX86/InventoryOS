@@ -1,7 +1,28 @@
 import { useState, useEffect, useCallback, Fragment } from "react";
 import { functions } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
-import { Loader2, QrCode, Smartphone, Wifi, WifiOff, Trash2, LogOut, Plus, RefreshCw, CheckCircle2, Info, PauseCircle, PlayCircle, ChevronDown, ChevronUp, Copy, Bot, AlertCircle, Eye, PowerOff, Users, User } from "lucide-react";
+import { Loader2, QrCode, Smartphone, Wifi, WifiOff, Trash2, LogOut, Plus, RefreshCw, CheckCircle2, Info, PauseCircle, PlayCircle, ChevronDown, ChevronUp, Copy, Bot, AlertCircle, Eye, PowerOff, Users, User, Activity } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
 
 export default function WhatsappInstanceManager() {
   const [instances, setInstances] = useState([]);
@@ -13,14 +34,7 @@ export default function WhatsappInstanceManager() {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [events, setEvents] = useState([]);
   const [notification, setNotification] = useState(null); // { message: string, type: 'success' | 'error' }
-  const [pausedInstances, setPausedInstances] = useState(() => {
-    try {
-      const stored = localStorage.getItem("whatsapp_paused_instances");
-      return stored ? JSON.parse(stored) : {};
-    } catch {
-      return {};
-    }
-  });
+  const [pausedInstances, setPausedInstances] = useState({});
 
   const toggleInstancePause = async (instanceName) => {
     setActionLoading(`pause-${instanceName}`);
@@ -45,14 +59,16 @@ export default function WhatsappInstanceManager() {
   };
   const [expandedEvent, setExpandedEvent] = useState(null);
 
-  const [ignoredGroups, setIgnoredGroups] = useState(() => {
+  const [ignoredGroups, setIgnoredGroups] = useState({});
+
+  useEffect(() => {
     try {
-      const stored = localStorage.getItem("whatsapp_ignored_groups");
-      return stored ? JSON.parse(stored) : {};
-    } catch {
-      return {};
-    }
-  });
+      const p = localStorage.getItem("whatsapp_paused_instances");
+      if (p) setPausedInstances(JSON.parse(p));
+      const i = localStorage.getItem("whatsapp_ignored_groups");
+      if (i) setIgnoredGroups(JSON.parse(i));
+    } catch (e) {}
+  }, []);
 
   const toggleGroupIgnore = async (groupId, groupName) => {
     setActionLoading(`group-${groupId}`);
@@ -270,45 +286,56 @@ export default function WhatsappInstanceManager() {
   }
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6">
+    <div className="flex flex-col gap-6 p-4 md:p-8 bg-[#0e0e0e]">
       {/* Header & Create */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-zinc-900/50 p-6 border border-white/5 backdrop-blur-sm">
-        <div>
-          <h2 className="text-xl font-black uppercase tracking-tight text-white mb-1">Gerenciar WhatsApp</h2>
-          <p className="text-sm text-zinc-400 font-medium">Conecte sua conta para automatizar o inventário.</p>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            placeholder="Nome da Instância (ex: principal)"
-            value={newInstanceName}
-            onChange={(e) => setNewInstanceName(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ""))}
-            className="bg-zinc-950 border border-white/10 px-4 py-2 text-sm font-bold text-white placeholder:text-zinc-600 focus:outline-none focus:border-white/20 transition-colors"
-          />
-          <div className="hidden lg:block group relative" title="O prefixo ios_ é adicionado automaticamente para identificar este projeto.">
-            <Info size={14} className="text-zinc-500 cursor-help" />
+      <div className="border border-[#484848]/20 bg-[#131313] relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-3 text-[8px] font-mono text-[#484848] uppercase tracking-widest">WAPP_INSTANCE_CONTROLLER</div>
+        <div className="p-8 flex flex-col md:flex-row md:items-center justify-between gap-8 relative z-10">
+          <div className="space-y-2">
+            <Badge variant="outline" className="h-5 px-2 bg-[#1f2020] text-[#97a5ff] border-[#484848]/20 text-[9px] font-bold uppercase tracking-[0.2em] rounded-none font-display">
+              OPS_INITIATOR
+            </Badge>
+            <h2 className="text-2xl font-black uppercase tracking-tighter text-[#e7e5e5] font-display">INSTÂNCIAS_<span className="text-[#acabaa]/30">WHATSAPP</span></h2>
+            <p className="text-[10px] text-[#acabaa]/40 font-mono uppercase tracking-widest">PROTOCOLO_DE_CONEXÃO_MULTI_DISPOSITIVO</p>
           </div>
-          <button
-            onClick={handleCreateInstance}
-            disabled={actionLoading === "create" || !newInstanceName}
-            className="bg-white text-black px-4 py-2 text-xs font-black uppercase tracking-widest hover:bg-zinc-200 disabled:opacity-50 transition-all flex items-center gap-2"
-          >
-            {actionLoading === "create" ? <Loader2 className="animate-spin" size={14} /> : <Plus size={14} />}
-            Criar
-          </button>
+          
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-0 group relative border border-[#484848]/20 bg-[#0e0e0e]">
+              <div className="px-3 border-r border-[#484848]/10 text-[#acabaa]/30 hidden md:block">
+                <Bot size={14} />
+              </div>
+              <Input
+                type="text"
+                placeholder="ID_INSTÂNCIA (ALPHA_NUM)"
+                value={newInstanceName}
+                onChange={(e) => setNewInstanceName(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ""))}
+                className="w-full md:w-64 font-mono text-xs uppercase tracking-tight h-12 border-0 bg-transparent focus-visible:ring-0 rounded-none text-[#e7e5e5]"
+              />
+            </div>
+            <Button
+              onClick={handleCreateInstance}
+              disabled={actionLoading === "create" || !newInstanceName}
+              className="font-black uppercase tracking-widest px-8 h-12 rounded-none bg-primary hover:bg-primary/90 text-primary-foreground transition-none font-display text-[10px]"
+            >
+              {actionLoading === "create" ? (
+                <Loader2 className="animate-spin mr-3" size={14} />
+              ) : (
+                <Plus size={14} className="mr-3" />
+              )}
+              PROLONG_STORAGE
+            </Button>
+          </div>
         </div>
       </div>
 
       {/* Instances List */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {instances.length === 0 ? (
-          <div className="col-span-full py-12 text-center border border-dashed border-white/10">
-            <p className="text-sm font-bold uppercase tracking-widest text-zinc-500">Nenhuma instância encontrada.</p>
+          <div className="col-span-full border border-dashed border-[#484848]/20 bg-transparent p-12 text-center rounded-none">
+            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#acabaa]/30 font-display">SYSTEM_EMPTY: NO_ACTIVE_INSTANCES</p>
           </div>
         ) : (
           instances.map((inst) => {
-            // Suporte para ambas as versões da API (Evolution v1 wrap ou v2 flat)
             const instanceName = inst?.instance?.instanceName || inst?.name || inst?.instanceName;
             const connectionStatus = inst?.instance?.status || inst?.connectionStatus || inst?.status;
             
@@ -320,146 +347,143 @@ export default function WhatsappInstanceManager() {
             return (
               <div 
                 key={instanceName}
-                className="group relative flex flex-col bg-zinc-950 border border-white/5 hover:border-white/10 transition-all overflow-hidden"
+                className="group relative flex flex-col bg-[#131313] border border-[#484848]/20 rounded-none transition-none overflow-hidden"
               >
                 {/* Status Bar */}
-                <div className={`h-1 w-full ${isConnected ? "bg-emerald-500" : "bg-amber-500"}`} />
+                <div className={`h-1 w-full ${isConnected ? "bg-emerald-500/40" : "bg-amber-500/40"}`} />
                 
-                <div className="p-5 flex flex-col gap-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${isConnected ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"}`}>
-                        <Smartphone size={18} />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-black uppercase tracking-tight text-white">{instanceName}</h3>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          {isConnected ? (
-                            <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-emerald-400">
-                              <Wifi size={10} /> Conectado
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-amber-400">
-                              <WifiOff size={10} /> Desconectado
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                <div className="p-6 flex flex-row items-start justify-between space-y-0 relative z-10">
+                  <div className="flex items-center gap-4">
+                    <div className={`p-3 rounded-none border ${isConnected ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-amber-500/10 text-amber-500 border-amber-500/20"}`}>
+                      <Smartphone size={20} />
                     </div>
-
-                    <div className="flex items-center gap-1">
-                      {confirmDelete === instanceName ? (
-                        <div className="flex items-center gap-2 pr-1">
-                          <button 
-                            onClick={() => handleDeleteInstance(instanceName)}
-                            className="px-3 py-1.5 bg-red-500 text-white text-[9px] font-black uppercase tracking-widest hover:bg-red-600 transition-all rounded-sm shadow-lg shadow-red-500/20"
-                          >
-                            CONFIRMAR EXCLUSÃO
-                          </button>
-                          <button 
-                            onClick={() => setConfirmDelete(null)}
-                            className="p-1.5 text-zinc-500 hover:text-white transition-all"
-                          >
-                            <Plus size={14} className="rotate-45" />
-                          </button>
-                        </div>
-                      ) : (
-                        <>
-                          <button 
-                            onClick={() => toggleInstancePause(instanceName)}
-                            title={pausedInstances[instanceName] ? "Retomar Digestão de IA" : "Pausar Digestão de IA"}
-                            className={`p-2 transition-all ${pausedInstances[instanceName] ? "text-amber-500 hover:text-amber-400 bg-amber-500/10 rounded-sm shadow-sm" : "text-zinc-500 hover:text-white"}`}
-                          >
-                            {actionLoading === `pause-${instanceName}` ? <Loader2 size={16} className="animate-spin" /> : (pausedInstances[instanceName] ? <PlayCircle size={16} /> : <PauseCircle size={16} />)}
-                          </button>
-                          <button 
-                            onClick={() => handleSetWebhook(instanceName)}
-                            title="Configurar Webhook (Necessário para o Monitor de Atividade)"
-                            className={`p-2 transition-all ${isConnected ? "text-emerald-500 hover:text-emerald-400" : "text-zinc-500 hover:text-white"}`}
-                          >
-                            {actionLoading === `webhook-${instanceName}` ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                          </button>
-
-                          <button 
-                            onClick={() => handleSyncGroups(instanceName)}
-                            title="Sincronizar metadados de grupos"
-                            className="p-2 text-zinc-500 hover:text-emerald-400 hover:bg-emerald-400/5 transition-all"
-                          >
-                            {actionLoading === `sync-${instanceName}` ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-                          </button>
-                          <button 
-                            onClick={() => fetchInstances()}
-                            title="Atualizar status da conexão"
-                            className="p-2 text-zinc-500 hover:text-white hover:bg-white/5 transition-all"
-                          >
-                            <RefreshCw size={16} className={isActionLoading ? "animate-spin" : ""} />
-                          </button>
-                          <button 
-                            onClick={() => setConfirmDelete(instanceName)}
-                            className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-400/5 transition-all"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </>
-                      )}
+                    <div>
+                      <h3 className="text-lg font-black uppercase tracking-tighter text-[#e7e5e5] font-display">{instanceName}</h3>
+                      <div className="flex items-center gap-3 mt-1.5">
+                        <Badge variant="outline" className={`h-4 px-2 text-[8px] font-bold uppercase tracking-[0.2em] rounded-none font-mono ${isConnected ? "border-emerald-500/20 text-emerald-500" : "border-amber-500/20 text-amber-500"}`}>
+                          {isConnected ? "STABLE_CONNECTION" : "LINK_REQUIRED"}
+                        </Badge>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Actions / QR Code Area */}
-                  <div className="flex flex-col gap-3 pt-2">
-                    {!isConnected && (
-                      <div className="flex flex-col gap-4">
-                        {activeInstance === instanceName && qrCode ? (
-                          <div className="flex flex-col items-center justify-center p-6 bg-white rounded-xl shadow-2xl shadow-emerald-500/10">
-                            {qrCode === "loading" ? (
-                              <div className="h-48 w-48 flex items-center justify-center">
-                                <Loader2 className="animate-spin text-zinc-900" size={32} />
-                              </div>
-                            ) : (
-                              <>
-                                <img src={qrCode} alt="WhatsApp QR Code" className="h-48 w-48" />
-                                <p className="text-[10px] font-black uppercase tracking-widest text-zinc-900 mt-4 text-center">
-                                  Escaneie no WhatsApp {" > "} Aparelhos Conectados
-                                </p>
-                              </>
-                            )}
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => handleGetQrCode(instanceName)}
-                            className="w-full bg-emerald-500 text-black py-3 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-emerald-400 transition-all flex items-center justify-center gap-2"
-                          >
-                            <QrCode size={14} />
-                            Conectar Aparelho
-                          </button>
-                        )}
+                  <div className="flex items-center gap-1">
+                    {confirmDelete === instanceName ? (
+                      <div className="flex items-center gap-px bg-[#484848]/20 border border-[#484848]/20">
+                        <Button 
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => handleDeleteInstance(instanceName)}
+                          className="h-9 px-4 text-[8px] font-bold uppercase tracking-widest rounded-none bg-[#7f2927] hover:bg-[#9e3330] transition-none font-display"
+                        >
+                          CONFIRM_PURGE
+                        </Button>
+                        <Button 
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => setConfirmDelete(null)}
+                          className="h-9 w-9 bg-[#1f2020] text-[#acabaa] rounded-none hover:bg-[#2a2b2b] transition-none"
+                        >
+                          <Plus size={14} className="rotate-45" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <Button 
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => toggleInstancePause(instanceName)}
+                            className={`h-10 w-10 rounded-none border border-transparent transition-none ${pausedInstances[instanceName] ? "text-amber-500 bg-amber-500/10 border-amber-500/20" : "text-[#acabaa]/40 hover:text-[#e7e5e5] hover:bg-[#1f2020]"}`}
+                        >
+                            {actionLoading === `pause-${instanceName}` ? <Loader2 size={16} className="animate-spin" /> : (pausedInstances[instanceName] ? <PlayCircle size={16} /> : <PauseCircle size={16} />)}
+                        </Button>
+
+                        <Button 
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleSetWebhook(instanceName)}
+                          className={`h-10 w-10 rounded-none border border-transparent transition-none ${isConnected ? "text-emerald-500 bg-emerald-500/10 border-emerald-500/20" : "text-[#acabaa]/40 hover:text-[#e7e5e5] hover:bg-[#1f2020]"}`}
+                        >
+                          {actionLoading === `webhook-${instanceName}` ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                        </Button>
+
+                        <Button 
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleSyncGroups(instanceName)}
+                          className="h-10 w-10 rounded-none text-[#acabaa]/40 hover:text-emerald-500 hover:bg-emerald-500/10 hover:border-emerald-500/20 border border-transparent transition-none"
+                        >
+                          {actionLoading === `sync-${instanceName}` ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+                        </Button>
+
+                        <Button 
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setConfirmDelete(instanceName)}
+                          className="h-10 w-10 rounded-none text-[#acabaa]/40 hover:text-red-500 hover:bg-red-500/10 hover:border-red-500/20 border border-transparent transition-none"
+                        >
+                          <Trash2 size={16} />
+                        </Button>
                       </div>
                     )}
+                  </div>
+                </div>
 
-                    {isConnected && (
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="bg-zinc-900/50 p-3 border border-white/5 rounded-lg flex flex-col gap-1">
-                          <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Bateria</span>
-                          <span className="text-sm font-bold text-white">
+                <div className="px-6 pb-8 pt-0 flex flex-col gap-6 relative z-10">
+                  <div className="h-px w-full bg-[#484848]/10" />
+                  
+                  {/* Actions / QR Code Area */}
+                  {!isConnected ? (
+                    <div className="space-y-6">
+                      {activeInstance === instanceName && qrCode ? (
+                        <div className="flex flex-col items-center justify-center p-8 bg-white rounded-none border-4 border-primary/20">
+                          {qrCode === "loading" ? (
+                            <div className="h-48 w-48 flex items-center justify-center">
+                              <Loader2 className="animate-spin text-[#0e0e0e]" size={32} />
+                            </div>
+                          ) : (
+                            <>
+                              <img src={qrCode} alt="WhatsApp QR Code" className="h-48 w-48" />
+                              <div className="mt-6 px-4 py-1.5 bg-[#0e0e0e] text-[#e7e5e5] text-[10px] font-bold uppercase tracking-[0.2em] rounded-none font-display border border-primary/20 anim-pulse">
+                                AGUARDANDO_ESCANEAMENTO
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ) : (
+                        <Button
+                          onClick={() => handleGetQrCode(instanceName)}
+                          className="w-full h-14 bg-emerald-600 hover:bg-emerald-500 text-[#0e0e0e] font-black uppercase tracking-[0.3em] rounded-none transition-none font-display text-xs"
+                        >
+                          <QrCode size={18} className="mr-3" />
+                          INIT_CONNECT_SEQUENCE
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-[#1f2020] p-4 rounded-none border border-[#484848]/10 flex flex-col gap-2">
+                          <span className="text-[9px] font-bold uppercase tracking-widest text-[#acabaa]/30 font-mono">BATERIA_LVL</span>
+                          <span className="text-sm font-bold text-[#e7e5e5] font-mono">
                             {inst.battery !== undefined && inst.battery !== null ? `${inst.battery}%` : (inst.instance?.batteryLevel ?? "---")}
                           </span>
                         </div>
-                        <div className="bg-zinc-900/50 p-3 border border-white/5 rounded-lg flex flex-col gap-1">
-                          <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Plataforma</span>
-                          <span className="text-sm font-bold text-white capitalize">
+                        <div className="bg-[#1f2020] p-4 rounded-none border border-[#484848]/10 flex flex-col gap-2">
+                          <span className="text-[9px] font-bold uppercase tracking-widest text-[#acabaa]/30 font-mono">OS_ARCH_TYPE</span>
+                          <span className="text-sm font-bold text-[#e7e5e5] uppercase font-mono tracking-tighter">
                             {inst.platform || inst.instance?.platform || "---"}
                           </span>
                         </div>
-                        <button
+                        <Button
+                          variant="outline"
                           onClick={() => handleLogoutInstance(instanceName)}
-                          className="col-span-2 border border-white/10 text-white py-2.5 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/5 transition-all flex items-center justify-center gap-2 mt-2"
+                          className="col-span-2 h-12 mt-4 font-bold uppercase tracking-[0.25em] border-[#7f2927]/20 bg-[#0e0e0e] hover:bg-[#7f2927]/10 text-[#ee7d77] rounded-none transition-none font-display text-[10px]"
                         >
-                          <LogOut size={14} />
-                          Desconectar
-                        </button>
+                          <LogOut size={16} className="mr-3" />
+                          EXIT_INSTANCE_SESSION
+                        </Button>
                       </div>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
             );
@@ -469,48 +493,59 @@ export default function WhatsappInstanceManager() {
 
       {/* Global Notification */}
       {notification && (
-        <div 
-          className={`fixed bottom-8 right-8 z-50 p-4 border flex items-center gap-3 animate-in slide-in-from-bottom-4 fade-in duration-300 ${
-            notification.type === "error" 
-              ? "bg-red-950 border-red-500 text-red-200" 
-              : "bg-emerald-950 border-emerald-500 text-emerald-200"
-          }`}
-        >
-          {notification.type === "error" ? <WifiOff size={18} /> : <CheckCircle2 size={18} />}
-          <span className="text-xs font-black uppercase tracking-tight">{notification.message}</span>
+        <div className="fixed bottom-10 right-10 z-[100] border-l-4 border-primary bg-[#131313] p-6 shadow-[0_32px_64px_rgba(0,0,0,0.6)] animate-in slide-in-from-right-8 duration-200 rounded-none w-96 border border-[#484848]/20">
+          <div className="flex items-start gap-5">
+            <div className={`mt-1 p-2 rounded-none border ${notification.type === "error" ? "bg-[#7f2927]/10 text-[#ee7d77] border-[#7f2927]/20" : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"}`}>
+              {notification.type === "error" ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
+            </div>
+            <div className="flex-1">
+              <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#acabaa]/40 mb-2 font-display">
+                SYSTEM_EVENT:// {notification.type === "error" ? "CRITICAL_ERROR" : "OP_SUCCESS"}
+              </p>
+              <p className="text-sm font-bold text-[#e7e5e5] uppercase font-mono leading-tight tracking-tight">
+                {notification.message}
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
       {/* Activity Monitor Section */}
-      <div className="mt-4 flex flex-col gap-4">
-        <div className="flex items-center justify-between border-b border-white/5 pb-2">
-          <h2 className="text-sm font-black uppercase tracking-[0.2em] text-zinc-500">
-            Monitor de Atividade Global
-          </h2>
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Live</span>
+      <div className="mt-12 flex flex-col gap-8">
+        <div className="flex items-center justify-between border-b border-[#484848]/20 pb-6 relative overflow-hidden">
+          <div className="flex items-center gap-4 relative z-10">
+            <Activity className="text-[#97a5ff]" size={20} />
+            <div>
+              <h2 className="text-sm font-black uppercase tracking-[0.4em] text-[#e7e5e5] font-display">
+                MONITOR_ATIVIDADE_GLOBAL
+              </h2>
+              <p className="text-[9px] font-mono uppercase tracking-widest text-[#acabaa]/30 mt-1">REALTIME_EVENT_STREAM_V2</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-4 py-2 bg-[#0e0e0e] border border-emerald-500/20 relative z-10">
+            <span className="w-1.5 h-1.5 rounded-none bg-emerald-500 animate-pulse" />
+            <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-emerald-500 font-mono">LINK_ACTIVE</span>
           </div>
         </div>
         
-        <div className="bg-black border border-white/5 overflow-hidden">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-zinc-900/50">
-                <th className="p-3 w-8 border-b border-white/5"></th>
-                <th className="p-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5">Evento</th>
-                <th className="p-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5">Origem / Contato</th>
-                <th className="p-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5">Sincronização / IA</th>
-                <th className="p-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5 text-right">Data/Hora</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
+        <div className="border border-[#484848]/20 bg-[#131313] rounded-none overflow-hidden">
+          <Table className="font-mono">
+            <TableHeader className="bg-[#1f2020] border-b border-[#484848]/20">
+              <TableRow className="hover:bg-transparent border-none h-14">
+                <TableHead className="w-12"></TableHead>
+                <TableHead className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#acabaa]/40 font-display">TYPE_ID</TableHead>
+                <TableHead className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#acabaa]/40 font-display">ENDPOINT_CONTEXT</TableHead>
+                <TableHead className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#acabaa]/40 font-display">PROCESSING_STATE</TableHead>
+                <TableHead className="text-right text-[9px] font-bold uppercase tracking-[0.2em] text-[#acabaa]/40 font-display">TIMESTAMP</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {events.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="p-8 text-center text-[10px] font-bold uppercase tracking-widest text-zinc-700">
+                <TableRow>
+                  <TableCell colSpan={5} className="p-12 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground/30">
                     Aguardando eventos do WhatsApp...
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ) : (
                 events.map((event) => {
                   const isExpanded = expandedEvent === event.id;
@@ -519,148 +554,161 @@ export default function WhatsappInstanceManager() {
                   
                   return (
                     <Fragment key={event.id}>
-                      <tr 
-                        className="hover:bg-white/[0.02] transition-colors group cursor-pointer"
+                      <TableRow 
+                        className={`cursor-pointer transition-none group border-b border-[#484848]/10 h-16 ${isExpanded ? "bg-[#1f2020]" : "bg-[#131313] hover:bg-[#191a1a]"}`}
                         onClick={() => setExpandedEvent(isExpanded ? null : event.id)}
                       >
-                        <td className="p-3 text-zinc-600 group-hover:text-white transition-colors">
+                        <TableCell className="text-[#acabaa]/30 group-hover:text-[#e7e5e5]">
                           {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                        </td>
-                        <td className="p-3">
-                          <div className="flex flex-col gap-1">
-                            <span className="text-[11px] font-black uppercase tracking-tight text-white group-hover:text-emerald-400 transition-colors">
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1.5">
+                            <span className="text-[10px] font-bold uppercase tracking-tight group-hover:text-[#97a5ff] text-[#e7e5e5] font-display">
                               {event.eventType || "MESSAGES_UPSERT"}
                             </span>
-                            <span className="text-[9px] font-medium text-zinc-600">ID: {event.id.slice(-8)}</span>
+                            <span className="text-[8px] font-mono uppercase tracking-widest text-[#acabaa]/30 font-bold">UID_{event.id.slice(-8)}</span>
                           </div>
-                        </td>
-                        <td className="p-3">
-                          <div className="flex flex-col items-start gap-1">
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col items-start gap-1.5">
                             {contact.isGroup ? (
                               <>
-                                <span className="text-[11px] font-black uppercase tracking-tight text-emerald-400 flex items-center gap-1.5 leading-none">
-                                  <Users size={10}/> {contact.groupName.toLowerCase()}
+                                <span className="text-[10px] font-bold uppercase tracking-tight text-emerald-500/80 flex items-center gap-2 font-display">
+                                  <Users size={12}/> {contact.groupName.toUpperCase()}
                                 </span>
-                                <span className="text-[9px] font-bold text-zinc-500 flex items-center gap-1 opacity-70">
-                                  <User size={8}/> {contact.name.toLowerCase()}
+                                <span className="text-[9px] font-bold text-[#acabaa]/40 flex items-center gap-1.5 uppercase tracking-tighter">
+                                  <User size={10}/> {contact.name}
                                 </span>
                               </>
                             ) : (
-                              <span className="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5 capitalize">
-                                <User size={10} className="text-zinc-500"/> {contact.name.toLowerCase()}
+                              <span className="text-[10px] font-bold text-[#e7e5e5] flex items-center gap-2 uppercase font-display">
+                                <User size={12} className="text-[#acabaa]/30"/> {contact.name}
                               </span>
                             )}
-                            <span className="text-[9px] font-black uppercase tracking-widest text-zinc-600 mt-0.5">
-                              via {event.instanceId || "---"}
+                            <span className="text-[8px] font-bold uppercase tracking-widest text-[#acabaa]/10 font-mono">
+                              SRC_ID::{event.instanceId || "NIL"}
                             </span>
                           </div>
-                        </td>
-                        <td className="p-3">
-                          <div className="flex flex-col items-start gap-1.5">
-                            {/* Webhook/Sync Status */}
-                            <span className={`px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.1em] flex items-center gap-1 rounded-sm border ${
-                              event.status === "processed" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
-                              event.status === "failed" ? "bg-red-500/10 text-red-400 border-red-500/20" :
-                              "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col items-start gap-2">
+                            <Badge variant="outline" className={`text-[8px] font-bold uppercase tracking-[0.2em] border-none px-2 py-0.5 h-auto rounded-none font-mono ${
+                              event.status === "processed" ? "bg-emerald-500/10 text-emerald-500" :
+                              event.status === "failed" ? "bg-red-500/10 text-red-500" :
+                              "bg-[#1f2020] text-[#acabaa]/40"
                             }`}>
-                              {event.status === "processed" ? "SINCRONIZADO" : (event.status || "recebido")}
-                            </span>
+                              {event.status === "processed" ? "SYNC_COMPLETE" : (event.status ? event.status.toUpperCase() : "RECEIVED")}
+                            </Badge>
                             
-                            {/* AI Processing Status */}
                             {event.payload?.data?.message && (
-                              <span className={`px-1.5 py-0.5 rounded-sm text-[8px] font-black uppercase tracking-widest border flex items-center gap-1 ${
-                                event.aiExtractionStatus === "processed" ? "bg-purple-500/10 text-purple-400 border-purple-500/20" :
-                                event.aiExtractionStatus === "failed" ? "bg-red-500/10 text-red-300 border-red-500/10" :
-                                "bg-zinc-800 text-zinc-500 border-white/5"
+                              <Badge variant="outline" className={`text-[8px] font-bold uppercase tracking-[0.2em] border-none px-2 py-0.5 h-auto rounded-none font-mono gap-2 ${
+                                event.aiExtractionStatus === "processed" ? "bg-[#3e4829] text-[#acc3ce]" :
+                                event.aiExtractionStatus === "failed" ? "bg-[#7f2927]/10 text-[#ee7d77]" :
+                                "bg-[#1f2020] text-[#acabaa]/20"
                               }`}>
-                                <Bot size={8} />
-                                {event.aiExtractionStatus === "processed" ? (event.aiClassification || "PROCESSADO") : 
-                                 event.aiExtractionStatus === "failed" ? "ERRO IA" : "FILA IA"}
-                              </span>
+                                <Bot size={10} />
+                                {event.aiExtractionStatus === "processed" ? (event.aiClassification ? event.aiClassification.toUpperCase() : "EXTRACTED") : 
+                                 event.aiExtractionStatus === "failed" ? "ENGINE_ERR" : "QUEUE_ACTIVE"}
+                              </Badge>
                             )}
                           </div>
-                        </td>
+                        </TableCell>
 
-                        <td className="p-3 text-right">
-                          <div className="flex flex-col items-end">
-                            <span className="text-[10px] font-medium text-zinc-400">
+                        <TableCell className="text-right">
+                          <div className="flex flex-col items-end gap-1">
+                            <span className="text-[9px] font-bold text-[#e7e5e5] font-mono tracking-tight">
                               {event.occurredAt ? new Date(event.occurredAt).toLocaleDateString("pt-BR") : "---"}
                             </span>
-                            <span className="text-[9px] font-black text-zinc-500">
+                            <span className="text-[8px] font-bold text-[#acabaa]/20 font-mono tracking-widest">
                               {event.occurredAt ? new Date(event.occurredAt).toLocaleTimeString("pt-BR") : "---"}
                             </span>
                           </div>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                       {isExpanded && (
-                        <tr className="bg-zinc-950/50">
-                          <td colSpan={5} className="p-4 border-l-2 border-emerald-500/50">
-                            <div className="flex flex-col gap-2">
+                        <TableRow className="hover:bg-transparent bg-[#111212]/50 border-b border-[#484848]/20">
+                          <TableCell colSpan={5} className="p-8">
+                            <div className="flex flex-col gap-8 animate-in fade-in duration-200">
                               {previewText && (
-                                <div className="mb-2 p-3 bg-zinc-900 border border-white/5 rounded-md">
-                                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500 mb-1 block">Preview da Mensagem:</span>
-                                  <p className="text-sm text-zinc-300 font-medium">&quot;{previewText}&quot;</p>
+                                <div className="p-6 bg-[#0e0e0e] border border-[#484848]/20 rounded-none relative">
+                                  <div className="absolute top-0 right-0 p-2 text-[7px] font-mono text-[#484848] uppercase tracking-[0.4em]">RAW_STRING_BUFFER</div>
+                                  <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#97a5ff] mb-4 block font-display">PREVIEW_DE_FRAGMENTO</span>
+                                  <p className="text-sm text-[#e7e5e5]/80 font-mono leading-relaxed border-l-2 border-[#484848]/40 pl-4">{previewText}</p>
                                 </div>
                               )}
                               
-                              <div className="mt-1 mb-2 p-3 bg-zinc-900 border border-white/5 rounded-md flex items-center justify-between">
-                                <div className="flex gap-2 items-center">
-                                  <Bot size={14} className="text-zinc-500"/>
-                                  <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Dados Extraídos (IA): <span className="text-zinc-400 font-medium ml-1">{event.aiExtraction ? "Processado" : "Aguardando fila assíncrona..."}</span></span>
-                                </div>
-                                <button className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest bg-white/5 hover:bg-white/10 text-white px-2 py-1.5 rounded-sm transition-colors">
-                                  <Eye size={12} />
-                                  Detalhes
-                                </button>
-                              </div>
-
-                              {contact.isGroup && (
-                                <div className="mb-2 p-3 bg-emerald-950/20 border border-emerald-500/10 rounded-md flex items-center justify-between">
-                                  <div className="flex gap-2 items-center">
-                                    <Users size={14} className="text-emerald-500/50"/>
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500/80">
-                                      Grupo Detectado: {contact.groupName?.toLowerCase() || "Sem Nome"}
-                                    </span>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-[#484848]/20 border border-[#484848]/20">
+                                <div className="bg-[#131313] p-6 flex items-center justify-between transition-none">
+                                  <div className="flex gap-5 items-center">
+                                    <div className="p-3 bg-[#1f2020] rounded-none border border-[#484848]/10 text-[#acabaa]/30">
+                                      <Bot size={18}/>
+                                    </div>
+                                    <div className="flex flex-col">
+                                      <span className="text-[9px] font-bold uppercase tracking-widest text-[#acabaa]/40 font-display">ENGINE_CLASSIFIER</span>
+                                      <span className="text-xs font-bold text-[#e7e5e5] uppercase font-mono">{event.aiExtraction ? "OPTIMIZED_EXTRACTION" : "WAITING_IN_BUFFER..."}</span>
+                                    </div>
                                   </div>
-                                  <button 
-                                    onClick={(e) => { e.stopPropagation(); toggleGroupIgnore(contact.groupId, contact.name); }}
-                                    className={`flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest px-3 py-1.5 transition-colors shadow-sm ${
-                                      ignoredGroups[contact.groupId] ? "bg-amber-500 hover:bg-amber-400 text-black rounded-full" : "bg-white/5 hover:bg-white/10 text-white rounded-sm"
-                                    }`}
-                                  >
-                                    {actionLoading === `group-${contact.groupId}` ? <Loader2 size={12} className="animate-spin" /> : <PowerOff size={12} />}
-                                    {ignoredGroups[contact.groupId] ? "Grupo Silenciado" : "Silenciar IA para este grupo"}
-                                  </button>
+                                  <Button variant="outline" size="sm" className="h-9 px-6 text-[8px] font-bold uppercase tracking-widest rounded-none border-[#484848]/20 font-display transition-none hover:bg-[#1f2020]">
+                                    <Eye size={14} className="mr-2" /> REVISAR_LOG
+                                  </Button>
                                 </div>
-                              )}
 
-                              <div className="flex justify-between items-center mb-1 mt-2">
-
-                                <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Payload Completo:</span>
-                                <button 
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(JSON.stringify(event.payload || event, null, 2));
-                                    showNotification("Payload copiado com sucesso!");
-                                  }}
-                                  className="flex items-center gap-1 p-1 text-zinc-500 hover:text-white transition-colors text-[9px] font-bold uppercase tracking-widest"
-                                >
-                                  <Copy size={12} /> Copiar
-                                </button>
+                                {contact.isGroup && (
+                                  <div className={`bg-[#131313] p-6 flex items-center justify-between transition-none ${ignoredGroups[contact.groupId] ? "border-l-4 border-amber-500/40" : ""}`}>
+                                    <div className="flex gap-5 items-center min-w-0">
+                                      <div className={`p-3 rounded-none border ${ignoredGroups[contact.groupId] ? "bg-amber-500/10 border-amber-500/20 text-amber-500" : "bg-[#1f2020] border-[#484848]/10 text-[#acabaa]/30"}`}>
+                                        <Users size={18}/>
+                                      </div>
+                                      <div className="flex flex-col min-w-0">
+                                        <span className="text-[9px] font-bold uppercase tracking-widest text-[#acabaa]/40 font-display">MONITOR_POLICY</span>
+                                        <span className="text-xs font-bold text-[#e7e5e5] uppercase font-mono truncate">{contact.groupName}</span>
+                                      </div>
+                                    </div>
+                                    <Button 
+                                      variant={ignoredGroups[contact.groupId] ? "default" : "outline"}
+                                      size="sm"
+                                      onClick={(e) => { e.stopPropagation(); toggleGroupIgnore(contact.groupId, contact.name); }}
+                                      className={`h-9 px-6 text-[8px] font-bold uppercase tracking-widest rounded-none transition-none font-display ${ignoredGroups[contact.groupId] ? "bg-amber-600 hover:bg-amber-500 text-[#0e0e0e] border-none" : "border-[#484848]/20 hover:bg-[#1f2020]"}`}
+                                    >
+                                      {actionLoading === `group-${contact.groupId}` ? <Loader2 size={12} className="animate-spin" /> : (ignoredGroups[contact.groupId] ? <PlayCircle size={14} className="mr-2" /> : <PowerOff size={14} className="mr-2" />)}
+                                      {ignoredGroups[contact.groupId] ? "ENABLE_LISTEN" : "MUTE_DOMAIN"}
+                                    </Button>
+                                  </div>
+                                )}
                               </div>
-                              <pre className="text-[10px] text-zinc-400 whitespace-pre-wrap overflow-x-auto p-3 bg-black border border-white/5 font-mono max-h-64 overflow-y-auto">
-                                {JSON.stringify(event.payload || event, null, 2)}
-                              </pre>
+
+                              <div className="space-y-3">
+                                <div className="flex justify-between items-center px-1">
+                                  <span className="text-[9px] font-bold uppercase tracking-[0.25em] text-[#acabaa]/20 font-display">METADATA_EXTRACT_REPT</span>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(JSON.stringify(event.payload || event, null, 2));
+                                      showNotification("Payload copiado com sucesso!");
+                                    }}
+                                    className="h-8 text-[8px] font-bold uppercase tracking-widest text-[#acabaa]/30 hover:text-[#e7e5e5] transition-none font-display"
+                                  >
+                                    <Copy size={12} className="mr-2" /> CLONE_JSON_NODE
+                                  </Button>
+                                </div>
+                                <div className="h-48 w-full border border-[#484848]/10 bg-[#0e0e0e] p-6 font-mono text-[10px] overflow-auto custom-scrollbar">
+                                  <pre className="text-[#acabaa]/40 leading-relaxed">
+                                    {JSON.stringify(event.payload || event, null, 2)}
+                                  </pre>
+                                </div>
+                              </div>
                             </div>
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       )}
                     </Fragment>
                   );
                 })
               )}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+          </div>
       </div>
     </div>
   );
