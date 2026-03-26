@@ -1,5 +1,8 @@
 import { execFileSync, spawnSync } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
+
+
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
@@ -72,10 +75,20 @@ function getChangedFiles() {
 }
 
 function getChangedAppCodeFiles() {
-  return getChangedFiles()
+
+  const diffBase = resolveDiffBase();
+  if (!diffBase) return [];
+
+  const output = runGit(["diff", "--name-only", diffBase, "HEAD"]);
+  if (!output) return [];
+
+  return output.split("\n")
+    .filter(Boolean)
     .filter((file) => /^app\/.+\.(js|jsx|mjs|cjs)$/.test(file))
-    .map((file) => file.replace(/^app\//, ""));
+    .map((file) => file.replace(/^app\//, ""))
+    .filter((file) => fs.existsSync(path.resolve(appDir, file)));
 }
+
 
 function runCommand(command, args, label) {
   console.log(`\n> ${label}`);
