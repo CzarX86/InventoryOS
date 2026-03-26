@@ -89,7 +89,7 @@ jobs:
           fi
 
           mapfile -t FILES < <(
-            git diff --name-only "$BASE_SHA" "$HEAD_SHA" \
+            git diff --diff-filter=d --name-only "$BASE_SHA" "$HEAD_SHA" \
               | grep '^app/.*\.\(js\|jsx\|mjs\|cjs\)$' \
               | sed 's#^app/##' \
               || true
