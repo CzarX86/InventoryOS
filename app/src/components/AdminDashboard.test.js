@@ -126,19 +126,19 @@ describe("AdminDashboard", () => {
   it("renders token usage and reversible activity for admins", async () => {
     render(<AdminDashboard items={[{ id: "item-123", status: "IN STOCK" }, { id: "item-456", status: "SOLD" }]} user={{ uid: "admin-1", email: "admin@example.com" }} />);
 
-    expect(await screen.findByText("Token Usage")).toBeInTheDocument();
-    expect(screen.getByText("Expansion Flags")).toBeInTheDocument();
-    expect(screen.getByText(/1 de 7 flags habilitadas/i)).toBeInTheDocument();
+    expect(await screen.findByText("AI_Resource_Consumption")).toBeInTheDocument();
+    expect(screen.getByText("Deployment_Control")).toBeInTheDocument();
+    expect(screen.getByText(/1 \/ 7 ACTIVE_FLAGS/i)).toBeInTheDocument();
     expect(screen.getByText("contactReviewQueue")).toBeInTheDocument();
     expect(screen.getAllByText("Disabled").length).toBeGreaterThan(0);
-    expect(screen.getByText("Itens em Estoque")).toBeInTheDocument();
-    expect(screen.getByText("Itens Vendidos")).toBeInTheDocument();
-    expect(screen.getByText("1080 tokens")).toBeInTheDocument();
+    expect(screen.getByText("Stock_Status")).toBeInTheDocument();
+    expect(screen.getByText("Outflow_Metrics")).toBeInTheDocument();
+    expect(screen.getByText("1080")).toBeInTheDocument();
     expect(screen.getByText("US$ 0.0142")).toBeInTheDocument();
-    expect(screen.getByText("42 tokens")).toBeInTheDocument();
-    expect(screen.getByText("Activity History")).toBeInTheDocument();
-    expect(screen.getByText("Support Inbox")).toBeInTheDocument();
+    expect(screen.getByText("42")).toBeInTheDocument();
+    expect(screen.getByText("Global_Operations_Log")).toBeInTheDocument();
+    expect(screen.getByText("System_Exceptions")).toBeInTheDocument();
     expect(screen.getByText(/RESOURCE_EXHAUSTED/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /undo/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /rollback/i })).toBeInTheDocument();
   });
 });
