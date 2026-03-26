@@ -2,7 +2,7 @@
 import { useState, useRef, useMemo, useEffect } from "react";
 import {
   Search, Plus, Mic, Package, Boxes, Settings,
-  Shield, LogOut, MoreHorizontal, AlertTriangle, Loader2, X, Share2, Trash2
+  Shield, LogOut, MoreHorizontal, Loader2, X, Share2, Trash2, MessageSquare
 } from "lucide-react";
 import { motion, AnimatePresence, useMotionValue, useTransform, useAnimation } from "framer-motion";
 import AddItemModal from "@/components/AddItemModal";
@@ -10,6 +10,7 @@ import ItemDetailModal from "@/components/ItemDetailModal";
 import VoiceSearch from "@/components/VoiceSearch";
 import AdminDashboard from "@/components/AdminDashboard";
 import SettingsView from "@/components/SettingsView";
+import WhatsappView from "@/components/WhatsappView";
 import SplashScreen from "@/components/SplashScreen";
 import useAuth from "@/hooks/useAuth";
 import useInventory from "@/hooks/useInventory";
@@ -54,7 +55,10 @@ export default function Dashboard() {
 
   const navItems = [
     { id: "INVENTORY", label: "Inventário", icon: Boxes },
-    ...(isAdmin ? [{ id: "ADMIN", label: "Admin", icon: Shield }] : []),
+    ...(isAdmin ? [
+      { id: "WHATSAPP", label: "WhatsApp", icon: MessageSquare },
+      { id: "ADMIN", label: "Admin", icon: Shield }
+    ] : []),
     { id: "SETTINGS", label: "Config.", icon: Settings },
   ];
 
@@ -212,8 +216,7 @@ export default function Dashboard() {
   };
 
   const handleShare = async (item, platform = "native") => {
-    const includePrice = user?.sharePriceByDefault ?? false;
-    const text = `Equipamento: ${item.model}\nMarca: ${item.brand}\nPN: ${item.partNumber}\n\nEspecificações:\n${item.specifications}${includePrice && item.sellingPrice ? `\n\nPreço: R$ ${parseFloat(item.sellingPrice).toLocaleString('pt-BR')}` : ""}`;
+    const text = `Equipamento: ${item.model}\nMarca: ${item.brand}\nPN: ${item.partNumber}\n\nEspecificações:\n${item.specifications}`;
     
     if (platform === "whatsapp") {
       window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
@@ -362,6 +365,8 @@ export default function Dashboard() {
             >
               {activeTab === "ADMIN" && isAdmin ? (
                 <AdminDashboard items={items} user={user} />
+              ) : activeTab === "WHATSAPP" ? (
+                <WhatsappView />
               ) : activeTab === "SETTINGS" ? (
                 <SettingsView />
               ) : (
@@ -717,9 +722,6 @@ function ItemRow({ item, idx, isMenuOpen, onMenuToggle, onEdit, onDelete, onView
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
               <span className="text-base font-bold text-white truncate">{item.model}</span>
-              {item.needsMarketResearch && (
-                <AlertTriangle size={11} className="text-amber-400 shrink-0" />
-              )}
             </div>
             <div className="flex items-center gap-1.5 text-base text-zinc-400">
               {brandMeta.logo ? (

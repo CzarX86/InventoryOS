@@ -1,8 +1,18 @@
 /* global process, Image, document, fetch */
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { sumUsageMetadata, normalizeUsageMetadata } from "./audit";
+import { normalizeUsageMetadata } from "./audit";
 
-const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY);
+const geminiApiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+const deepseekApiKey = process.env.NEXT_PUBLIC_DEEPSEEK_API_KEY;
+
+if (!geminiApiKey) {
+  console.warn("AI: NEXT_PUBLIC_GEMINI_API_KEY is missing!");
+}
+if (!deepseekApiKey) {
+  console.warn("AI: NEXT_PUBLIC_DEEPSEEK_API_KEY is missing! DeepSeek models will fail.");
+}
+
+const genAI = new GoogleGenerativeAI(geminiApiKey);
 
 // Utility to resize image to save tokens and improve performance
 const resizeImage = async (base64Str, maxWidth = 1024) => {
@@ -33,180 +43,167 @@ const resizeImage = async (base64Str, maxWidth = 1024) => {
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, width, height);
       
-      // Get base64 without the prefix
       const resizedBase64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
       resolve(resizedBase64);
     };
-    img.onerror = () => resolve(base64Str); // Fallback to original
+    img.onerror = () => resolve(base64Str);
   });
 };
 
-// Unified call with fallback from 2.5-flash-lite to 3.1-flash-lite
+/**
+ * Generic configuration resolver for models
+ */
+export function getAiModelConfig(modelName, options = {}) {
+  const config = { model: modelName };
+  
+  if (options.json) {
+    config.generationConfig = { response_mime_type: "application/json" };
+  }
+  
+  if (options.useSearch) {
+    config.tools = [{ googleSearch: {} }];
+    // Search Grounding cannot be used with JSON mime type in Gemini
+    delete config.generationConfig;
+  }
+  
+  return config;
+}
+
+/**
+ * Core execution function for structured output
+ */
+export async function generateStructuredOutput(prompt, modelName = "gemini-2.0-flash", parts = [], options = {}) {
+  if (modelName.startsWith("deepseek-")) {
+    return generateDeepSeekStructuredOutput(prompt, modelName, parts, options);
+  }
+  return generateGeminiStructuredOutput(prompt, modelName, parts, options);
+}
+
+async function generateGeminiStructuredOutput(prompt, modelName, parts, options) {
+  try {
+    const config = getAiModelConfig(modelName, options);
+    const model = genAI.getGenerativeModel(config, { apiVersion: "v1beta" });
+    
+    const contentParts = [prompt, ...parts];
+    const result = await model.generateContent(contentParts);
+    const response = await result.response;
+    const text = response.text();
+    const usage = normalizeUsageMetadata(response.usageMetadata);
+    
+    return {
+      output: parseStructuredText(text, options),
+      usage,
+      model: modelName,
+    };
+  } catch (error) {
+    console.error(`Gemini execution failed on ${modelName}:`, error);
+    throw error;
+  }
+}
+
+async function generateDeepSeekStructuredOutput(prompt, modelName, parts, options) {
+  try {
+    if (!deepseekApiKey) throw new Error("DeepSeek API Key missing");
+
+    const messages = [
+      { role: "system", content: "You are a specialized industrial inventory assistant. Always output valid JSON." },
+      { role: "user", content: prompt }
+    ];
+
+    // Simple implementation: DeepSeek doesn't support multimodal parts as easily as Gemini via simple fetch/OpenAI format here
+    // But for Task Planning and generic extractions, text prompts are enough.
+    
+    const response = await fetch("https://api.deepseek.com/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${deepseekApiKey}`
+      },
+      body: JSON.stringify({
+        model: modelName,
+        messages,
+        response_format: { type: "json_object" },
+        temperature: options.temperature || 0.1
+      })
+    });
+
+    const data = await response.json();
+    if (data.error) throw new Error(`DeepSeek Error: ${data.error.message}`);
+
+    const text = data.choices[0].message.content;
+    const usage = {
+      promptTokenCount: data.usage.prompt_tokens,
+      candidatesTokenCount: data.usage.completion_tokens,
+      totalTokenCount: data.usage.total_tokens
+    };
+
+    return {
+      output: parseStructuredText(text, options),
+      usage,
+      model: modelName,
+    };
+  } catch (error) {
+    console.error(`DeepSeek execution failed on ${modelName}:`, error);
+    throw error;
+  }
+}
+
+function parseStructuredText(text, options = {}) {
+  try {
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    return JSON.parse(jsonMatch ? jsonMatch[0] : text);
+  } catch (e) {
+    if (options.strictJson) throw e;
+    return { rawOutput: text };
+  }
+}
+
+// Legacy helpers (refactored to use new core)
 async function callWithFallback(prompt, visualData = null, useSearch = false) {
-  const models = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-1.5-flash"];
+  const models = ["gemini-2.0-flash", "gemini-1.5-flash"];
   let lastError = null;
-  const usageAttempts = [];
+  const calls = [];
 
   for (const modelName of models) {
     try {
-      // Basic configuration without tools
-      const modelConfig = { 
+      const parts = visualData ? [visualData] : [];
+      const { output, usage } = await generateStructuredOutput(prompt, modelName, parts, { useSearch, json: true });
+      
+      const call = {
         model: modelName,
+        source: "direct",
+        step: "generateContent",
+        usage,
       };
+      calls.push(call);
 
-      // Add options carefully based on rules
-      // For basic JSON extraction we force JSON output. But if using Search Grounding,
-      // the Gemini API throws 400 when combining tools with response_mime_type 'application/json'
-      if (!useSearch) {
-         modelConfig.generationConfig = { response_mime_type: "application/json" };
-      }
-      
-      // Google Search Grounding for real-time market research
-      if (useSearch) {
-        modelConfig.tools = [{ googleSearch: {} }];
-      }
-
-      const model = genAI.getGenerativeModel(modelConfig);
-      
-      const parts = [prompt];
-      if (visualData) parts.push(visualData);
-
-      // Using the simpler array format, the Gemini JS SDK automatically
-      // handles the formatting of text and inlineData objects properly.
-      const result = await model.generateContent(parts);
-      const response = await result.response;
-      const text = response.text();
-      const usage = normalizeUsageMetadata(response.usageMetadata);
-      if (usage) {
-        usageAttempts.push({
-          model: modelName,
-          source: useSearch ? "search" : "direct",
-          step: "generateContent",
-          usage,
-        });
-      }
-      
-      // Attempt to parse JSON
-      try {
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : text);
-        const tokenUsage = sumUsageMetadata(usageAttempts);
-        return {
-          ...parsed,
-          tokenUsage: tokenUsage.totalTokenCount > 0 ? tokenUsage : null,
-          tokenUsageCalls: usageAttempts,
-          aiModel: modelName,
-        };
-      } catch (e) {
-        // If JSON fails but we have output, maybe retry with next model
-        if (modelName === models[0]) continue;
-        throw e;
-      }
-    } catch (error) {
-      console.warn(`Model ${modelName} failed or insufficient:`, error);
-      lastError = error;
+      return {
+        ...output,
+        tokenUsage: { ...usage, calls },
+        aiModel: modelName,
+      };
+    } catch (e) {
+      lastError = e;
     }
   }
-
-  throw lastError || new Error("All AI models failed");
+  throw lastError;
 }
 
-export async function extractFromLabel(base64Image, lite = false) {
-  // Resize to save ~50-70% tokens on high-res photos
+export async function extractFromLabel(base64Image) {
   const optimizedImage = await resizeImage(base64Image);
-  
-  const prompt = `
-    Analise esta etiqueta de equipamento industrial/elétrico e extraia os campos em formato JSON:
-    - type: (ex: "INVERSOR DE FREQUÊNCIA", "MOTOR", "CONTATOR")
-    - brand: (Fabricante, ex: "WEG", "SIEMENS")
-    - model: (Série/Nome principal do modelo)
-    - partNumber: (Código alfanumérico específico)
-    - specifications: (CRÍTICO: Extraia TODAS as potências, tensões, correntes, frequências, fases, IP, etc. Concatene em uma string.)
-    ${!lite ? `
-    - estimatedMarketValue: (Estimativa numérica realista do preço de mercado para este item usado/semi-novo em BRL/R$. Use ferramentas de busca se necessário.)
-    - marketJustification: (Breve justificativa baseada em referências atuais.)
-    ` : ''}
-    
-    IMPORTANTE: Retorne APENAS o JSON bruto. Use null para campos não encontrados.
-  `;
-
-  const imageData = {
-    inlineData: {
-      data: optimizedImage,
-      mimeType: "image/jpeg",
-    },
-  };
-
-  try {
-    // Image + Search Grounding cannot be combined in the same Gemini API call.
-    // Always extract from image without search; model uses internal knowledge for price estimation.
-    return await callWithFallback(prompt, imageData, false);
-  } catch (e) {
-    console.error("AI Label Extraction failed after all attempts", e);
-    e.errorContext = "image";
-    throw e;
-  }
+  const prompt = `Analise esta etiqueta industrial e retorne JSON: type, brand, model, partNumber, specifications.`;
+  const imageData = { inlineData: { data: optimizedImage, mimeType: "image/jpeg" } };
+  return callWithFallback(prompt, imageData, false);
 }
 
 export async function extractFromAudio(base64Audio, mimeType = "audio/webm") {
-  const prompt = `
-    O usuário está ditando um item de estoque ou buscando por ele.
-    Transcreva e identifique a intenção no formato JSON:
-    {
-      "text": "Transcrição exata",
-      "intent": "SEARCH" // ou "ADD"
-    }
-    Apenas retorne o JSON válido.
-  `;
-
-  const audioData = {
-    inlineData: {
-      data: base64Audio,
-      mimeType: mimeType,
-    },
-  };
-
-  try {
-    return await callWithFallback(prompt, audioData);
-  } catch (e) {
-    console.error("Audio Extraction failed", e);
-    e.errorContext = "audio-search";
-    throw e;
-  }
+  const prompt = `Transcreva e identifique intenção (SEARCH/ADD) em JSON: { text, intent }.`;
+  const audioData = { inlineData: { data: base64Audio, mimeType } };
+  return callWithFallback(prompt, audioData);
 }
 
-export async function extractRegistrationFromAudio(base64Audio, mimeType = "audio/webm", lite = false) {
-  const prompt = `
-    O usuário está ditando informações de um equipamento elétrico/industrial.
-    Sua tarefa é transcrever e extrair as informações EXATAS ditadas no áudio e estruturá-las no formato JSON abaixo.
-    CRÍTICO: NÃO invente ou assuma informações. Se o usuário não mencionar um campo explicitamente (como o part number ou modelo), defina o valor dele estritamente como null.
-    
-    Campos para extração JSON:
-    - type: (Tipo do equipamento. Ex: INVERSOR DE FREQUÊNCIA, MOTOR)
-    - brand: (Fabricante/Marca. Ex: WEG, SIEMENS)
-    - model: (Modelo do equipamento)
-    - partNumber: (Part number / código do produto)
-    - specifications: (Qualquer outra especificação citada, como potência, tensão, estado, etc.)
-    ${!lite ? `
-    - estimatedMarketValue: (Estimativa numérica de preço secundário em BRL se possível buscar baseado no áudio, senão null)
-    - marketJustification: (Justificativa)
-    ` : ''}
-    
-    Apenas retorne o JSON puro e válido, e certifique-se de ser EXTREMAMENTE FIEL ao áudio original, retornando null as chaves que faltarem.
-  `;
-
-  const audioData = {
-    inlineData: {
-      data: base64Audio,
-      mimeType: mimeType,
-    },
-  };
-
-  try {
-    return await callWithFallback(prompt, audioData, !lite);
-  } catch (e) {
-    console.error("Audio Registration Extraction failed", e);
-    e.errorContext = "audio-registration";
-    throw e;
-  }
+export async function extractRegistrationFromAudio(base64Audio, mimeType = "audio/webm") {
+  const prompt = `Extraia informações de equipamento industrial em JSON: type, brand, model, partNumber, specifications.`;
+  const audioData = { inlineData: { data: base64Audio, mimeType } };
+  return callWithFallback(prompt, audioData);
 }

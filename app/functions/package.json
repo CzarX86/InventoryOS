@@ -2,7 +2,7 @@
   "name": "inventoryos-functions",
   "private": true,
   "engines": {
-    "node": "20"
+    "node": "22"
   },
   "main": "index.js",
   "scripts": {
@@ -11,7 +11,8 @@
     "deploy": "firebase deploy --only functions"
   },
   "dependencies": {
-    "firebase-admin": "^13.5.0",
-    "firebase-functions": "^6.5.0"
+    "firebase-admin": "^13.7.0",
+    "firebase-functions": "^7.2.2",
+    "@google/generative-ai": "^0.24.1"
   }
 }

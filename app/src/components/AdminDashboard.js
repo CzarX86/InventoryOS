@@ -1,10 +1,52 @@
 import { useState, useEffect, useMemo } from "react";
 import { db } from "@/lib/firebase";
 import { collection, query, orderBy, limit, onSnapshot, doc } from "firebase/firestore";
-import { Activity, Shield, Cpu, TrendingUp, DollarSign, Loader2, Undo2, Bug, Copy, Bell } from "lucide-react";
+import { Loader2, Undo2, Bug, Copy, Bell } from "lucide-react";
 import { isActivityUndone, undoActivityEvent } from "@/lib/audit";
 import { updateErrorStatus } from "@/lib/errorReporting";
 import AdminPushRegistration from "@/components/AdminPushRegistration";
+import useFeatureFlags from "@/hooks/useFeatureFlags";
+import { EXPANSION_FEATURE_FLAGS, isFeatureEnabled } from "@/lib/featureFlags";
+import WhatsappInstanceManager from "@/components/WhatsappInstanceManager";
+import AdminUsageStats from "@/components/AdminUsageStats";
+
+function extractTimestampValue(value) {
+  if (!value) return 0;
+  if (typeof value?.toDate === "function") return value.toDate().getTime();
+  if (value instanceof Date) return value.getTime();
+  return 0;
+}
+
+function normalizeAiUsageEntry(entry) {
+  const totalTokenCount =
+    entry.actualTotalTokenCount ??
+    entry.totalTokenCount ??
+    entry.estimatedTotalTokens ??
+    0;
+  const callCount = entry.usageCalls?.length ?? entry.calls?.length ?? 0;
+  const costUsd = entry.actualCostUsd ?? entry.estimatedCostUsd ?? null;
+
+  return {
+    ...entry,
+    totalTokenCount,
+    callCount,
+    costUsd,
+    sortTimestamp: extractTimestampValue(entry.createdAt),
+  };
+}
+
+function mergeAiUsageEntries(...entryGroups) {
+  return entryGroups
+    .flat()
+    .map(normalizeAiUsageEntry)
+    .sort((left, right) => right.sortTimestamp - left.sortTimestamp)
+    .slice(0, 12);
+}
+
+function formatUsdCost(value) {
+  if (value == null || Number.isNaN(Number(value))) return null;
+  return `US$ ${Number(value).toFixed(4)}`;
+}
 
 export default function AdminDashboard({ items = [], user = null }) {
   const [telemetry, setTelemetry] = useState([]);
@@ -15,9 +57,15 @@ export default function AdminDashboard({ items = [], user = null }) {
   const [undoingId, setUndoingId] = useState(null);
   const [updatingErrorId, setUpdatingErrorId] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { flags, enabledCount } = useFeatureFlags(user);
 
   useEffect(() => {
     if (!db) return;
+    let aiRuns = [];
+    let legacyTaskUsage = [];
+    const syncAiUsage = () => {
+      setTokenUsage(mergeAiUsageEntries(aiRuns, legacyTaskUsage));
+    };
     const q = query(collection(db, "telemetry"), orderBy("timestamp", "desc"), limit(10));
     const unsubTele = onSnapshot(q, snap =>
       setTelemetry(snap.docs.map(d => ({ id: d.id, ...d.data() })))
@@ -26,9 +74,19 @@ export default function AdminDashboard({ items = [], user = null }) {
       setSystemHealth(d.data());
       setLoading(false);
     });
+    const unsubAiRuns = onSnapshot(
+      query(collection(db, "ai_runs"), orderBy("createdAt", "desc"), limit(12)),
+      snap => {
+        aiRuns = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        syncAiUsage();
+      }
+    );
     const unsubTokenUsage = onSnapshot(
       query(collection(db, "task_ai_usage"), orderBy("createdAt", "desc"), limit(12)),
-      snap => setTokenUsage(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      snap => {
+        legacyTaskUsage = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        syncAiUsage();
+      }
     );
     const unsubActivity = onSnapshot(
       query(collection(db, "activity_log"), orderBy("createdAt", "desc"), limit(16)),
@@ -38,7 +96,7 @@ export default function AdminDashboard({ items = [], user = null }) {
       query(collection(db, "error_reports"), orderBy("createdAt", "desc"), limit(20)),
       snap => setErrorReports(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     );
-    return () => { unsubTele(); unsubHealth(); unsubTokenUsage(); unsubActivity(); unsubErrors(); };
+    return () => { unsubTele(); unsubHealth(); unsubAiRuns(); unsubTokenUsage(); unsubActivity(); unsubErrors(); };
   }, []);
 
   const undoneActivityIds = useMemo(() => {
@@ -51,15 +109,11 @@ export default function AdminDashboard({ items = [], user = null }) {
     );
   }, [activityLog]);
 
-  const financials = useMemo(() => {
-    const totalEstimatedValue = items
-      .filter(i => i.status === "IN STOCK")
-      .reduce((a, i) => a + (parseFloat(i.estimatedMarketValue) || 0), 0);
-    const grossProfit = items
-      .filter(i => i.status === "SOLD")
-      .reduce((a, i) => a + ((parseFloat(i.sellingPrice) || 0) - (parseFloat(i.estimatedMarketValue) || 0)), 0);
-    return { totalEstimatedValue, grossProfit };
-  }, [items]);
+  const inventoryStats = useMemo(() => items.reduce((acc, item) => {
+    if (item.status === "IN STOCK") acc.inStock += 1;
+    if (item.status === "SOLD") acc.sold += 1;
+    return acc;
+  }, { inStock: 0, sold: 0 }), [items]);
 
   const handleUndo = async (activity) => {
     if (!user || !activity) return;
@@ -120,19 +174,16 @@ export default function AdminDashboard({ items = [], user = null }) {
 
       {/* Financial stats */}
       <AdminPushRegistration user={user} isAdmin={Boolean(user)} />
+      <AdminUsageStats />
 
       <div className="flex border-b border-white/[0.07]">
         <div className="flex-1 px-4 md:px-6 py-5 border-r border-white/[0.07]">
-          <p className="text-base font-bold uppercase tracking-widest text-zinc-300 mb-1">Valor em Estoque</p>
-          <p className="text-2xl font-black text-white">
-            R$ {financials.totalEstimatedValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-          </p>
+          <p className="text-base font-bold uppercase tracking-widest text-zinc-300 mb-1">Itens em Estoque</p>
+          <p className="text-2xl font-black text-white">{inventoryStats.inStock}</p>
         </div>
         <div className="flex-1 px-4 md:px-6 py-5">
-          <p className="text-base font-bold uppercase tracking-widest text-zinc-300 mb-1">Lucro Bruto</p>
-          <p className="text-2xl font-black text-white">
-            R$ {financials.grossProfit.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-          </p>
+          <p className="text-base font-bold uppercase tracking-widest text-zinc-300 mb-1">Itens Vendidos</p>
+          <p className="text-2xl font-black text-white">{inventoryStats.sold}</p>
         </div>
       </div>
 
@@ -152,6 +203,48 @@ export default function AdminDashboard({ items = [], user = null }) {
           </div>
         ))}
       </div>
+
+      {/* Expansion flags */}
+      <div className="px-4 md:px-6 pt-6 pb-2">
+        <h2 className="text-base font-black uppercase tracking-widest text-zinc-200">Expansion Flags</h2>
+        <p className="text-sm text-zinc-400 mt-1">
+          {enabledCount} de {EXPANSION_FEATURE_FLAGS.length} flags habilitadas no expansion track.
+        </p>
+      </div>
+      <div className="border-t border-white/[0.07]">
+        {EXPANSION_FEATURE_FLAGS.map((flag) => {
+          const enabled = Boolean(flags?.[flag]);
+          return (
+            <div
+              key={flag}
+              className="flex items-center justify-between gap-4 px-4 md:px-6 py-3 border-b border-white/[0.06] hover:bg-white/[0.02] transition-colors"
+            >
+              <span className="text-xs md:text-sm font-black uppercase tracking-[0.18em] text-zinc-300">
+                {flag}
+              </span>
+              <span
+                className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${
+                  enabled ? "bg-emerald-500/15 text-emerald-300" : "bg-zinc-500/15 text-zinc-400"
+                }`}
+              >
+                {enabled ? "Enabled" : "Disabled"}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* WhatsApp Management */}
+      {isFeatureEnabled(flags, "whatsappIngestion") && (
+        <>
+          <div className="px-4 md:px-6 pt-6 pb-2">
+            <h2 className="text-base font-black uppercase tracking-widest text-zinc-200">WhatsApp Connectivity</h2>
+          </div>
+          <div className="border-t border-white/[0.07]">
+            <WhatsappInstanceManager />
+          </div>
+        </>
+      )}
 
       {/* Token usage */}
       <div className="px-4 md:px-6 pt-6 pb-2">
@@ -181,8 +274,15 @@ export default function AdminDashboard({ items = [], user = null }) {
               </div>
               <div className="md:ml-auto flex items-center gap-4 text-base text-zinc-200">
                 <span>{task.totalTokenCount ?? 0} tokens</span>
-                <span>{task.calls?.length ?? 0} calls</span>
-                <span>{task.itemId ? `Item ${task.itemId.slice(0, 8)}…` : "Sem item"}</span>
+                <span>{task.callCount ?? 0} calls</span>
+                <span>{task.costUsd != null ? formatUsdCost(task.costUsd) : "Sem custo"}</span>
+                <span>
+                  {task.itemId
+                    ? `Item ${task.itemId.slice(0, 8)}…`
+                    : task.targetId
+                      ? `${task.targetType || "Target"} ${task.targetId.slice(0, 8)}…`
+                      : "Sem alvo"}
+                </span>
               </div>
             </div>
           ))

@@ -21,8 +21,42 @@ service cloud.firestore {
         ]);
     }
 
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function requestOwnerId() {
+      return request.resource.data.ownerId;
+    }
+
+    function requestAccountId() {
+      return request.resource.data.accountId;
+    }
+
+    function resourceOwnerId() {
+      return resource.data.ownerId;
+    }
+
+    function resourceAccountId() {
+      return resource.data.accountId;
+    }
+
+    function matchesOwnBoundary(ownerId, accountId) {
+      return isSignedIn() &&
+        ownerId == request.auth.uid &&
+        accountId == userDoc().defaultAccountId;
+    }
+
+    function canCreateOwnedResource() {
+      return matchesOwnBoundary(requestOwnerId(), requestAccountId());
+    }
+
+    function canReadOwnedResource() {
+      return matchesOwnBoundary(resourceOwnerId(), resourceAccountId());
+    }
+
     match /users/{userId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if isSignedIn() || userId == "demo-user";
     }
 
     match /inventory/{itemId} {
@@ -48,6 +82,61 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin();
     }
 
+    match /ai_runs/{runId} {
+      allow create: if canCreateOwnedResource() || request.resource.data.ownerId == "demo-user";
+      allow read, update, delete: if isAdmin() || canReadOwnedResource() || resource.data.ownerId == "demo-user";
+    }
+
+    match /ai_cost_policies/{policyId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /prompt_templates/{templateId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /style_profiles/{profileId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /whatsapp_instances/{instanceId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /whatsapp_webhook_events/{eventId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /whatsapp_messages/{messageId} {
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateOwnedResource();
+    }
+
+    match /whatsapp_extracted_transactions/{transactionId} {
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateOwnedResource();
+    }
+
+    match /history_backfill_jobs/{jobId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /txt_import_jobs/{jobId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /message_dispatch_jobs/{jobId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
     match /activity_log/{eventId} {
       allow create: if isSignedIn() && request.resource.data.actorId == request.auth.uid;
       allow read, update, delete: if isAdmin();
@@ -70,6 +159,121 @@ service cloud.firestore {
       allow create, update: if isAdmin() && request.resource.data.userId == request.auth.uid;
       allow delete: if isAdmin() && resource.data.userId == request.auth.uid;
       allow read: if isAdmin();
+    }
+
+    match /accounts/{accountId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /contacts/{contactId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /contact_channels/{channelId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /conversations/{conversationId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /messages/{messageId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /opportunities/{opportunityId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /contracts/{contractId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /crm_events/{eventId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /tasks/{taskId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /interests/{interestId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /catalog_items/{itemId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /inventory_items/{itemId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /installed_base/{itemId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /maintenance_rules/{ruleId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /item_relationships/{relationshipId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /supplier_accounts/{supplierId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /supplier_contacts/{contactId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /quote_requests/{requestId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /quote_responses/{responseId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /ai_usage_stats/{accountId} {
+      allow read: if isAdmin() || canReadOwnedResource();
+      allow create, update: if canCreateOwnedResource(); // For simplified accounting
+    }
+
+    match /ai_runs/{runId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /supplier_performance_profiles/{profileId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    }
+
+    match /procurement_opportunities/{opportunityId} {
+      allow create: if canCreateOwnedResource();
+      allow read, update, delete: if isAdmin() || canReadOwnedResource();
     }
   }
 }

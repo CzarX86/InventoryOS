@@ -1,14 +1,27 @@
 "use client";
-import { X, Edit2, TrendingUp, Mic, Package, Hash, Tag, Activity, Calendar, Server, Share2 } from "lucide-react";
+import { X, Edit2, Mic, Package, Hash, Tag, Activity, Calendar, Server, Share2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getBrandLogo } from "@/lib/utils";
+
+function DetailField({ icon: Icon, label, value, mono = false }) {
+  return (
+    <div className="py-4 border-b border-white/[0.04]">
+      <div className="flex items-center gap-2 mb-1.5">
+        <Icon size={13} className="text-zinc-500" />
+        <span className="text-xs font-black uppercase tracking-widest text-zinc-500">{label}</span>
+      </div>
+      <p className={`text-base text-white ${mono ? "font-mono" : "font-medium"}`}>
+        {value || <span className="text-zinc-700 italic">Não informado</span>}
+      </p>
+    </div>
+  );
+}
 
 export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
   if (!isOpen || !item) return null;
 
   const handleShare = async (platform = "native") => {
-    const includePrice = item.userSettings?.sharePriceByDefault ?? false;
-    const text = `Equipamento: ${item.model}\nMarca: ${item.brand}\nPN: ${item.partNumber}\n\nEspecificações:\n${item.specifications}${includePrice && item.sellingPrice ? `\n\nPreço: R$ ${parseFloat(item.sellingPrice).toLocaleString('pt-BR')}` : ""}`;
+    const text = `Equipamento: ${item.model}\nMarca: ${item.brand}\nPN: ${item.partNumber}\n\nEspecificações:\n${item.specifications}`;
     
     if (platform === "whatsapp") {
       window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
@@ -41,18 +54,6 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
       minute: '2-digit'
     }).format(d);
   };
-
-  const DetailField = ({ icon: Icon, label, value, mono = false }) => (
-    <div className="py-4 border-b border-white/[0.04]">
-      <div className="flex items-center gap-2 mb-1.5">
-        <Icon size={13} className="text-zinc-500" />
-        <span className="text-xs font-black uppercase tracking-widest text-zinc-500">{label}</span>
-      </div>
-      <p className={`text-base text-white ${mono ? "font-mono" : "font-medium"}`}>
-        {value || <span className="text-zinc-700 italic">Não informado</span>}
-      </p>
-    </div>
-  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/90 backdrop-blur-md">
@@ -149,36 +150,6 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
           </div>
 
           <div className="px-6 pb-6">
-            {/* Market Values Panel */}
-            <div className="bg-white/[0.03] border border-white/[0.06] p-6 mb-8 mt-2">
-              <div className="grid grid-cols-2 gap-8">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-2">Estimativa de Mercado</p>
-                  <p className="text-3xl font-black text-white">
-                    {item.estimatedMarketValue ? `R$ ${parseFloat(item.estimatedMarketValue).toLocaleString('pt-BR')}` : "N/A"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-2">Preço de Venda</p>
-                  <p className="text-3xl font-black text-emerald-400">
-                    {item.sellingPrice ? `R$ ${parseFloat(item.sellingPrice).toLocaleString('pt-BR')}` : "N/A"}
-                  </p>
-                </div>
-              </div>
-              
-              {item.marketJustification && (
-                <div className="mt-6 pt-6 border-t border-white/[0.06]">
-                  <div className="flex items-center gap-2 mb-3">
-                    <TrendingUp size={14} className="text-zinc-400" />
-                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Análise da IA</span>
-                  </div>
-                  <p className="text-zinc-300 text-sm leading-relaxed italic">
-                    "{item.marketJustification}"
-                  </p>
-                </div>
-              )}
-            </div>
-
             {/* Specifications Section */}
             <div className="mb-8">
               <div className="flex items-center gap-2 mb-4">

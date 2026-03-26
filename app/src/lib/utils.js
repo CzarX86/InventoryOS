@@ -1,3 +1,10 @@
+import { clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs) {
+  return twMerge(clsx(inputs));
+}
+
 const BRAND_DEFINITIONS = [
   { key: "abb", match: ["abb"], label: "ABB", logo: "/brands/abb.png" },
   { key: "fanuc", match: ["fanuc"], label: "FANUC", logo: "/brands/fanuc.png" },
@@ -47,3 +54,4 @@ export const getBrandMeta = (brand) => {
 };
 
 export const getBrandLogo = (brand) => getBrandMeta(brand).logo;
+

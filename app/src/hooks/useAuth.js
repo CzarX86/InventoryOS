@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { auth, db, googleProvider } from '@/lib/firebase';
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { buildDefaultAccountId } from '@/lib/ownership';
 
 export default function useAuth() {
   const [user, setUser] = useState(null);
@@ -23,11 +24,13 @@ export default function useAuth() {
           setIsAdmin(userData.role === 'admin');
         } else {
           // If profile doesn't exist, create a default 'user' profile
+          const ownerId = firebaseUser.uid;
           const initialData = {
             email: firebaseUser.email,
+            ownerId,
+            defaultAccountId: buildDefaultAccountId(ownerId),
             role: 'user', 
             aiWorkflow: 'real-time',
-            sharePriceByDefault: false,
             createdAt: new Date().toISOString()
           };
           await setDoc(userRef, initialData);
