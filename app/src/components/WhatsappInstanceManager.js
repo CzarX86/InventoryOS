@@ -443,8 +443,10 @@ export default function WhatsappInstanceManager() {
                             </div>
                           ) : (
                             <>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img src={qrCode} alt="WhatsApp QR Code" className="h-48 w-48" />
                               <div className="mt-6 px-4 py-1.5 bg-[#0e0e0e] text-[#e7e5e5] text-[10px] font-bold uppercase tracking-[0.2em] rounded-none font-display border border-primary/20 anim-pulse">
+
                                 AGUARDANDO_ESCANEAMENTO
                               </div>
                             </>

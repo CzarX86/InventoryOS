@@ -223,8 +223,9 @@ export default function VoiceSearch({ onResult, isOpen, onClose }) {
             <div className="w-full py-4 border-y border-white/5 mb-10 flex flex-col items-center gap-2">
               <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40">GUIDE_PARAMETER</span>
               <p className="text-[11px] font-bold text-primary/60 italic tracking-wide font-mono">
-                "Diga o modelo, marca ou part number"
+                &quot;Diga o modelo, marca ou part number&quot;
               </p>
+
             </div>
           )}
 
