@@ -80,3 +80,10 @@ app/.swc/
 *.njsproj
 *.sln
 *.sw?
+
+# Firebase Functions
+app/functions/lib/
+app/functions/npm-debug.log
+app/functions/firebase-debug.log
+app/functions/firestore-debug.log
+
