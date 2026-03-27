@@ -6,7 +6,9 @@ import * as logger from "firebase-functions/logger";
 import * as crypto from "crypto";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { WHATSAPP_TRANSACTION_EXTRACTION_PROMPT } from "./whatsappTransactionPrompt";
+import { MESSAGE_RELEVANCE_PROMPT } from "./messageRelevancePrompt";
 import { planAiTask, executeAiTask } from "./aiTaskPlanner";
+
 import { WHATSAPP_COLLECTIONS, createWhatsappExtractedTransactionRecord } from "./whatsappDomain";
 import { processPendingContactClassifications } from "./whatsappClassification";
 
@@ -751,7 +753,45 @@ async function processPendingWhatsappBatches() {
      const combinedText = messages.map((m: any) => `[${m.timestamp?.toDate ? m.timestamp.toDate().toISOString() : m.timestamp}] ${m.pushName || 'User'}: ${m.text}`).join("\n");
      
      try {
-       // 1. Plan AI Task
+       // 1. Plan AI Task for Relevance Check (Layer 1)
+       const relevancePlan = await planAiTask(
+         "whatsapp_relevance_check", 
+         remoteJid, 
+         { 
+           targetType: "whatsapp_chat_batch",
+           metadata: { messageCount: messages.length, combinedText } 
+         }
+       );
+       
+       const relevancePrompt = MESSAGE_RELEVANCE_PROMPT.replace("{{messageText}}", combinedText);
+       const relevanceRun = await executeAiTask(relevancePlan, relevancePrompt);
+       
+       if (relevanceRun.status !== "completed") {
+         throw new Error(relevanceRun.errorMessage || "AI Relevance Check Failed");
+       }
+       
+       const relevanceResult = relevanceRun.output;
+       const isRelevant = ["commercial", "operational"].includes(relevanceResult.relevance);
+       
+       // If irrelevant, update messages and skip extraction
+       if (!isRelevant) {
+         const batch = db.batch();
+         messages.forEach((m: any) => {
+           const msgRef = db.collection("whatsapp_messages").doc(m.id);
+           batch.update(msgRef, {
+             extracted: "skipped",
+             relevanceCategory: relevanceResult.relevance,
+             relevanceSummary: relevanceResult.summary,
+             updatedAt: FieldValue.serverTimestamp()
+           });
+         });
+         await batch.commit();
+         logger.info("Batch skipped by relevance filter", { remoteJid, category: relevanceResult.relevance });
+         processedCount += messages.length;
+         continue; 
+       }
+
+       // 2. Plan AI Task for Transaction Extraction (Layer 2)
        const plan = await planAiTask(
          "whatsapp_batch_extraction", 
          remoteJid, 
@@ -761,10 +801,10 @@ async function processPendingWhatsappBatches() {
          }
        );
 
-       // 2. Execute AI
-       // Modifying prompt structure to handle multiple lines/context if necessary
+       // 3. Execute AI
        const prompt = WHATSAPP_TRANSACTION_EXTRACTION_PROMPT.replace("{{messageText}}", combinedText);
        const runResult = await executeAiTask(plan, prompt);
+
 
        if (runResult.status !== "completed") {
          throw new Error(runResult.errorMessage || "AI Batch Execution Failed");

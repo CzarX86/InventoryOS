@@ -5,4 +5,5 @@ set -eu
 REPO_ROOT=$(git rev-parse --show-toplevel)
 
 cd "$REPO_ROOT/app"
-pnpm validate:local
+pnpm validate:changed
+
