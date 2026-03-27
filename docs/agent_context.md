@@ -21,7 +21,9 @@ InventoryOS is an operational platform currently focused on inventory and item m
 ## Current State of Development (March 2026)
 - **Production**: Active for inventory/items.
 - **Expansion Foundation**: Ongoing implementation of the "Expansion Track" foundation.
-- **WhatsApp Integration**: Connected to Evolution API (vps-hosted); activity monitor and group metadata synchronization stabilized. Identified `findGroupInfos` endpoint for robust group name resolution.
+- **WhatsApp Integration**: Estabilizado com buffering de webhooks (Inbox Pattern), resolução de nomes de grupos e classificação de contatos.
+- **Observabilidade & FinOps**: Backend 100% industrializado com Structured Logging, Error Wrappers globais e Kill Switch de orçamento AI. Dashboards de custo MTD operacionais.
+
 - **FinOps & Observability**: Implemented a real-time AI cost dashboard with MTD (Month-To-Date) tracking and run-rate projections. Added a background aggregator for cost summaries to minimize read costs.
 - **UI Migration**: New features are using `shadcn/ui` components; legacy components coexist.
 - **Development Flow**: Work is organized in the `codex/expansion-foundation` branch with PR-first workflow to `main`.
@@ -51,10 +53,12 @@ InventoryOS is an operational platform currently focused on inventory and item m
 
 
 ## Next Recommended Steps
-1. Integrate WhatsApp Group monitoring with the new Review Queue.
-2. Implement target-driven group name resolution (Payload -> Cache -> `findGroupInfos`).
-3. Build the `Review Queue` for contact segmentation (Professional vs. Personal).
+1. Integrate WhatsApp Group monitoring with the new Review Queue (STABILIZED).
+2. Implement target-driven group name resolution (STABILIZED).
+3. Build the `Review Queue` for contact segmentation (STABILIZED).
 4. Implement `BigQuery Billing Export` to pull official GCP/Firebase costs into the FinOps dashboard.
+5. Create structured CRM entities (Opportunities/Tasks) from extracted data (Story 2.1.2).
+
 
 ## Technical Reference
 - **System Structure**: [architecture.md](file:///Users/juliocezar/Dev/personal/InventoryOS/docs/architecture.md)

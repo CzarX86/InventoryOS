@@ -2,7 +2,8 @@
 import { useState, useRef, useMemo, useEffect } from "react";
 import {
   Search, Plus, Mic, Package, Boxes, Settings,
-  Shield, LogOut, MoreHorizontal, Loader2, X, Share2, Trash2, MessageSquare
+  Shield, LogOut, MoreHorizontal, Loader2, X, Share2, Trash2, MessageSquare,
+  CheckSquare
 } from "lucide-react";
 import { motion, AnimatePresence, useMotionValue, useTransform, useAnimation } from "framer-motion";
 import AddItemModal from "@/components/AddItemModal";
@@ -12,6 +13,7 @@ import AdminDashboard from "@/components/AdminDashboard";
 import SettingsView from "@/components/SettingsView";
 import WhatsappView from "@/components/WhatsappView";
 import SplashScreen from "@/components/SplashScreen";
+import ActionInbox from "@/components/ActionInbox";
 import PWAInstallPrompt from "@/components/PWAInstallPrompt"; // Added PWAInstallPrompt import
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -80,6 +82,7 @@ export default function Dashboard() {
   const navItems = [
     { id: "INVENTORY", label: "Inventário", icon: Boxes },
     ...(isAdmin ? [
+      { id: "ACTIONS", label: "Ações", icon: CheckSquare },
       { id: "WHATSAPP", label: "WhatsApp", icon: MessageSquare },
       { id: "ADMIN", label: "Admin", icon: Shield }
     ] : []),
@@ -421,7 +424,10 @@ export default function Dashboard() {
                   <AdminDashboard items={items} user={user} />
                 ) : activeTab === "WHATSAPP" ? (
                   <WhatsappView />
+                ) : activeTab === "ACTIONS" ? (
+                  <ActionInbox />
                 ) : activeTab === "SETTINGS" ? (
+
                   <SettingsView />
                 ) : (
                   <InventoryContent

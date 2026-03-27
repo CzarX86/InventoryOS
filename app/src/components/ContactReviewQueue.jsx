@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
   Check, X, MessageSquare, Users, ChevronDown, ChevronRight, 
-  Play, AlertCircle, Terminal, Brain, Shield, User, Briefcase, Info 
+  Play, AlertCircle, Terminal, Brain, Shield, User, Briefcase, Info,
+  CheckSquare, Calendar, Star, TrendingUp
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -117,6 +118,149 @@ function MessagePreview({ jid }) {
           ))}
         </AnimatePresence>
       </div>
+    </div>
+  );
+}
+/**
+ * Hook to listen for CRM insights for a specific contact
+ */
+function useContactCrmInsights(jid) {
+  const [insights, setInsights] = useState({ opportunities: [], tasks: [], loading: true });
+
+  useEffect(() => {
+    if (!jid) return;
+    
+    // Listen for active opportunities
+    const oppsQuery = query(
+      collection(db, "opportunities"),
+      where("remoteJid", "==", jid)
+    );
+    
+    // Listen for pending tasks
+    const tasksQuery = query(
+      collection(db, "tasks"),
+      where("remoteJid", "==", jid)
+    );
+
+    const unsubOpps = onSnapshot(oppsQuery, (snap) => {
+      const opps = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setInsights(prev => ({ ...prev, opportunities: opps, loading: false }));
+    });
+
+    const unsubTasks = onSnapshot(tasksQuery, (snap) => {
+      const tasks = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setInsights(prev => ({ ...prev, tasks: tasks, loading: false }));
+    });
+
+    return () => {
+      unsubOpps();
+      unsubTasks();
+    };
+  }, [jid]);
+
+  return insights;
+}
+
+/**
+ * Small indicator for the table row
+ */
+function ContactCrmQuickSignals({ jid }) {
+  const { opportunities, tasks, loading } = useContactCrmInsights(jid);
+  
+  if (loading || (opportunities.length === 0 && tasks.length === 0)) return null;
+
+  return (
+    <div className="flex items-center gap-2 mt-1">
+      {opportunities.length > 0 && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger>
+              <div className="flex items-center gap-1 text-primary text-[8px] font-black font-mono">
+                <Briefcase size={10} />
+                <span>{opportunities.length}</span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent className="bg-black border-white/10 text-[10px] uppercase font-mono tracking-widest">
+              OPORTUNIDADES_DETECTADAS
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+      {tasks.length > 0 && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger>
+              <div className="flex items-center gap-1 text-amber-500 text-[8px] font-black font-mono">
+                <CheckSquare size={10} />
+                <span>{tasks.length}</span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent className="bg-black border-white/10 text-[10px] uppercase font-mono tracking-widest">
+              TAREFAS_PENDENTES
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Detailed CRM view for the expanded row
+ */
+function ContactCrmDetailView({ jid }) {
+  const { opportunities, tasks, loading } = useContactCrmInsights(jid);
+
+  if (loading) return null;
+  if (opportunities.length === 0 && tasks.length === 0) return null;
+
+  return (
+    <div className="px-6 py-4 bg-[#0d0d0d] border-b border-white/5 space-y-6">
+      {opportunities.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-3 text-[10px] font-display font-black uppercase tracking-[0.2em] text-primary/80">
+            <TrendingUp size={12} />
+            OPORTUNIDADES_COMERCIAIS
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {opportunities.map(opp => (
+              <div key={opp.id} className="p-3 bg-[#151515] border border-primary/10 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-black uppercase tracking-tight text-foreground truncate">{opp.title}</span>
+                  <Badge className="bg-primary/10 text-primary border-none text-[8px]">{opp.stage || 'NEW'}</Badge>
+                </div>
+                {opp.estimatedValue && (
+                  <span className="text-[9px] font-mono text-primary/60">VALOR_EST: R$ {opp.estimatedValue}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tasks.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-3 text-[10px] font-display font-black uppercase tracking-[0.2em] text-amber-500/80">
+            <CheckSquare size={12} />
+            AÇÕES_E_FOLLOW_UPS
+          </div>
+          <div className="space-y-2">
+            {tasks.map(task => (
+              <div key={task.id} className="p-3 bg-[#151515] border border-amber-500/10 flex items-center justify-between gap-4">
+                <div className="flex flex-col gap-1 overflow-hidden">
+                  <span className="text-[10px] font-mono text-muted-foreground uppercase leading-tight line-clamp-1">{task.description}</span>
+                  {task.dueDate && (
+                    <span className="text-[8px] font-mono text-amber-500/40 font-black tracking-widest">EXPIRA_EM: {task.dueDate}</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                   <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" title="Pendente" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -342,6 +486,8 @@ export default function ContactReviewQueue() {
                           )}
                           <span className="truncate max-w-[250px]">{item.name || item.pushName || "UNIDENTIFIED_USER"}</span>
                         </span>
+                        <ContactCrmQuickSignals jid={item.id} />
+
                         <div className="flex items-center gap-2 font-mono text-[8px] uppercase tracking-tighter">
                           <span className="text-muted-foreground/30">{item.id}</span>
                           <span className="text-muted-foreground/10">•</span>
@@ -401,14 +547,15 @@ export default function ContactReviewQueue() {
                     {expandedId === item.id && (
                       <TableRow className="border-white/5 bg-[#0b0b0b] hover:bg-transparent overflow-hidden">
                         <TableCell colSpan={5} className="p-0">
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: "auto", opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.3, ease: "circOut" }}
-                          >
-                            <MessagePreview jid={item.id} />
-                          </motion.div>
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: "auto", opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.3, ease: "circOut" }}
+                            >
+                              <ContactCrmDetailView jid={item.id} />
+                              <MessagePreview jid={item.id} />
+                            </motion.div>
                         </TableCell>
                       </TableRow>
                     )}

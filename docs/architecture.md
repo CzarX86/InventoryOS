@@ -42,8 +42,10 @@
 ```mermaid
 graph TD
     WA[WhatsApp User] -->|Message| EVO[Evolution API - VPS]
-    EVO -->|Webhook Callback| CF_IN[Firebase Cloud Functions - Ingestion]
-    CF_IN -->|Store| DB_MSG[Firestore - Messages/Webhooks]
+    EVO -->|Webhook Callback| CF_IN[Firebase Cloud Functions - Webhook]
+    CF_IN -->|Inbox Store| DB_WEB[Firestore - whatsapp_webhook_events]
+    DB_WEB -->|Trigger| CF_MSG[Firebase Cloud Functions - Ingestion]
+    CF_MSG -->|Store & Cache| DB_MSG[Firestore - whatsapp_messages]
     DB_MSG -->|Trigger| CF_AI[Firebase Cloud Functions - AI Orchestrator]
     CF_AI -->|Analyze| AI[LLM: Gemini / DeepSeek]
     AI -->|Structured Result| CF_AI
@@ -129,6 +131,19 @@ Location: `system_usage/ai_usage_summary_{YYYYMM}`
     }
   },
   "updatedAt": "serverTimestamp"
+}
+```
+
+### System Audit Log Schema
+Location: `system_audit_logs/{id}`
+```json
+{
+  "category": "security | finops | data | system",
+  "action": "string (action identifier)",
+  "actorId": "string (uid or 'system')",
+  "severity": "info | warning | critical",
+  "details": "object (contextual data)",
+  "timestamp": "serverTimestamp"
 }
 ```
 

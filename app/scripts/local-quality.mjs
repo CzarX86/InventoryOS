@@ -84,7 +84,7 @@ function getChangedAppCodeFiles() {
 
   return output.split("\n")
     .filter(Boolean)
-    .filter((file) => /^app\/.+\.(js|jsx|mjs|cjs)$/.test(file))
+    .filter((file) => /^app\/.+\.(js|jsx|mjs|cjs|ts|tsx)$/.test(file))
     .map((file) => file.replace(/^app\//, ""))
     .filter((file) => fs.existsSync(path.resolve(appDir, file)));
 }
