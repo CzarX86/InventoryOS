@@ -101,6 +101,9 @@ function runCommand(command, args, label) {
     nextEnv.NODE_OPTIONS = existingNodeOptions.includes(heapOption)
       ? existingNodeOptions
       : `${existingNodeOptions} ${heapOption}`.trim();
+    
+    // Always add --passWithNoTests to avoid breaking push when files have no tests
+    args.push("--passWithNoTests");
   }
 
   const result = spawnSync(command, args, {
