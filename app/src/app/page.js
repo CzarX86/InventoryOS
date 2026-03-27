@@ -118,7 +118,7 @@ export default function Dashboard() {
             Gestão de estoque com extração inteligente por IA.
           </p>
           {process.env.NEXT_PUBLIC_APP_VERSION && (
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-10 font-mono">
+            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-10 font-mono">
               Versão {process.env.NEXT_PUBLIC_APP_VERSION}
             </p>
           )}
@@ -305,7 +305,7 @@ export default function Dashboard() {
                 variant={activeTab === id ? "secondary" : "ghost"}
                 size="sm"
                 onClick={() => setActiveTab(id)}
-                className={`w-full justify-start gap-3 h-10 font-bold uppercase tracking-widest text-[9px] rounded-none transition-none font-display ${
+                className={`w-full justify-start gap-3 h-10 font-bold uppercase tracking-widest text-[11px] rounded-none transition-none font-display ${
                   activeTab === id 
                     ? "bg-[#1f2020] text-[#e7e5e5]" 
                     : "text-[#acabaa]/60 hover:text-[#e7e5e5] hover:bg-[#131313]"
@@ -324,10 +324,10 @@ export default function Dashboard() {
                 {user.email?.[0].toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[9px] font-bold uppercase tracking-widest text-[#e7e5e5] truncate font-display">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-[#e7e5e5] truncate font-display">
                   {user.displayName || user.email?.split("@")[0]}
                 </p>
-                <Badge variant="outline" className="h-4 px-1.5 py-0 border-[#97a5ff]/20 text-[#97a5ff] bg-[#97a5ff]/5 text-[7px] font-bold uppercase tracking-widest shadow-none rounded-none font-display">
+                <Badge variant="outline" className="h-4 px-1.5 py-0 border-[#97a5ff]/20 text-[#97a5ff] bg-[#97a5ff]/5 text-[10px] font-bold uppercase tracking-widest shadow-none rounded-none font-display">
                   USR_ROOT
                 </Badge>
               </div>
@@ -336,7 +336,7 @@ export default function Dashboard() {
               variant="outline"
               size="sm"
               onClick={logout}
-              className="w-full justify-center gap-2 h-8 text-[8px] font-bold uppercase tracking-widest border-[#ee7d77]/10 text-[#ee7d77] hover:bg-[#ee7d77]/10 hover:border-[#ee7d77]/20 transition-none rounded-none font-display"
+              className="w-full justify-center gap-2 h-8 text-[11px] font-bold uppercase tracking-widest border-[#ee7d77]/10 text-[#ee7d77] hover:bg-[#ee7d77]/10 hover:border-[#ee7d77]/20 transition-none rounded-none font-display"
             >
               <LogOut size={12} /> TERMINATE_SESSION
             </Button>
@@ -359,7 +359,7 @@ export default function Dashboard() {
                 placeholder="SEARCH_MANIFEST_DB..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="pl-10 h-9 bg-[#131313] border-none shadow-none focus-visible:ring-1 focus-visible:ring-[#97a5ff]/20 placeholder:text-[#acabaa]/20 text-[9px] font-bold uppercase tracking-[0.1em] transition-none rounded-none font-display"
+                className="pl-10 h-9 bg-[#131313] border-none shadow-none focus-visible:ring-1 focus-visible:ring-[#97a5ff]/20 placeholder:text-[#acabaa]/20 text-[11px] font-bold uppercase tracking-[0.1em] transition-none rounded-none font-display"
               />
               {searchQuery && (
                 <Button 
@@ -392,7 +392,7 @@ export default function Dashboard() {
 
               <Button
                 onClick={() => { setItemToEdit(null); setIsModalOpen(true); }}
-                className="gap-2 bg-[#e7e5e5] hover:bg-[#c6c6c7] text-[#0e0e0e] text-[9px] font-bold uppercase tracking-widest h-9 px-4 shadow-none rounded-none transition-none font-display border border-[#484848]/10"
+                className="gap-2 bg-[#e7e5e5] hover:bg-[#c6c6c7] text-[#0e0e0e] text-[11px] font-bold uppercase tracking-widest h-9 px-4 shadow-none rounded-none transition-none font-display border border-[#484848]/10"
               >
                 <Plus size={16} />
                 <span className="hidden sm:inline">ADD_NEW_ENTRY</span>
@@ -462,7 +462,7 @@ export default function Dashboard() {
                 }`}
               >
                 <Icon size={16} strokeWidth={activeTab === id ? 3 : 2} className={activeTab === id ? "drop-shadow-[0_0_8px_rgba(var(--primary),0.5)]" : ""} />
-                <span className="text-[6.5px] font-bold uppercase tracking-[0.15em]">{label}</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.15em]">{label}</span>
                 {activeTab === id && (
                   <motion.div 
                     layoutId="activeTabDot" 
@@ -605,7 +605,7 @@ function InventoryContent({ items, filteredItems, stats, loading, searchQuery, a
       {/* Page Title & Context */}
       <div className="px-4 md:px-6 pt-10 pb-8 bg-[#0e0e0e]">
         <div className="flex items-center gap-3 mb-4">
-          <Badge variant="outline" className="h-5 px-2 bg-[#1f2020] text-[#97a5ff] border-[#484848]/20 text-[9px] font-bold uppercase tracking-[0.2em] shadow-none rounded-none font-display">
+          <Badge variant="outline" className="h-5 px-2 bg-[#1f2020] text-[#97a5ff] border-[#484848]/20 text-[11px] font-bold uppercase tracking-[0.2em] shadow-none rounded-none font-display">
             STATUS_OPERACIONAL.SYS
           </Badge>
         </div>
@@ -622,7 +622,7 @@ function InventoryContent({ items, filteredItems, stats, loading, searchQuery, a
           { label: "VENDIDOS_LOG",   value: stats.sold,     color: "text-[#acabaa]/40" },
         ].map(({ label, value, color }) => (
           <div key={label} className="p-3 md:p-5 space-y-1">
-            <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-[#acabaa]/50 font-display">{label}</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#acabaa]/50 font-display">{label}</p>
             <p className={`text-xl md:text-2xl font-bold tracking-tighter font-mono ${color}`}>{value}</p>
           </div>
         ))}
@@ -636,7 +636,7 @@ function InventoryContent({ items, filteredItems, stats, loading, searchQuery, a
             variant={selectedBrandKey === brand.key ? "default" : "outline"}
             size="sm"
             onClick={() => setSelectedBrandKey(selectedBrandKey === brand.key ? null : brand.key)}
-            className={`h-8 rounded-none text-[9px] font-bold uppercase tracking-[0.15em] transition-none font-display shrink-0 ${
+            className={`h-8 rounded-none text-[11px] font-bold uppercase tracking-[0.15em] transition-none font-display shrink-0 ${
               selectedBrandKey === brand.key 
                 ? "bg-[#e7e5e5] text-[#0e0e0e] shadow-none" 
                 : "bg-[#191a1a] border-[#484848]/10 text-[#acabaa] hover:bg-[#1f2020] hover:text-[#e7e5e5]"
@@ -660,7 +660,7 @@ function InventoryContent({ items, filteredItems, stats, loading, searchQuery, a
         ) : (
           <div className="divide-y divide-foreground/[0.01]">
             {/* Desktop Table Header */}
-            <div className="hidden md:flex items-center gap-6 px-8 py-3 bg-[#131313] text-[8px] font-bold uppercase tracking-[0.3em] text-[#acabaa]/40 border-b border-[#484848]/10 font-display">
+            <div className="hidden md:flex items-center gap-6 px-8 py-3 bg-[#131313] text-[10px] font-bold uppercase tracking-[0.3em] text-[#acabaa]/40 border-b border-[#484848]/10 font-display">
               <span className="flex-1">ESPECIFICAÇÕES_DO_ATIVO</span>
               <span className="w-32">CATEGORIA_IDX</span>
               <span className="w-32 px-4">STATUS_FLG</span>
@@ -708,7 +708,7 @@ function ItemRow({ item, idx, isMenuOpen, onMenuToggle, onEdit, onDelete, onView
       >
         <div className="flex flex-col items-center gap-1 text-white">
           <Share2 size={18} />
-          <span className="text-[8px] font-black uppercase tracking-tighter">SHARE</span>
+          <span className="text-[10px] font-black uppercase tracking-tighter">SHARE</span>
         </div>
       </motion.div>
 
@@ -719,7 +719,7 @@ function ItemRow({ item, idx, isMenuOpen, onMenuToggle, onEdit, onDelete, onView
       >
         <div className="flex flex-col items-center gap-1 text-white">
           <Trash2 size={18} />
-          <span className="text-[8px] font-black uppercase tracking-tighter">DELETE</span>
+          <span className="text-[10px] font-black uppercase tracking-tighter">DELETE</span>
         </div>
       </motion.div>
 
@@ -754,7 +754,7 @@ function ItemRow({ item, idx, isMenuOpen, onMenuToggle, onEdit, onDelete, onView
             <div className="flex items-center gap-2 mb-0.5">
               <span className="text-sm md:text-base font-bold text-[#e7e5e5] truncate uppercase tracking-tight font-display">{item.model}</span>
             </div>
-            <div className="flex items-center gap-2 text-[9px] md:text-[10px] font-mono">
+            <div className="flex items-center gap-2 text-[11px] md:text-[12px] font-mono">
               <span className="font-semibold text-[#acabaa] uppercase">{item.brand}</span>
 
               {item.partNumber && (
@@ -768,7 +768,7 @@ function ItemRow({ item, idx, isMenuOpen, onMenuToggle, onEdit, onDelete, onView
 
           {/* Metadata Desktop */}
           <div className="hidden md:block w-32 shrink-0">
-            <Badge variant="secondary" className="bg-[#191a1a] text-[#acabaa] border border-[#484848]/20 font-mono text-[8px] font-black px-2 py-0.5 shadow-none rounded-none uppercase tracking-widest">
+            <Badge variant="secondary" className="bg-[#191a1a] text-[#acabaa] border border-[#484848]/20 font-mono text-[10px] font-black px-2 py-0.5 shadow-none rounded-none uppercase tracking-widest">
               {item.type || "GERAL"}
             </Badge>
           </div>
@@ -776,7 +776,7 @@ function ItemRow({ item, idx, isMenuOpen, onMenuToggle, onEdit, onDelete, onView
           {/* Status Pillar */}
           <div className="w-24 shrink-0 flex items-center gap-2 px-2 font-mono">
             <div className={`w-1 h-1 rounded-none ${status.dot}`} />
-            <span className={`text-[8px] font-bold uppercase tracking-[0.1em] ${status.cls}`}>
+            <span className={`text-[10px] font-bold uppercase tracking-[0.1em] ${status.cls}`}>
               {item.status}
             </span>
           </div>
@@ -790,7 +790,7 @@ function ItemRow({ item, idx, isMenuOpen, onMenuToggle, onEdit, onDelete, onView
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48 bg-[#1f2020] border-[#484848] rounded-none shadow-none">
-                <DropdownMenuItem onClick={() => onEdit(item)} className="text-[9px] font-bold uppercase tracking-widest py-3 cursor-pointer transition-none font-display">
+                <DropdownMenuItem onClick={() => onEdit(item)} className="text-[11px] font-bold uppercase tracking-widest py-3 cursor-pointer transition-none font-display">
                   EDIT_ACTIVE_RECORD
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-[#484848]/20" />

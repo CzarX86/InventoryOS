@@ -49,7 +49,7 @@ function MessagePreview({ jid }) {
         transition={{ duration: 1.5, repeat: Infinity }}
         className="w-1 h-3 bg-primary/40" 
       />
-      <span className="text-[10px] font-display font-black uppercase tracking-[0.2em] text-muted-foreground">BUFFER_STREAM_SYNCING...</span>
+      <span className="text-[11px] font-display font-black uppercase tracking-[0.2em] text-muted-foreground">BUFFER_STREAM_SYNCING...</span>
     </div>
   );
   
@@ -61,13 +61,13 @@ function MessagePreview({ jid }) {
 
   return (
     <div className="p-6 bg-[#0b0b0b] border-y border-white/5 relative overflow-hidden">
-      <div className="absolute top-0 right-0 p-2 text-[8px] font-mono text-muted-foreground/10 uppercase tracking-widest font-black pointer-events-none">
+      <div className="absolute top-0 right-0 p-2 text-[10px] font-mono text-muted-foreground/10 uppercase tracking-widest font-black pointer-events-none">
         CONTEXT_WINDOW_v2.5
       </div>
       
       <div className="flex items-center gap-3 mb-6">
         <div className="w-1 h-4 bg-primary/60" />
-        <h4 className="text-[10px] uppercase tracking-[0.25em] font-display font-black text-muted-foreground flex items-center gap-2">
+        <h4 className="text-[11px] uppercase tracking-[0.25em] font-display font-black text-muted-foreground flex items-center gap-2">
           PROTOCOL_HISTORY_STREAM
         </h4>
       </div>
@@ -88,10 +88,10 @@ function MessagePreview({ jid }) {
                   : 'bg-[#121212] border-white/10 text-muted-foreground'
               } rounded-none relative group`}>
                 <div className="flex items-center justify-between gap-6 mb-2 border-b border-white/5 pb-1">
-                  <span className="text-[9px] font-display font-black uppercase tracking-widest text-primary/60 truncate max-w-[150px]">
+                  <span className="text-[11px] font-display font-black uppercase tracking-widest text-primary/60 truncate max-w-[150px]">
                     {msg.pushName || (msg.fromMe ? 'SYSTEM_ROOT' : 'EXT_USER')}
                   </span>
-                  <span className="text-[8px] font-mono text-muted-foreground/40 font-black">
+                  <span className="text-[10px] font-mono text-muted-foreground/40 font-black">
                     {msg.timestamp?.toDate()?.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                   </span>
                 </div>
@@ -100,14 +100,14 @@ function MessagePreview({ jid }) {
                 </p>
                 
                 {msg.extracted === "waiting_context" && (
-                  <div className="mt-3 pt-2 border-t border-amber-500/20 flex items-center gap-2 text-[9px] text-amber-500/80 font-mono font-black uppercase tracking-widest">
+                  <div className="mt-3 pt-2 border-t border-amber-500/20 flex items-center gap-2 text-[11px] text-amber-500/80 font-mono font-black uppercase tracking-widest">
                     <AlertCircle size={10} />
                     <span>FRAGMENT_DETECTED: {msg.completenessReason || "WAIT_CONTEXT"}</span>
                   </div>
                 )}
 
                 {msg.extracted === "skipped" && (
-                  <div className="mt-3 pt-2 border-t border-red-500/20 flex items-center gap-2 text-[9px] text-red-500/60 font-mono font-black uppercase tracking-widest">
+                  <div className="mt-3 pt-2 border-t border-red-500/20 flex items-center gap-2 text-[11px] text-red-500/60 font-mono font-black uppercase tracking-widest">
                     <Info size={10} />
                     <span>FILTER_SKIPPED: {msg.relevanceCategory || "IRRELEVANT"}</span>
                   </div>
@@ -180,7 +180,7 @@ function ContactCrmQuickSignals({ jid }) {
                 <span>{opportunities.length}</span>
               </div>
             </TooltipTrigger>
-            <TooltipContent className="bg-black border-white/10 text-[10px] uppercase font-mono tracking-widest">
+            <TooltipContent className="bg-black border-white/10 text-[11px] uppercase font-mono tracking-widest">
               OPORTUNIDADES_DETECTADAS
             </TooltipContent>
           </Tooltip>
@@ -195,7 +195,7 @@ function ContactCrmQuickSignals({ jid }) {
                 <span>{tasks.length}</span>
               </div>
             </TooltipTrigger>
-            <TooltipContent className="bg-black border-white/10 text-[10px] uppercase font-mono tracking-widest">
+            <TooltipContent className="bg-black border-white/10 text-[11px] uppercase font-mono tracking-widest">
               TAREFAS_PENDENTES
             </TooltipContent>
           </Tooltip>
@@ -218,7 +218,7 @@ function ContactCrmDetailView({ jid }) {
     <div className="px-6 py-4 bg-[#0d0d0d] border-b border-white/5 space-y-6">
       {opportunities.length > 0 && (
         <div>
-          <div className="flex items-center gap-2 mb-3 text-[10px] font-display font-black uppercase tracking-[0.2em] text-primary/80">
+          <div className="flex items-center gap-2 mb-3 text-[11px] font-display font-black uppercase tracking-[0.2em] text-primary/80">
             <TrendingUp size={12} />
             OPORTUNIDADES_COMERCIAIS
           </div>
@@ -227,10 +227,10 @@ function ContactCrmDetailView({ jid }) {
               <div key={opp.id} className="p-3 bg-[#151515] border border-primary/10 flex flex-col gap-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-black uppercase tracking-tight text-foreground truncate">{opp.title}</span>
-                  <Badge className="bg-primary/10 text-primary border-none text-[8px]">{opp.stage || 'NEW'}</Badge>
+                  <Badge className="bg-primary/10 text-primary border-none text-[10px]">{opp.stage || 'NEW'}</Badge>
                 </div>
                 {opp.estimatedValue && (
-                  <span className="text-[9px] font-mono text-primary/60">VALOR_EST: R$ {opp.estimatedValue}</span>
+                  <span className="text-[10px] font-mono text-primary/60">VALOR_EST: R$ {opp.estimatedValue}</span>
                 )}
               </div>
             ))}
@@ -240,7 +240,7 @@ function ContactCrmDetailView({ jid }) {
 
       {tasks.length > 0 && (
         <div>
-          <div className="flex items-center gap-2 mb-3 text-[10px] font-display font-black uppercase tracking-[0.2em] text-amber-500/80">
+          <div className="flex items-center gap-2 mb-3 text-[11px] font-display font-black uppercase tracking-[0.2em] text-amber-500/80">
             <CheckSquare size={12} />
             AÇÕES_E_FOLLOW_UPS
           </div>
@@ -248,9 +248,9 @@ function ContactCrmDetailView({ jid }) {
             {tasks.map(task => (
               <div key={task.id} className="p-3 bg-[#151515] border border-amber-500/10 flex items-center justify-between gap-4">
                 <div className="flex flex-col gap-1 overflow-hidden">
-                  <span className="text-[10px] font-mono text-muted-foreground uppercase leading-tight line-clamp-1">{task.description}</span>
+                  <span className="text-[11px] font-mono text-muted-foreground uppercase leading-tight line-clamp-1">{task.description}</span>
                   {task.dueDate && (
-                    <span className="text-[8px] font-mono text-amber-500/40 font-black tracking-widest">EXPIRA_EM: {task.dueDate}</span>
+                    <span className="text-[10px] font-mono text-amber-500/40 font-black tracking-widest">EXPIRA_EM: {task.dueDate}</span>
                   )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -324,12 +324,12 @@ export default function ContactReviewQueue() {
   const getStatusBadge = (status) => {
     switch (status) {
       case "active":
-        return <Badge className="bg-emerald-500/10 text-emerald-500 border-none font-display text-[9px] font-black uppercase tracking-widest rounded-none px-3">MONITORANDO</Badge>;
+        return <Badge className="bg-emerald-500/10 text-emerald-500 border-none font-display text-[11px] font-black uppercase tracking-widest rounded-none px-3">MONITORANDO</Badge>;
       case "ignored":
-        return <Badge className="bg-muted text-muted-foreground border-none font-display text-[9px] font-black uppercase tracking-widest rounded-none px-3 opacity-40">IGNORADO</Badge>;
+        return <Badge className="bg-muted text-muted-foreground border-none font-display text-[11px] font-black uppercase tracking-widest rounded-none px-3 opacity-40">IGNORADO</Badge>;
       case "pending_review":
       default:
-        return <Badge className="bg-amber-500/10 text-amber-500 border-none font-display text-[9px] font-black uppercase tracking-widest rounded-none px-3">PENDENTE</Badge>;
+        return <Badge className="bg-amber-500/10 text-amber-500 border-none font-display text-[11px] font-black uppercase tracking-widest rounded-none px-3">PENDENTE</Badge>;
     }
   };
 
@@ -342,12 +342,12 @@ export default function ContactReviewQueue() {
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger>
-              <div className="flex items-center gap-2 text-muted-foreground/20 italic font-mono text-[9px] uppercase tracking-widest">
+              <div className="flex items-center gap-2 text-muted-foreground/20 italic font-mono text-[11px] uppercase tracking-widest">
                 <Brain size={10} className="grayscale opacity-30" />
                 <span>NO_INSIGHT</span>
               </div>
             </TooltipTrigger>
-            <TooltipContent className="bg-black border-white/10 rounded-none text-[10px] font-mono tracking-widest uppercase">
+            <TooltipContent className="bg-black border-white/10 rounded-none text-[11px] font-mono tracking-widest uppercase">
               AGUARDANDO_PROCESSAMENTO_LOTE
             </TooltipContent>
           </Tooltip>
@@ -361,7 +361,7 @@ export default function ContactReviewQueue() {
 
     return (
       <div className="flex flex-col gap-1">
-        <div className={`flex items-center gap-2 ${color} font-display text-[9px] font-black uppercase tracking-[0.15em]`}>
+        <div className={`flex items-center gap-2 ${color} font-display text-[11px] font-black uppercase tracking-[0.15em]`}>
           <Icon size={12} />
           <span>{classification === "professional" ? "COMERCIAL" : "PESSOAL"}</span>
         </div>
@@ -409,7 +409,7 @@ export default function ContactReviewQueue() {
           <Button 
             variant="outline" 
             size="sm" 
-            className="flex-1 md:flex-none bg-[#1a1b1c] border-white/10 text-muted-foreground hover:bg-white/5 font-display text-[9px] font-black uppercase tracking-[0.2em] rounded-none py-6 px-8 transition-none h-auto"
+            className="flex-1 md:flex-none bg-[#1a1b1c] border-white/10 text-muted-foreground hover:bg-white/5 font-display text-[11px] font-black uppercase tracking-[0.2em] rounded-none py-6 px-8 transition-none h-auto"
             onClick={triggerBatchProcess}
             disabled={isProcessing}
           >
@@ -434,10 +434,7 @@ export default function ContactReviewQueue() {
             <TableHeader className="bg-[#1a1b1c]">
               <TableRow className="border-white/5 hover:bg-transparent">
                 <TableHead className="w-12"></TableHead>
-                <TableHead className="text-muted-foreground font-display text-[9px] font-black uppercase tracking-[0.2em] py-5">IDENTIDADE_DO_STREAM</TableHead>
-                <TableHead className="text-muted-foreground font-display text-[9px] font-black uppercase tracking-[0.2em] py-5">INSIGHT_IA</TableHead>
-                <TableHead className="text-muted-foreground font-display text-[9px] font-black uppercase tracking-[0.2em] py-5">STATUS</TableHead>
-                <TableHead className="text-muted-foreground font-display text-[9px] font-black uppercase tracking-[0.2em] py-5 text-right">COMANDOS_RAIO_X</TableHead>
+                <TableHead className="text-muted-foreground font-display text-[11px] font-black uppercase tracking-[0.2em] py-5 text-right">COMANDOS_RAIO_X</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -488,7 +485,7 @@ export default function ContactReviewQueue() {
                         </span>
                         <ContactCrmQuickSignals jid={item.id} />
 
-                        <div className="flex items-center gap-2 font-mono text-[8px] uppercase tracking-tighter">
+                        <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-tighter">
                           <span className="text-muted-foreground/30">{item.id}</span>
                           <span className="text-muted-foreground/10">•</span>
                           <span className="text-muted-foreground/40 font-black">
@@ -507,7 +504,7 @@ export default function ContactReviewQueue() {
                               <Button 
                                 onClick={() => handleUpdateStatus(item, "active")}
                                 size="sm" 
-                                className={`h-10 px-4 rounded-none transition-none font-black text-[9px] tracking-widest uppercase ${
+                                className={`h-10 px-4 rounded-none transition-none font-black text-[11px] tracking-widest uppercase ${
                                   item.monitoringStatus === "active" 
                                     ? 'bg-emerald-500 text-black border-none' 
                                     : 'bg-emerald-500/5 text-emerald-500 hover:bg-emerald-500 hover:text-black border border-emerald-500/20'
@@ -516,7 +513,7 @@ export default function ContactReviewQueue() {
                                 {item.monitoringStatus === "active" ? <Check size={14} strokeWidth={4} /> : "ATIVAR"}
                               </Button>
                             </TooltipTrigger>
-                            <TooltipContent className="bg-black border-white/10 rounded-none text-[9px] uppercase font-mono">
+                            <TooltipContent className="bg-black border-white/10 rounded-none text-[11px] uppercase font-mono">
                               MONITORAR_ESTE_FLUXO
                             </TooltipContent>
                           </Tooltip>
@@ -526,7 +523,7 @@ export default function ContactReviewQueue() {
                               <Button 
                                 onClick={() => handleUpdateStatus(item, "ignored")}
                                 size="sm" 
-                                className={`h-10 px-4 rounded-none transition-none font-black text-[9px] tracking-widest uppercase ${
+                                className={`h-10 px-4 rounded-none transition-none font-black text-[11px] tracking-widest uppercase ${
                                   item.monitoringStatus === "ignored"
                                     ? 'bg-red-500 text-black border-none'
                                     : 'bg-red-500/5 text-red-500 hover:bg-red-500 hover:text-black border border-red-500/20'
@@ -535,7 +532,7 @@ export default function ContactReviewQueue() {
                                 {item.monitoringStatus === "ignored" ? <X size={14} strokeWidth={4} /> : "IGNORAR"}
                               </Button>
                             </TooltipTrigger>
-                            <TooltipContent className="bg-black border-white/10 rounded-none text-[9px] uppercase font-mono">
+                            <TooltipContent className="bg-black border-white/10 rounded-none text-[11px] uppercase font-mono">
                               REJEITAR_PROSPECÇÃO
                             </TooltipContent>
                           </Tooltip>

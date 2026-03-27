@@ -85,12 +85,12 @@ export default function ActionInbox() {
               <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tighter text-foreground leading-none">
                 ACTION_INBOX.LOG
               </h2>
-              <p className="text-[10px] font-mono font-black uppercase tracking-[0.25em] text-muted-foreground/40">
+              <p className="text-[11px] font-mono font-black uppercase tracking-[0.25em] text-muted-foreground/40">
                 SISTEMA_DE_CAPTAÇÃO_E_RESOLUÇÃO_DE_DEMANDAS
               </p>
             </div>
           </div>
-          <Badge className="bg-[#1f2020] text-primary border-none text-[9px] font-black uppercase px-3 py-1 rounded-none tracking-widest font-mono">
+          <Badge className="bg-[#1f2020] text-primary border-none text-[11px] font-black uppercase px-3 py-1 rounded-none tracking-widest font-mono">
             {filteredItems.length} ACTIVE_RECORDS
           </Badge>
         </div>
@@ -102,14 +102,14 @@ export default function ActionInbox() {
               placeholder="PESQUISAR_NO_INBOX..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 h-11 bg-[#1a1b1c] border-white/5 rounded-none text-[10px] uppercase font-mono tracking-widest focus-visible:ring-primary/20"
+              className="pl-10 h-11 bg-[#1a1b1c] border-white/5 rounded-none text-[11px] uppercase font-mono tracking-widest focus-visible:ring-primary/20"
             />
           </div>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="bg-[#1a1b1c] p-1 border border-white/5">
             <TabsList className="bg-transparent h-9 gap-1">
-              <TabsTrigger value="all" className="data-[state=active]:bg-[#0e0e0e] data-[state=active]:text-primary text-[9px] font-black uppercase tracking-widest h-7 px-4 rounded-none transition-none font-display">TUDO</TabsTrigger>
-              <TabsTrigger value="opportunities" className="data-[state=active]:bg-[#0e0e0e] data-[state=active]:text-primary text-[9px] font-black uppercase tracking-widest h-7 px-4 rounded-none transition-none font-display">OPORTUNIDADES</TabsTrigger>
-              <TabsTrigger value="tasks" className="data-[state=active]:bg-[#0e0e0e] data-[state=active]:text-primary text-[9px] font-black uppercase tracking-widest h-7 px-4 rounded-none transition-none font-display">TAREFAS</TabsTrigger>
+              <TabsTrigger value="all" className="data-[state=active]:bg-[#0e0e0e] data-[state=active]:text-primary text-[11px] font-black uppercase tracking-widest h-7 px-4 rounded-none transition-none font-display">TUDO</TabsTrigger>
+              <TabsTrigger value="opportunities" className="data-[state=active]:bg-[#0e0e0e] data-[state=active]:text-primary text-[11px] font-black uppercase tracking-widest h-7 px-4 rounded-none transition-none font-display">OPORTUNIDADES</TabsTrigger>
+              <TabsTrigger value="tasks" className="data-[state=active]:bg-[#0e0e0e] data-[state=active]:text-primary text-[11px] font-black uppercase tracking-widest h-7 px-4 rounded-none transition-none font-display">TAREFAS</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
@@ -121,7 +121,7 @@ export default function ActionInbox() {
           {filteredItems.length === 0 ? (
             <div className="py-32 flex flex-col items-center justify-center gap-4 opacity-20">
               <Clock size={48} strokeWidth={1} />
-              <span className="text-[10px] font-mono font-black uppercase tracking-[0.5em]">BUFFER_EMPTY</span>
+              <span className="text-[11px] font-mono font-black uppercase tracking-[0.5em]">BUFFER_EMPTY</span>
             </div>
           ) : (
             filteredItems.map((item) => (
@@ -161,10 +161,10 @@ function ActionItem({ item, onUpdateOpp, onUpdateTask, onDelete }) {
           <CollectionIcon size={20} />
         </div>
         <div className="flex flex-col">
-          <span className={`text-[8px] font-mono font-black uppercase tracking-widest ${statusColor} opacity-60`}>
+          <span className={`text-[10px] font-mono font-black uppercase tracking-widest ${statusColor} opacity-60`}>
             {isOpp ? 'OPPORTUNITY' : 'TASK_ACTION'}
           </span>
-          <span className="text-[9px] font-mono text-muted-foreground/30">{item.id.slice(0, 8)}</span>
+          <span className="text-[10px] font-mono text-muted-foreground/30">{item.id.slice(0, 8)}</span>
         </div>
       </div>
 
@@ -173,7 +173,7 @@ function ActionItem({ item, onUpdateOpp, onUpdateTask, onDelete }) {
         <h3 className="text-sm font-black uppercase tracking-tight text-white mb-1 truncate">
           {isOpp ? item.title : item.description}
         </h3>
-        <div className="flex flex-wrap items-center gap-3 font-mono text-[9px] text-muted-foreground/60 uppercase">
+        <div className="flex flex-wrap items-center gap-3 font-mono text-[11px] text-muted-foreground/60 uppercase">
           <span className="flex items-center gap-1.5">
             <MessageSquare size={10} /> {item.remoteJid?.split('@')[0] || 'SYSTEM'}
           </span>
@@ -193,8 +193,8 @@ function ActionItem({ item, onUpdateOpp, onUpdateTask, onDelete }) {
       {/* Status & Actions */}
       <div className="flex items-center gap-6 w-full md:w-auto mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-none border-white/5">
         <div className="flex flex-col gap-1 items-end shrink-0 hidden sm:flex">
-          <span className="text-[8px] font-mono font-black text-muted-foreground/30 uppercase tracking-widest">CURRENT_STATUS</span>
-          <Badge className={`bg-transparent border-white/10 ${statusColor} rounded-none text-[9px] font-black uppercase tracking-tighter`}>
+          <span className="text-[10px] font-mono font-black text-muted-foreground/30 uppercase tracking-widest">CURRENT_STATUS</span>
+          <Badge className={`bg-transparent border-white/10 ${statusColor} rounded-none text-[11px] font-black uppercase tracking-tighter`}>
             {isOpp ? (item.stage || 'NEW') : (item.status || 'PENDING')}
           </Badge>
         </div>

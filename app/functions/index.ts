@@ -365,7 +365,7 @@ export const evolutionWebhook = onRequest({
     logger.error("Error storing webhook event", { error: error.message, eventId });
     res.status(500).send("Internal Server Error");
   }
-});
+}));
 
 /**
  * Fetches all groups from the Evolution API and populates the whatsapp_groups cache.
@@ -549,7 +549,7 @@ export const processWhatsappEvent = onDocumentCreated("whatsapp_webhook_events/{
       errorMessage: error.message,
     });
   }
-});
+}));
 
 async function resolvePrimaryAdminUid(db: FirebaseFirestore.Firestore) {
   const supportDoc = await db.collection("system").doc("support").get();
@@ -710,7 +710,7 @@ export const onWhatsappMessageCreated = onDocumentCreated({
   });
 
   logger.info("Message queued for batch AI processing", { messageId, remoteJid });
-});
+}));
 
 /**
  * Core logic for batching whatsapp messages per contact and extracting transactions
