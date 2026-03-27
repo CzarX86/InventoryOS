@@ -104,6 +104,14 @@ function MessagePreview({ jid }) {
                     <span>FRAGMENT_DETECTED: {msg.completenessReason || "WAIT_CONTEXT"}</span>
                   </div>
                 )}
+
+                {msg.extracted === "skipped" && (
+                  <div className="mt-3 pt-2 border-t border-red-500/20 flex items-center gap-2 text-[9px] text-red-500/60 font-mono font-black uppercase tracking-widest">
+                    <Info size={10} />
+                    <span>FILTER_SKIPPED: {msg.relevanceCategory || "IRRELEVANT"}</span>
+                  </div>
+                )}
+
               </div>
             </motion.div>
           ))}
