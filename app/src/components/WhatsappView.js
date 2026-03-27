@@ -26,7 +26,7 @@ export default function WhatsappView() {
           <div className="bg-[#131313] p-6 space-y-4">
             <div className="flex items-center gap-2 text-[#acabaa]">
               <Zap size={14} className="text-[#97a5ff]" />
-              <span className="text-[11px] font-bold uppercase tracking-[0.2em] font-display">{label}</span>
+              <span className="text-[11px] font-bold uppercase tracking-[0.2em] font-display">PASSIVE_INGESTION</span>
             </div>
             <p className="text-[11px] text-[#acabaa]/60 leading-relaxed font-mono uppercase">
               RECV_STREAM: MONITORING ALL INCOMING TRAFFIC. EACH PACKET IS LOGGED FOR CONTINUOUS NEURAL TRAINING.
