@@ -6,7 +6,7 @@
     "lib": ["esnext"],
     "sourceMap": true,
     "outDir": "lib",
-    "rootDir": ".",
+    "rootDir": "src",
     "allowJs": true,
     "checkJs": false,
     "skipLibCheck": true,

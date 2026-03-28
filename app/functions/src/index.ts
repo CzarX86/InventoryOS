@@ -1,4 +1,6 @@
 import * as admin from "firebase-admin";
+admin.initializeApp(); // Initialize early for child modules
+
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { onRequest, onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
 import { onSchedule, ScheduledEvent } from "firebase-functions/v2/scheduler";
@@ -12,7 +14,6 @@ import { withHttpErrorHandling, withEventErrorHandling, withCallErrorHandling } 
 import { createLogger } from "./lib/logger";
 import { buildOwnershipContext } from "./ownership";
 import { planAiTask, executeAiTask } from "./aiTaskPlanner";
-const admin = require("firebase-admin");
 import { WHATSAPP_COLLECTIONS, createWhatsappExtractedTransactionRecord } from "./whatsappDomain";
 import { 
   CRM_COLLECTIONS, 
@@ -26,7 +27,7 @@ import { processPendingContactClassifications } from "./whatsappClassification";
 
 
 
-admin.initializeApp();
+// Redundant initialization removed - initialized at top of file
 
 /**
  * Helper to ensure user is an admin for onCall functions.

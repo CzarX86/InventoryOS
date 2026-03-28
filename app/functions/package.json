@@ -2,7 +2,7 @@
   "name": "inventoryos-functions",
   "private": true,
   "engines": {
-    "node": "22"
+    "node": "20"
   },
   "main": "lib/index.js",
   "scripts": {
