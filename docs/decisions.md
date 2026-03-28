@@ -36,6 +36,15 @@ active_decisions:
   - id: ai_cost_reduction
     name: AI Cost Reduction - Relevance Filter & Batching
     status: Active
+  - id: webhook_async_buffer
+    name: Async Webhook Buffering (Inbox Pattern)
+    status: Active
+  - id: unified_observability_wrapper
+    name: Unified Error Handling & Structured Logging
+    status: Active
+  - id: finops_kill_switch
+    name: FinOps Monthly Budget Kill Switch
+    status: Active
 ---
 
 # Technical Decisions Log (ADR)
@@ -152,6 +161,27 @@ Location: `system_usage/ai_usage_summary_{YYYYMM}`
 - **Implications**: 
     - Requires setting up a root `tsconfig.json` and configuring Next.js/Firebase Functions to support TS.
     - Potential friction when legacy JS components interact with TS-first modules; uses of `any` or `@ts-ignore` should be minimized but are permissible as a migration bridge.
+- **Status**: Active.
+
+## Decision: Async Webhook Buffering (Inbox Pattern)
+- **Decision**: Refactor all webhooks to perform minimal work (reception + hashing) and save the payload to a "buffer" collection (`whatsapp_webhook_events`) before returning 200 OK.
+- **Reason**: Ensures zero data loss if downstream processing (AI/Firestore triggers) lags or fails. Provides a clear retry path for ingestion.
+- **Implications**: Decouples receipt from processing. Triggers now work on the buffered collection.
+- **Status**: Active.
+
+## Decision: Unified Observability Wrapper
+- **Decision**: Every Cloud Function must be wrapped in `withHttpErrorHandling` or `withEventErrorHandling`. Logs must use `StructuredLogger`.
+- **Reason**: Standardizes error responses (with Correlation IDs) and provides trace-ability across distributed logging.
+- **Implications**: Simplifies error management; internal crashes are caught and attributed to trace IDs.
+- **Status**: Active.
+
+## Decision: FinOps Monthly Budget Kill Switch
+- **Decision**: Implement a mandatory budget check in `aiTaskPlanner.ts` before any AI execution. If current month spend >= limit, the task fails with `budget_exceeded`.
+- **Reason**: Prevents catastrophic cloud billing if an automated loop or malicious actor triggers high-volume AI calls.
+- **Implications**: 
+  - O orçamento é configurado no documento Firestore `system/config` (campo: `aiMonthlyBudgetLimitUsd`).
+  - Se o documento não existir, o limite padrão é **$10.00 USD**.
+  - Violações de limite geram um log de categoria `finops` na coleção `system_audit_logs`.
 - **Status**: Active.
 
 ## Technical Reference

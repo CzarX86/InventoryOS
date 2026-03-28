@@ -17,7 +17,7 @@ function DetailField({ icon: Icon, label, value, mono = false }) {
     <div className="py-5 border-b border-foreground/5 last:border-0 group select-none">
       <div className="flex items-center gap-2 mb-2 opacity-40 group-hover:opacity-80 transition-opacity">
         <Icon size={12} className="text-primary/60" />
-        <span className="text-[9px] font-display font-black uppercase tracking-[0.2em]">{label}</span>
+        <span className="text-[11px] font-display font-black uppercase tracking-[0.2em]">{label}</span>
       </div>
       <p className={`text-sm text-foreground/90 ${mono ? "font-mono" : "font-display font-black uppercase"} tracking-tight`}>
         {value || <span className="text-muted-foreground/20 italic">NULL_DATA</span>}
@@ -107,10 +107,10 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
             )}
             <div className="flex-1 min-w-0 pb-1">
               <div className="flex items-center gap-2 mb-4">
-                <Badge variant="outline" className="bg-transparent border-foreground/10 text-[9px] font-display font-black uppercase tracking-[0.2em] text-muted-foreground/40 rounded-none font-mono py-0 h-5">
+                <Badge variant="outline" className="bg-transparent border-foreground/10 text-[10px] font-display font-black uppercase tracking-[0.2em] text-muted-foreground/40 rounded-none font-mono py-0 h-5">
                   UID_{item.id?.slice(0, 8).toUpperCase()}
                 </Badge>
-                <div className={`px-3 h-5 flex items-center text-[9px] font-display font-black uppercase tracking-[0.2em] border-none rounded-none
+                <div className={`px-3 h-5 flex items-center text-[10px] font-display font-black uppercase tracking-[0.2em] border-none rounded-none
                     ${item.status === "IN STOCK" ? "bg-emerald-500/10 text-emerald-500" :
                     item.status === "SOLD" ? "bg-foreground/5 text-muted-foreground/60" :
                     "bg-red-500/10 text-red-500"}`}>
@@ -139,10 +139,10 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
             <div className="mb-12">
               <div className="flex items-center gap-2 mb-6 opacity-40">
                 <CornerRightDown size={14} className="text-primary/60" />
-                <h4 className="text-[10px] font-display font-black uppercase tracking-[0.2em]">TECHNICAL_SPECIFICATIONS.TXT</h4>
+                <h4 className="text-[11px] font-display font-black uppercase tracking-[0.2em]">TECHNICAL_SPECIFICATIONS.TXT</h4>
               </div>
               <div className="bg-[#131313] border border-foreground/10 p-8 rounded-none relative group transition-all">
-                <div className="absolute top-0 right-0 p-3 text-[9px] font-mono text-muted-foreground/20 uppercase font-black">UTF-8</div>
+                <div className="absolute top-0 right-0 p-3 text-[10px] font-mono text-muted-foreground/20 uppercase font-black">UTF-8</div>
                 <div className="absolute top-0 left-0 w-[2px] h-0 bg-primary group-hover:h-full transition-all duration-300" />
                 <p className="text-sm text-foreground/70 leading-relaxed font-mono whitespace-pre-wrap">
                   {item.specifications || "NO_TECHNICAL_DATA_AVAILABLE_IN_SYSTEM_INDEX"}
@@ -158,8 +158,8 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-3">
-                    <p className="text-[10px] font-display font-black uppercase tracking-[0.2em] opacity-30">VOICE_TRANSMISSION_LOG</p>
-                    <span className="text-[9px] font-mono text-primary/40 uppercase">AI_SOURCE_ENCODED</span>
+                    <p className="text-[11px] font-display font-black uppercase tracking-[0.2em] opacity-30">VOICE_TRANSMISSION_LOG</p>
+                    <span className="text-[10px] font-mono text-primary/40 uppercase">AI_SOURCE_ENCODED</span>
                   </div>
                   <audio src={item.audioUrl} controls className="w-full h-8 brightness-[0.4] contrast-200" />
                 </div>
@@ -173,7 +173,7 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
           <Button
             variant="ghost"
             onClick={onClose}
-            className="w-full py-8 text-[11px] font-display font-black uppercase tracking-[0.4em] hover:bg-foreground hover:text-background rounded-none transition-all duration-300 text-muted-foreground/60"
+            className="w-full py-8 text-[12px] font-display font-black uppercase tracking-[0.4em] hover:bg-foreground hover:text-background rounded-none transition-all duration-300 text-muted-foreground/60"
           >
             DISMISS_VIEWPORT_TERMINAL
           </Button>

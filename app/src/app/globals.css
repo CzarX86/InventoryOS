@@ -63,7 +63,7 @@ html {
 ::-webkit-scrollbar-thumb:hover { background: #52525b; }
 /* v1.0.2 - Final PWA Update Verification */
 .magnetic-tooltip {
-  @apply bg-[#1f2020] border border-white/10 text-white text-[9px] font-black uppercase tracking-[0.2em] px-2 py-1 shadow-2xl pointer-events-none z-[9999];
+  @apply bg-[#1f2020] border border-white/10 text-white text-[11px] font-black uppercase tracking-[0.2em] px-2 py-1 shadow-2xl pointer-events-none z-[9999];
   border-radius: 0;
   transform: translate(12px, 12px);
   backdrop-filter: blur(8px);

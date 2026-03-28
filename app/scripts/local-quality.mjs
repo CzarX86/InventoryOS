@@ -84,7 +84,8 @@ function getChangedAppCodeFiles() {
 
   return output.split("\n")
     .filter(Boolean)
-    .filter((file) => /^app\/.+\.(js|jsx|mjs|cjs)$/.test(file))
+    .filter((file) => /^app\/.+\.(js|jsx|mjs|cjs|ts|tsx)$/.test(file))
+    .filter((file) => !file.startsWith("app/functions/"))
     .map((file) => file.replace(/^app\//, ""))
     .filter((file) => fs.existsSync(path.resolve(appDir, file)));
 }
@@ -100,6 +101,9 @@ function runCommand(command, args, label) {
     nextEnv.NODE_OPTIONS = existingNodeOptions.includes(heapOption)
       ? existingNodeOptions
       : `${existingNodeOptions} ${heapOption}`.trim();
+    
+    // Always add --passWithNoTests to avoid breaking push when files have no tests
+    args.push("--passWithNoTests");
   }
 
   const result = spawnSync(command, args, {

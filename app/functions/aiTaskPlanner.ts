@@ -1,6 +1,8 @@
 import { createAiRunRecord, saveAiRun, updateAiRun } from "./aiRuns";
 import { generateStructuredOutput } from "./ai";
 import { routeTask, getModelPricing } from "./modelRouter";
+import { checkAiBudget } from "./finops";
+import { logAudit } from "./lib/audit";
 
 export interface AiTaskResult {
   runId: string;
@@ -55,6 +57,33 @@ export async function executeAiTask(plan: any, prompt: string, parts: any[] = []
 
   await updateAiRun(plan.id, { status: "running", startedAt: new Date().toISOString() });
   
+  // -- FinOps Kill Switch --
+  const budget = await checkAiBudget();
+  if (budget.exceeded) {
+    const errorResult = {
+      status: "failed" as const,
+      errorCode: "budget_exceeded",
+      errorMessage: `Monthly AI budget limit reached ($${budget.limit}). Current spend: $${budget.currentCost.toFixed(2)}`,
+      failedAt: new Date().toISOString(),
+    };
+
+    await logAudit({
+      category: "finops",
+      action: "budget_limit_reached",
+      severity: "critical",
+      actorId: "system",
+      targetId: plan.id,
+      details: {
+        currentSpend: budget.currentCost,
+        limit: budget.limit,
+        taskType: plan.taskType
+      }
+    });
+
+    await updateAiRun(plan.id, errorResult);
+    return { runId: plan.id, ...errorResult };
+  }
+  
   try {
     const { output, usage, model } = await generateStructuredOutput(
       prompt, 
@@ -63,6 +92,8 @@ export async function executeAiTask(plan: any, prompt: string, parts: any[] = []
       { json: true, ...options }
     );
 
+    const isShadow = options.shadow === true;
+
     const result = {
       status: "completed" as const,
       actualPromptTokenCount: usage?.promptTokenCount || 0,
@@ -70,6 +101,7 @@ export async function executeAiTask(plan: any, prompt: string, parts: any[] = []
       actualTotalTokenCount: usage?.totalTokenCount || 0,
       model,
       completedAt: new Date().toISOString(),
+      metadata: { ...plan.metadata, shadow: isShadow }
     };
 
     await updateAiRun(plan.id, result);
