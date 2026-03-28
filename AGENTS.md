@@ -146,6 +146,9 @@ Como usar:
 - **Todo desenvolvimento do `Expansion Track` deve seguir TDD**.
 - **Toda UI nova do `Expansion Track` deve usar `shadcn/ui` por padrão**.
 - **Todo código novo do `Expansion Track` deve ser escrito em TypeScript (`.ts`/`.tsx`)**.
+- **Toda Cloud Function nova deve usar wrappers de erro unificados** (`withHttpErrorHandling`, `withEventErrorHandling` em `lib/errors.ts`).
+- **Todo log deve ser estruturado** usando o `StructuredLogger` em `lib/logger.ts`.
+- **Nenhuma mensagem de Webhook deve ser processada sincronicamente**; use o padrão Inbox via `whatsapp_webhook_events`.
 
 ## Stack
 
@@ -162,3 +165,10 @@ Como usar:
 - O ESLint só roda em arquivos `.js/.jsx/.mjs/.cjs` dentro de `app/`. Arquivos `.ts/.tsx` não são cobertos no CI atualmente.
 - `firebase deploy` usa `--force` para configurar automaticamente a cleanup policy do Artifact Registry (necessário em modo não-interativo).
 - Cloud Functions Gen 2 requer permissões IAM específicas no GCP — veja `docs/release-pipeline.md` para a lista completa.
+
+## Dicas Pro & Troubleshooting (Industrialização)
+
+- **FinOps Kill Switch**: Se a IA parar de processar, verifique `system/config` -> `aiMonthlyBudgetLimitUsd`. O padrão é \$10.00.
+- **TypeScript & ts-jest**: Mantenha o TypeScript em `^5.7.x` para compatibilidade com o preset `ts-jest` atual. Upgrades para `v6+` exigem atualização do preset.
+- **Debugging com Correlation IDs**: Use o ID gerado pelo `withHttpErrorHandling` para filtrar logs no GCP e na coleção `system_audit_logs`.
+- **Shadow Mode**: Teste alterações de prompt de forma segura passando `{ shadow: true }` nas opções do `executeAiTask`. Isso registra a execução sem afetar os dados de produção.

@@ -26,4 +26,22 @@ describe("functions ownership helpers", () => {
 
     expect(hasOwnershipBoundary({ ownerId: "user-123", accountId: "acct_user-123" } as any)).toBe(true);
   });
+
+  it("should PREVENT malicious override of ownerId if context is provided", () => {
+    const maliciousPayload = { ownerId: "other-user", data: "secret" };
+    const safeContext = { ownerId: "real-user", defaultAccountId: "acct_real-user" };
+    
+    const result = applyOwnershipContext(maliciousPayload, safeContext);
+    
+    // The context should ALWAYS override the payload ownerId
+    expect(result.ownerId).toBe("real-user");
+    expect(result.accountId).toBe("acct_real-user");
+  });
+
+  it("should handle null/empty context gracefully", () => {
+    const payload = { data: "test" };
+    const result = applyOwnershipContext(payload, null as any);
+    expect(result.ownerId).toBeNull();
+    expect(result.accountId).toBeNull();
+  });
 });

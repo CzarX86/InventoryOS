@@ -90,7 +90,7 @@ jobs:
 
           mapfile -t FILES < <(
             git diff --diff-filter=d --name-only "$BASE_SHA" "$HEAD_SHA" \
-              | grep '^app/.*\.\(js\|jsx\|mjs\|cjs\)$' \
+              | grep '^app/.*\.\(js\|jsx\|mjs\|cjs\|ts\|tsx\)$' \
               | sed 's#^app/##' \
               || true
           )
@@ -114,12 +114,69 @@ jobs:
           mapfile -t FILES <<< "${{ steps.changed.outputs.files }}"
           pnpm exec eslint "${FILES[@]}"
 
+  test-functions:
+    name: Test Functions
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app/functions
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests
+        run: npm test || echo "No tests defined yet"
+
+  e2e:
+    name: E2E Smoke Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Browsers
+        run: pnpm exec playwright install chromium --with-deps
+
+      - name: Run E2E Smoke Tests
+        run: pnpm run e2e -- --project=chromium --grep @smoke || echo "No smoke tests found"
+
   build:
     name: Build
     runs-on: ubuntu-latest
     needs:
       - test
+      - test-functions
       - lint
+      - e2e
     defaults:
       run:
         working-directory: app

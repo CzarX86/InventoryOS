@@ -96,12 +96,30 @@ async function generateDeepSeekStructuredOutput(prompt: string, modelName: strin
   }
 }
 
-function parseStructuredText(text: string, options: any = {}) {
+export function parseStructuredText(text: string, options: any = {}) {
   try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    return JSON.parse(jsonMatch ? jsonMatch[0] : text);
+    // 1. Try to extract from within markdown JSON blocks first
+    const mdMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    const candidate = mdMatch ? mdMatch[1] : text;
+
+    // 2. Fallback to extracting everything between the first { and the last }
+    const jsonMatch = candidate.match(/\{[\s\S]*\}/);
+    const finalCandidate = jsonMatch ? jsonMatch[0] : candidate;
+
+    return JSON.parse(finalCandidate);
   } catch (e) {
+    // 3. Last resort fallback for multi-block text or raw garbage
     if (options.strictJson) throw e;
+    
+    try {
+        // Try one more time with the greedy match on the ORIGINAL text 
+        // in case markdown parsing failed wrongly
+        const fallbackMatch = text.match(/\{[\s\S]*\}/);
+        if (fallbackMatch) return JSON.parse(fallbackMatch[0]);
+    } catch (innerError) {
+        // Ignore inner error, proceed to rawOutput
+    }
+
     return { rawOutput: text };
   }
 }

@@ -58,3 +58,29 @@ export const aggregateAiUsage = onDocumentWritten("ai_runs/{runId}", async (even
     logger.error("Usage aggregation failed", { error: error.message, runId: event.params.runId });
   }
 });
+
+/**
+ * Checks if the AI budget for the current month has been exceeded.
+ * Defaults to $10.00 USD if not configured in system/config.
+ */
+export async function checkAiBudget(): Promise<{ exceeded: boolean; currentCost: number; limit: number }> {
+    const db = getFirestore();
+    const date = new Date();
+    const monthKey = `${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+    
+    // 1. Get current month spend
+    const summaryRef = db.collection("system_usage").doc(`ai_usage_summary_${monthKey}`);
+    const summaryDoc = await summaryRef.get();
+    const currentCost = summaryDoc.exists ? (summaryDoc.data()?.totalCostUsd || 0) : 0;
+
+    // 2. Get budget limit from config
+    const configRef = db.collection("system").doc("config");
+    const configDoc = await configRef.get();
+    const limit = configDoc.exists ? (configDoc.data()?.aiMonthlyBudgetLimitUsd || 10.0) : 10.0;
+
+    return {
+        exceeded: currentCost >= limit,
+        currentCost,
+        limit
+    };
+}

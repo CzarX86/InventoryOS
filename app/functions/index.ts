@@ -6,8 +6,25 @@ import * as logger from "firebase-functions/logger";
 import * as crypto from "crypto";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { WHATSAPP_TRANSACTION_EXTRACTION_PROMPT } from "./whatsappTransactionPrompt";
+import { UNIFIED_BUSINESS_EXTRACTION_PROMPT } from "./unifiedExtractionPrompt";
+import { MESSAGE_RELEVANCE_PROMPT } from "./messageRelevancePrompt";
+import { withHttpErrorHandling, withEventErrorHandling, withCallErrorHandling } from "./lib/errors";
+import { createLogger } from "./lib/logger";
+import { buildOwnershipContext } from "./ownership";
 import { planAiTask, executeAiTask } from "./aiTaskPlanner";
+const admin = require("firebase-admin");
 import { WHATSAPP_COLLECTIONS, createWhatsappExtractedTransactionRecord } from "./whatsappDomain";
+import { 
+  CRM_COLLECTIONS, 
+  createOpportunityRecord, 
+  createTaskRecord, 
+  createCrmEventRecord,
+  createInterestRecord 
+} from "./crmDomain";
+import { processHardwareInterests } from "./hardwareResolution";
+import { processPendingContactClassifications } from "./whatsappClassification";
+
+
 
 admin.initializeApp();
 
@@ -288,7 +305,7 @@ function verifySignature(rawBody: Buffer, signature: string, secret: string) {
  */
 export const evolutionWebhook = onRequest({
   secrets: ["EVOLUTION_WEBHOOK_SECRET"],
-}, async (req: any, res: any) => {
+}, withHttpErrorHandling(async (req: any, res: any, logger: any) => {
   const secret = process.env.EVOLUTION_WEBHOOK_SECRET;
   const signature = req.headers["x-hub-signature-256"] || req.headers["x-evolution-signature"];
   
@@ -348,7 +365,7 @@ export const evolutionWebhook = onRequest({
     logger.error("Error storing webhook event", { error: error.message, eventId });
     res.status(500).send("Internal Server Error");
   }
-});
+}));
 
 /**
  * Fetches all groups from the Evolution API and populates the whatsapp_groups cache.
@@ -407,7 +424,7 @@ export const syncWhatsappGroups = onCall({
  * Trigger to process stored WhatsApp events.
  * Extracts messages and links lineage.
  */
-export const processWhatsappEvent = onDocumentCreated("whatsapp_webhook_events/{eventId}", async (event: any) => {
+export const processWhatsappEvent = onDocumentCreated("whatsapp_webhook_events/{eventId}", withEventErrorHandling(async (event: any, logger: any) => {
   const eventData = event.data?.data();
   if (!eventData) return;
 
@@ -532,7 +549,7 @@ export const processWhatsappEvent = onDocumentCreated("whatsapp_webhook_events/{
       errorMessage: error.message,
     });
   }
-});
+}));
 
 async function resolvePrimaryAdminUid(db: FirebaseFirestore.Firestore) {
   const supportDoc = await db.collection("system").doc("support").get();
@@ -642,7 +659,7 @@ export const notifyAdminOnSupportTicket = onDocumentCreated("support_tickets/{ti
 export const onWhatsappMessageCreated = onDocumentCreated({
   document: "whatsapp_messages/{messageId}",
   secrets: ["GEMINI_API_KEY", "DEEPSEEK_API_KEY"]
-}, async (event: any) => {
+}, withEventErrorHandling(async (event: any, logger: any) => {
   const messageId = event.params.messageId;
   const messageData = event.data?.data();
 
@@ -693,7 +710,7 @@ export const onWhatsappMessageCreated = onDocumentCreated({
   });
 
   logger.info("Message queued for batch AI processing", { messageId, remoteJid });
-});
+}));
 
 /**
  * Core logic for batching whatsapp messages per contact and extracting transactions
@@ -749,7 +766,45 @@ async function processPendingWhatsappBatches() {
      const combinedText = messages.map((m: any) => `[${m.timestamp?.toDate ? m.timestamp.toDate().toISOString() : m.timestamp}] ${m.pushName || 'User'}: ${m.text}`).join("\n");
      
      try {
-       // 1. Plan AI Task
+       // 1. Plan AI Task for Relevance Check (Layer 1)
+       const relevancePlan = await planAiTask(
+         "whatsapp_relevance_check", 
+         remoteJid, 
+         { 
+           targetType: "whatsapp_chat_batch",
+           metadata: { messageCount: messages.length, combinedText } 
+         }
+       );
+       
+       const relevancePrompt = MESSAGE_RELEVANCE_PROMPT.replace("{{messageText}}", combinedText);
+       const relevanceRun = await executeAiTask(relevancePlan, relevancePrompt);
+       
+       if (relevanceRun.status !== "completed") {
+         throw new Error(relevanceRun.errorMessage || "AI Relevance Check Failed");
+       }
+       
+       const relevanceResult = relevanceRun.output;
+       const isRelevant = ["commercial", "operational"].includes(relevanceResult.relevance);
+       
+       // If irrelevant, update messages and skip extraction
+       if (!isRelevant) {
+         const batch = db.batch();
+         messages.forEach((m: any) => {
+           const msgRef = db.collection("whatsapp_messages").doc(m.id);
+           batch.update(msgRef, {
+             extracted: "skipped",
+             relevanceCategory: relevanceResult.relevance,
+             relevanceSummary: relevanceResult.summary,
+             updatedAt: FieldValue.serverTimestamp()
+           });
+         });
+         await batch.commit();
+         logger.info("Batch skipped by relevance filter", { remoteJid, category: relevanceResult.relevance });
+         processedCount += messages.length;
+         continue; 
+       }
+
+       // 2. Plan AI Task for Transaction Extraction (Layer 2)
        const plan = await planAiTask(
          "whatsapp_batch_extraction", 
          remoteJid, 
@@ -759,9 +814,8 @@ async function processPendingWhatsappBatches() {
          }
        );
 
-       // 2. Execute AI
-       // Modifying prompt structure to handle multiple lines/context if necessary
-       const prompt = WHATSAPP_TRANSACTION_EXTRACTION_PROMPT.replace("{{messageText}}", combinedText);
+       // 3. Execute AI - Using UNIFIED PROMPT
+       const prompt = UNIFIED_BUSINESS_EXTRACTION_PROMPT.replace("{{messageText}}", combinedText);
        const runResult = await executeAiTask(plan, prompt);
 
        if (runResult.status !== "completed") {
@@ -769,35 +823,95 @@ async function processPendingWhatsappBatches() {
        }
 
        const extractedData = runResult.output;
+       const crmBatch = db.batch();
+       const ownershipContext = { ownerId: "system", defaultAccountId: "system" }; // Simplified context for AI automated runs
 
-       // 3. Save Extracted Transaction
-       const extractionRef = db.collection(WHATSAPP_COLLECTIONS.whatsappExtractedTransactions).doc();
-       const extractionRecord = createWhatsappExtractedTransactionRecord({
-         messageId: messages[messages.length - 1].id, // Use the last message as anchor
-         remoteJid: remoteJid,
-         operation: extractedData.operation,
-         items: extractedData.items,
-         grandTotal: extractedData.grandTotal,
-         confidence: extractedData.confidence,
-         summary: extractedData.summary,
-         lineage: {
-           aiRunId: runResult.runId,
-           model: runResult.model,
-           batchMessageIds: messages.map((m: any) => m.id) // Track all messages that went into this extraction
-         }
-       });
+       // 3.1 Save Extracted Transactions (Inventory)
+       if (extractedData.inventoryTransactions?.length > 0) {
+         extractedData.inventoryTransactions.forEach((tx: any) => {
+           const extractionRef = db.collection(WHATSAPP_COLLECTIONS.whatsappExtractedTransactions).doc();
+           const extractionRecord = createWhatsappExtractedTransactionRecord({
+             messageId: lastMessage.id, 
+             remoteJid: remoteJid,
+             operation: tx.operation,
+             items: tx.items,
+             grandTotal: tx.grandTotal,
+             confidence: extractedData.confidence,
+             summary: extractedData.summary,
+             lineage: {
+               aiRunId: runResult.runId,
+               model: runResult.model,
+               batchMessageIds: messages.map((m: any) => m.id) 
+             }
+           });
+           crmBatch.set(extractionRef, extractionRecord);
+         });
+       }
 
-       await extractionRef.set(extractionRecord);
+       // 3.2 Save CRM Opportunities
+       if (extractedData.opportunities?.length > 0) {
+         extractedData.opportunities.forEach((opp: any) => {
+           const oppRef = db.collection(CRM_COLLECTIONS.opportunities).doc();
+           const oppRecord = createOpportunityRecord({
+             ...opp,
+             remoteJid: remoteJid, // Link to whatsapp
+             _lineage: { aiRunId: runResult.runId }
+           }, ownershipContext);
+           crmBatch.set(oppRef, oppRecord);
+         });
+       }
+
+       // 3.3 Save CRM Tasks
+       if (extractedData.tasks?.length > 0) {
+         extractedData.tasks.forEach((task: any) => {
+           const taskRef = db.collection(CRM_COLLECTIONS.tasks).doc();
+           const taskRecord = createTaskRecord({
+             ...task,
+             remoteJid: remoteJid, // Link to whatsapp
+             _lineage: { aiRunId: runResult.runId }
+           }, ownershipContext);
+           crmBatch.set(taskRef, taskRecord);
+         });
+       }
+
+
+       // 3.4 Save CRM Events
+       if (extractedData.events?.length > 0) {
+         extractedData.events.forEach((evt: any) => {
+           const evtRef = db.collection(CRM_COLLECTIONS.crmEvents).doc();
+           const evtRecord = createCrmEventRecord({
+             ...evt,
+             remoteJid: remoteJid, // Link to whatsapp
+             _lineage: { aiRunId: runResult.runId }
+           }, ownershipContext);
+           crmBatch.set(evtRef, evtRecord);
+         });
+       }
+
+       // 3.5 Process Hardware Interests
+       if (extractedData.interests?.length > 0) {
+         await processHardwareInterests(
+           extractedData.interests.map((it: any) => ({ ...it, name: it.catalogItemId })),
+           { 
+             remoteJid, 
+             aiRunId: runResult.runId, 
+             ownership: ownershipContext 
+           }
+         );
+       }
+
+       await crmBatch.commit();
 
        // 4. Update Messages in Batch based on completeness
-       const batch = db.batch();
+       const messagesBatch = db.batch();
+
        const nextStatus = extractedData.isConversationComplete ? true : "waiting_context";
        
        messages.forEach((m: any) => {
          const msgRef = db.collection("whatsapp_messages").doc(m.id);
-         batch.update(msgRef, {
+         messagesBatch.update(msgRef, {
            extracted: nextStatus,
-           extractionId: extractionRef.id,
+           aiRunId: runResult.runId, // Link to the AI run that processed it
            batchProcessedAt: FieldValue.serverTimestamp(),
            completenessReason: extractedData.completenessReason || null
          });
@@ -805,18 +919,20 @@ async function processPendingWhatsappBatches() {
          // Sync back to webhooks monitor
          if (m.lineage && m.lineage.rawSourceEventId) {
            const webhookRef = db.collection("whatsapp_webhook_events").doc(m.lineage.rawSourceEventId);
-           batch.update(webhookRef, {
-              aiClassification: extractedData.operation || "BATCH_CLASSIFIED",
+           messagesBatch.update(webhookRef, {
+              aiClassification: nextStatus === true ? "processed" : "partial",
               aiExtractionStatus: nextStatus === true ? "processed" : "partial",
-              aiSummary: `Batch extraction (${nextStatus}): ${extractedData.summary || 'done'}`,
+              aiSummary: `Unified extraction (${nextStatus}): ${extractedData.summary || 'done'}`,
               updatedAt: FieldValue.serverTimestamp()
            });
          }
        });
 
-       await batch.commit();
+       await messagesBatch.commit();
        processedCount += messages.length;
+
        logger.info("Processed whatsapp batch", { remoteJid, complete: extractedData.isConversationComplete, count: messages.length });
+
      } catch (error: any) {
        logger.error("Failed to process whatsapp batch", { error: error.message, remoteJid });
        
@@ -844,21 +960,34 @@ async function processPendingWhatsappBatches() {
 export const scheduledWhatsappBatchProcess = onSchedule({
   schedule: "every 20 minutes",
   secrets: ["GEMINI_API_KEY", "DEEPSEEK_API_KEY"]
-}, async (event: ScheduledEvent) => {
+}, withEventErrorHandling(async (event: ScheduledEvent, logger: any) => {
   logger.info("Starting scheduled whatsapp batch process");
   await processPendingWhatsappBatches();
-});
+  await processPendingContactClassifications();
+}));
+
 
 /**
  * Manual trigger for testing the batch processing
  */
 export const triggerWhatsappBatch = onCall({
   secrets: ["GEMINI_API_KEY", "DEEPSEEK_API_KEY"]
-}, async (request: CallableRequest) => {
+}, withCallErrorHandling(async (request: any, logger: any) => {
   await ensureAdmin(request.auth);
   logger.info("Manual trigger for whatsapp batch process");
-  return await processPendingWhatsappBatches();
-});
+  
+  // 1. Process Message Batching (active contacts)
+  const extractionResult = await processPendingWhatsappBatches();
+  
+  // 2. Process Contact Classifications (pending contacts)
+  const classificationResult = await processPendingContactClassifications();
+
+  return { 
+    extraction: extractionResult, 
+    classification: classificationResult 
+  };
+}));
+
 
 // FinOps - Real-time aggregated usage monitoring
 import { aggregateAiUsage } from "./finops";
