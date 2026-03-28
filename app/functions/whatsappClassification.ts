@@ -51,6 +51,11 @@ export async function processPendingContactClassifications() {
 
       if (messagesSnap.empty) {
         logger.info("Skipping classification: No messages found for contact", { contactId: item.id });
+        // Mark as processed but insufficient data to avoid infinite retries
+        await db.collection(item.collection).doc(item.id).update({
+          monitoringStatus: "no_messages",
+          monitoringStatusLastCheckedAt: FieldValue.serverTimestamp()
+        });
         continue;
       }
 
@@ -82,6 +87,8 @@ export async function processPendingContactClassifications() {
         confidenceScore: result.confidence || 0,
         aiInsightSummary: result.summary || null,
         classificationRunId: runResult.runId,
+        monitoringStatus: "reviewed", // Mark as reviewed to remove from queue
+        monitoringStatusLastCheckedAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp()
       });
 
