@@ -49,13 +49,13 @@ function MessagePreview({ jid }) {
         transition={{ duration: 1.5, repeat: Infinity }}
         className="w-1 h-3 bg-primary/40" 
       />
-      <span className="text-[11px] font-display font-black uppercase tracking-[0.2em] text-muted-foreground">BUFFER_STREAM_SYNCING...</span>
+      <span className="text-[11px] font-display uppercase tracking-[0.2em] text-muted-foreground">BUFFER_STREAM_SYNCING...</span>
     </div>
   );
   
   if (messages.length === 0) return (
     <div className="p-8 flex items-center justify-center gap-3 bg-[#0e0e0e]">
-      <span className="text-[10px] font-display font-black uppercase tracking-[0.2em] text-muted-foreground/30">NO_DATA_BUFFER_FOUND</span>
+      <span className="text-[10px] font-display uppercase tracking-[0.2em] text-muted-foreground/30">NO_DATA_BUFFER_FOUND</span>
     </div>
   );
 
@@ -67,7 +67,7 @@ function MessagePreview({ jid }) {
       
       <div className="flex items-center gap-3 mb-6">
         <div className="w-1 h-4 bg-primary/60" />
-        <h4 className="text-[11px] uppercase tracking-[0.25em] font-display font-black text-muted-foreground flex items-center gap-2">
+        <h4 className="text-[11px] uppercase tracking-[0.25em] font-display text-muted-foreground flex items-center gap-2">
           PROTOCOL_HISTORY_STREAM
         </h4>
       </div>
@@ -88,7 +88,7 @@ function MessagePreview({ jid }) {
                   : 'bg-[#121212] border-white/10 text-muted-foreground'
               } rounded-none relative group`}>
                 <div className="flex items-center justify-between gap-6 mb-2 border-b border-white/5 pb-1">
-                  <span className="text-[11px] font-display font-black uppercase tracking-widest text-primary/60 truncate max-w-[150px]">
+                  <span className="text-[11px] font-display uppercase tracking-widest text-primary/60 truncate max-w-[150px]">
                     {msg.pushName || (msg.fromMe ? 'SYSTEM_ROOT' : 'EXT_USER')}
                   </span>
                   <span className="text-[10px] font-mono text-muted-foreground/40 font-black">
@@ -218,7 +218,7 @@ function ContactCrmDetailView({ jid }) {
     <div className="px-6 py-4 bg-[#0d0d0d] border-b border-white/5 space-y-6">
       {opportunities.length > 0 && (
         <div>
-          <div className="flex items-center gap-2 mb-3 text-[11px] font-display font-black uppercase tracking-[0.2em] text-primary/80">
+          <div className="flex items-center gap-2 mb-3 text-[11px] font-display uppercase tracking-[0.2em] text-primary/80">
             <TrendingUp size={12} />
             OPORTUNIDADES_COMERCIAIS
           </div>
@@ -240,7 +240,7 @@ function ContactCrmDetailView({ jid }) {
 
       {tasks.length > 0 && (
         <div>
-          <div className="flex items-center gap-2 mb-3 text-[11px] font-display font-black uppercase tracking-[0.2em] text-amber-500/80">
+          <div className="flex items-center gap-2 mb-3 text-[11px] font-display uppercase tracking-[0.2em] text-amber-500/80">
             <CheckSquare size={12} />
             AÇÕES_E_FOLLOW_UPS
           </div>
@@ -324,12 +324,12 @@ export default function ContactReviewQueue() {
   const getStatusBadge = (status) => {
     switch (status) {
       case "active":
-        return <Badge className="bg-emerald-500/10 text-emerald-500 border-none font-display text-[11px] font-black uppercase tracking-widest rounded-none px-3">MONITORANDO</Badge>;
+        return <Badge className="bg-emerald-500/10 text-emerald-500 border-none font-display text-[11px] uppercase tracking-widest rounded-none px-3">MONITORANDO</Badge>;
       case "ignored":
-        return <Badge className="bg-muted text-muted-foreground border-none font-display text-[11px] font-black uppercase tracking-widest rounded-none px-3 opacity-40">IGNORADO</Badge>;
+        return <Badge className="bg-muted text-muted-foreground border-none font-display text-[11px] uppercase tracking-widest rounded-none px-3 opacity-40">IGNORADO</Badge>;
       case "pending_review":
       default:
-        return <Badge className="bg-amber-500/10 text-amber-500 border-none font-display text-[11px] font-black uppercase tracking-widest rounded-none px-3">PENDENTE</Badge>;
+        return <Badge className="bg-amber-500/10 text-amber-500 border-none font-display text-[11px] uppercase tracking-widest rounded-none px-3">PENDENTE</Badge>;
     }
   };
 
@@ -361,7 +361,7 @@ export default function ContactReviewQueue() {
 
     return (
       <div className="flex flex-col gap-1">
-        <div className={`flex items-center gap-2 ${color} font-display text-[11px] font-black uppercase tracking-[0.15em]`}>
+        <div className={`flex items-center gap-2 ${color} font-display text-[11px] uppercase tracking-[0.15em]`}>
           <Icon size={12} />
           <span>{classification === "professional" ? "COMERCIAL" : "PESSOAL"}</span>
         </div>
@@ -389,7 +389,7 @@ export default function ContactReviewQueue() {
         <div className="flex items-center gap-5">
           <div className="w-1.5 h-12 bg-primary" />
           <div className="space-y-1">
-            <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tighter text-foreground leading-none">
+            <h2 className="text-2xl md:text-3xl font-normal font-display uppercase tracking-tighter text-foreground leading-none">
               FILA_DE_REVISÃO_DE_GATEWAY
             </h2>
             <div className="flex items-center gap-3">
@@ -409,7 +409,7 @@ export default function ContactReviewQueue() {
           <Button 
             variant="outline" 
             size="sm" 
-            className="flex-1 md:flex-none bg-[#1a1b1c] border-white/10 text-muted-foreground hover:bg-white/5 font-display text-[11px] font-black uppercase tracking-[0.2em] rounded-none py-6 px-8 transition-none h-auto"
+            className="flex-1 md:flex-none bg-[#1a1b1c] border-white/10 text-muted-foreground hover:bg-white/5 font-display text-[11px] uppercase tracking-[0.2em] rounded-none py-6 px-8 transition-none h-auto"
             onClick={triggerBatchProcess}
             disabled={isProcessing}
           >

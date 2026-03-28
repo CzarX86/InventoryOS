@@ -20,9 +20,11 @@ InventoryOS is an operational platform currently focused on inventory and item m
 
 ## Current State of Development (March 2026)
 - **Production**: Active for inventory/items.
-- **Expansion Foundation**: Ongoing implementation of the "Expansion Track" foundation.
-- **WhatsApp Integration**: Estabilizado com buffering de webhooks (Inbox Pattern), resolução de nomes de grupos e classificação de contatos.
-- **Observabilidade & FinOps**: Backend 100% industrializado com Structured Logging, Error Wrappers globais e Kill Switch de orçamento AI. Dashboards de custo MTD operacionais.
+- **Staging**: Currently resolving deployment blocks after Milestone 1 & 2 integration.
+- **Expansion Milestone 1 & 2**: Successfully integrated CRM (Action Inbox, Review Queue) and Hardware Intelligence (Resolution Logic).
+- **Backend Architecture**: Migrated Cloud Functions to a clean TypeScript `src/` structure to resolve TSC nesting and build-time collisions.
+- **WhatsApp Integration**: Stabilized with buffering of webhooks (Inbox Pattern), name resolution, and AI-driven classification.
+- **Observability & FinOps**: Backend 100% industrialized with Structured Logging, Error Wrappers, and real-time cost tracking.
 
 - **FinOps & Observability**: Implemented a real-time AI cost dashboard with MTD (Month-To-Date) tracking and run-rate projections. Added a background aggregator for cost summaries to minimize read costs.
 - **UI Migration**: New features are using `shadcn/ui` components; legacy components coexist.

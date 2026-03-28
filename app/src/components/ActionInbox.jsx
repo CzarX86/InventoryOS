@@ -82,7 +82,7 @@ export default function ActionInbox() {
           <div className="flex items-center gap-5">
             <div className="w-1.5 h-12 bg-[#97a5ff]" />
             <div className="space-y-1">
-              <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tighter text-foreground leading-none">
+              <h2 className="text-2xl md:text-3xl font-normal uppercase tracking-tighter text-foreground leading-none font-display">
                 ACTION_INBOX.LOG
               </h2>
               <p className="text-[11px] font-mono font-black uppercase tracking-[0.25em] text-muted-foreground/40">
@@ -170,7 +170,7 @@ function ActionItem({ item, onUpdateOpp, onUpdateTask, onDelete }) {
 
       {/* Main Content */}
       <div className="flex-1 min-w-0">
-        <h3 className="text-sm font-black uppercase tracking-tight text-white mb-1 truncate">
+        <h3 className="text-sm font-normal uppercase tracking-tight text-white mb-1 truncate font-display">
           {isOpp ? item.title : item.description}
         </h3>
         <div className="flex flex-wrap items-center gap-3 font-mono text-[11px] text-muted-foreground/60 uppercase">

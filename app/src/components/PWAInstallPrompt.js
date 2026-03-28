@@ -1,10 +1,8 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Download, X, Loader2, Smartphone, Apple } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 
 function getClientInstallState() {
   if (typeof window === "undefined") {
@@ -31,6 +29,9 @@ export default function PWAInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isInstalling, setIsInstalling] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const [progress, setProgress] = useState(1);
+  const [isHovered, setIsHovered] = useState(false);
+  const [speedMultiplier, setSpeedMultiplier] = useState(1);
   const [clientState, setClientState] = useState({
     isIOS: false,
     isStandalone: false,
@@ -38,6 +39,8 @@ export default function PWAInstallPrompt() {
   });
 
   const { isIOS, isStandalone, isInstallable } = clientState;
+  const lastTimeRef = useRef(null);
+  const TOTAL_TIMEOUT = 12000; // 12 seconds standard for reading instructions
 
   useEffect(() => {
     const state = getClientInstallState();
@@ -46,7 +49,6 @@ export default function PWAInstallPrompt() {
     }, 0);
 
     if (state.isStandalone) return;
-
 
     const handler = (e) => {
       e.preventDefault();
@@ -64,21 +66,54 @@ export default function PWAInstallPrompt() {
       });
     };
 
-
     window.addEventListener("beforeinstallprompt", handler);
     window.addEventListener("appinstalled", onAppInstalled);
-
-    // Auto-dismiss after 8 seconds if not interacted with
-    const timer = setTimeout(() => {
-      setDismissed(true);
-    }, 8000);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handler);
       window.removeEventListener("appinstalled", onAppInstalled);
-      clearTimeout(timer);
     };
   }, []);
+
+  // Progress Bar Logic
+  useEffect(() => {
+    if (dismissed || !isInstallable || isStandalone) return;
+
+    let requestRef;
+    
+    const animate = (time) => {
+      if (lastTimeRef.current !== undefined) {
+        if (!isHovered) {
+          const delta = time - lastTimeRef.current;
+          // Progress decreases. Multiplier accelerates it after hover.
+          setProgress((prev) => {
+            const next = prev - (delta / TOTAL_TIMEOUT) * speedMultiplier;
+            if (next <= 0) {
+              setDismissed(true);
+              return 0;
+            }
+            return next;
+          });
+        }
+      }
+      lastTimeRef.current = time;
+      requestRef = requestAnimationFrame(animate);
+    };
+
+    requestRef = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(requestRef);
+  }, [dismissed, isInstallable, isStandalone, isHovered, speedMultiplier]);
+
+  const handleMouseEnter = () => {
+    setIsHovered(true);
+    setProgress(1); // Reset to 100%
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+    setSpeedMultiplier((prev) => prev * 1.1); // 10% faster each time
+    lastTimeRef.current = undefined; // Reset delta check
+  };
 
   const handleInstall = async () => {
     if (!deferredPrompt && !isIOS) return;
@@ -92,7 +127,6 @@ export default function PWAInstallPrompt() {
         setDeferredPrompt(null);
         setClientState(prev => ({ ...prev, isInstallable: false }));
       }
-
     }
     
     if (isIOS && !deferredPrompt) {
@@ -114,13 +148,18 @@ export default function PWAInstallPrompt() {
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 100, opacity: 0 }}
         className="fixed bottom-6 left-4 right-4 z-[100] max-w-sm mx-auto pointer-events-auto"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
-        <div className="bg-[#131313] border border-white/10 shadow-2xl overflow-hidden relative group">
+        <div className="bg-[#131313]/90 backdrop-blur-xl border border-white/10 shadow-2xl overflow-hidden relative group">
           {/* Progress Bar Detail */}
-          <div className="absolute top-0 left-0 w-full h-[2px] bg-white/5" />
-          <div className="absolute top-0 left-0 h-[2px] bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)] transition-all duration-1000 w-1/3 group-hover:w-full" />
+          <div className="absolute top-0 left-0 w-full h-[3px] bg-white/5" />
+          <div 
+            className="absolute top-0 left-0 h-[3px] bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.8)] transition-none" 
+            style={{ width: `${progress * 100}%` }}
+          />
           
-          <div className="p-5">
+          <div className="p-5 pt-7">
             <Button 
               variant="ghost" 
               size="icon"
@@ -136,10 +175,10 @@ export default function PWAInstallPrompt() {
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2 mb-2">
-                  <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-white">
+                  <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-white font-display">
                     MODO_APLICATIVO
                   </h3>
-                  <div className="px-1.5 py-0.5 border border-emerald-500/30 text-[8px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-500/5">
+                  <div className="px-1.5 py-0.5 border border-emerald-500/30 text-[8px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-500/5 font-mono">
                     PWA_MODE
                   </div>
                 </div>
@@ -155,7 +194,7 @@ export default function PWAInstallPrompt() {
               <Button
                 onClick={handleInstall}
                 disabled={isInstalling}
-                className="w-full h-12 bg-white text-black font-black uppercase tracking-[0.2em] text-[10px] rounded-none hover:bg-zinc-200 transition-all"
+                className="w-full h-12 bg-white text-black font-black uppercase tracking-[0.2em] text-[10px] rounded-none hover:bg-zinc-200 transition-all font-display"
               >
                 {isInstalling ? (
                   <>
@@ -172,7 +211,6 @@ export default function PWAInstallPrompt() {
             )}
           </div>
 
-          {/* Decorative Corner */}
           <div className="absolute bottom-0 right-0 w-2 h-2 border-r border-b border-white/20" />
         </div>
       </motion.div>
