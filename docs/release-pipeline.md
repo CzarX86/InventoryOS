@@ -80,7 +80,7 @@ Ao configurar um novo projeto Firebase para deploy de Cloud Functions Gen 2, é 
 
 ### 1. Habilitar APIs manualmente no GCP Console
 
-Em um projeto novo, o deploy de production pode falhar em cadeia se as APIs abaixo ainda nao tiverem sido habilitadas. O caminho mais seguro e ligar todas antes do primeiro `Deploy Production`:
+Em um projeto novo, o deploy de production pode falhar em cadeia se as APIs abaixo ainda não tiverem sido habilitadas. O caminho mais seguro é ligar todas antes do primeiro `Deploy Production`:
 
 - [Artifact Registry API](https://console.cloud.google.com/apis/library/artifactregistry.googleapis.com)
 - [Cloud Billing API](https://console.developers.google.com/apis/api/cloudbilling.googleapis.com/overview)
@@ -92,10 +92,10 @@ Em um projeto novo, o deploy de production pode falhar em cadeia se as APIs abai
 
 ### 2. Conceder permissões IAM
 
-Considere as variaveis abaixo:
+Considere as variáveis abaixo:
 
 - `PROJECT_ID`: id do projeto Firebase/GCP
-- `PROJECT_NUMBER`: numero do projeto GCP
+- `PROJECT_NUMBER`: número do projeto GCP
 - `DEPLOY_SA`: service account usada no secret `FIREBASE_SERVICE_ACCOUNT`
 
 Execute os comandos abaixo substituindo `PROJECT_ID`, `PROJECT_NUMBER` e `DEPLOY_SA` pelos valores do projeto:
@@ -120,7 +120,7 @@ gcloud projects add-iam-policy-binding PROJECT_ID \
   --condition=None
 ```
 
-Se o deploy tambem publicar Cloud Functions Gen 2, aplique os bindings adicionais abaixo:
+Se o deploy também publicar Cloud Functions Gen 2, aplique os bindings adicionais abaixo:
 
 ```bash
 # Permite que o Pub/Sub crie tokens de autenticação
@@ -157,12 +157,12 @@ gcloud iam service-accounts add-iam-policy-binding \
   --project=PROJECT_ID
 ```
 
-No projeto production (`inventory-os-app`, numero `1097381975276`) tambem foi necessario conceder `roles/iam.serviceAccountUser` sobre:
+No projeto production (`inventory-os-app`, número `1097381975276`) também foi necessário conceder `roles/iam.serviceAccountUser` sobre:
 
 - `1097381975276-compute@developer.gserviceaccount.com`
 - `inventory-os-app@appspot.gserviceaccount.com`
 
-Para o projeto staging (`inventoryos-effd5`, numero `836596473888`) esses passos ja tinham sido executados.
+Para o projeto staging (`inventoryos-effd5`, número `836596473888`) esses passos já tinham sido executados.
 
 ### 3. Flag `--force` no deploy
 
