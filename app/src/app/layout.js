@@ -4,7 +4,7 @@ import "./globals.css";
 import ServiceWorkerUpdater from "@/components/ServiceWorkerUpdater";
 import PWAInstallPrompt from "@/components/PWAInstallPrompt";
 import NotificationPrompt from "@/components/NotificationPrompt";
-import { JetBrains_Mono, Space_Grotesk, Inter } from "next/font/google";
+import { JetBrains_Mono, Audiowide, Inter } from "next/font/google";
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
@@ -12,7 +12,8 @@ const jetbrainsMono = JetBrains_Mono({
   variable: "--font-mono",
 });
 
-const spaceGrotesk = Space_Grotesk({
+const audiowide = Audiowide({
+  weight: "400",
   subsets: ["latin"],
   display: "swap",
   variable: "--font-display",
@@ -53,7 +54,7 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="pt-BR" className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}>
+    <html lang="pt-BR" className={`${inter.variable} ${audiowide.variable} ${jetbrainsMono.variable}`}>
       <body className="antialiased font-sans flex flex-col min-h-screen bg-background text-foreground">
         <TooltipProvider>
           <ServiceWorkerUpdater />
