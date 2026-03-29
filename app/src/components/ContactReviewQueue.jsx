@@ -434,7 +434,7 @@ export default function ContactReviewQueue() {
             <TableHeader className="bg-[#1a1b1c]">
               <TableRow className="border-white/5 hover:bg-transparent">
                 <TableHead className="w-12"></TableHead>
-                <TableHead className="text-muted-foreground font-display text-[11px] font-black uppercase tracking-[0.2em] py-5 text-right">COMANDOS_RAIO_X</TableHead>
+                <TableHead className="text-muted-foreground font-display text-[11px] font-normal uppercase tracking-[0.2em] py-5 text-right">COMANDOS_RAIO_X</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -475,7 +475,7 @@ export default function ContactReviewQueue() {
                     </TableCell>
                     <TableCell className="py-6">
                       <div className="flex flex-col gap-2">
-                        <span className="flex items-center gap-3 font-display uppercase text-[12px] font-black tracking-widest text-white leading-none">
+                        <span className="flex items-center gap-3 font-display uppercase text-[12px] font-normal tracking-widest text-white leading-none">
                           {item.type === "group" ? (
                             <Users size={14} className="text-secondary/60" />
                           ) : (

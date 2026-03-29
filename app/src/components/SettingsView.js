@@ -35,7 +35,7 @@ export default function SettingsView() {
       {/* Title */}
       <div className="px-4 md:px-6 pt-10 pb-8 bg-[#0e0e0e] border-b border-[#484848]/20 mb-8">
         <div className="flex items-center gap-3 mb-4">
-          <Badge variant="outline" className="h-5 px-2 bg-[#1f2020] text-[#97a5ff] border-[#484848]/20 text-[9px] font-bold uppercase tracking-[0.2em] shadow-none rounded-none font-display">
+          <Badge variant="outline" className="h-5 px-2 bg-[#1f2020] text-[#97a5ff] border-[#484848]/20 text-[9px] font-normal uppercase tracking-[0.2em] shadow-none rounded-none font-display">
             SYSTEM_PREFERENCES.CFG
           </Badge>
         </div>

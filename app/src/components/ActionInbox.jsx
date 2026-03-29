@@ -107,9 +107,9 @@ export default function ActionInbox() {
           </div>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="bg-[#1a1b1c] p-1 border border-white/5">
             <TabsList className="bg-transparent h-9 gap-1">
-              <TabsTrigger value="all" className="data-[state=active]:bg-[#0e0e0e] data-[state=active]:text-primary text-[11px] font-black uppercase tracking-widest h-7 px-4 rounded-none transition-none font-display">TUDO</TabsTrigger>
-              <TabsTrigger value="opportunities" className="data-[state=active]:bg-[#0e0e0e] data-[state=active]:text-primary text-[11px] font-black uppercase tracking-widest h-7 px-4 rounded-none transition-none font-display">OPORTUNIDADES</TabsTrigger>
-              <TabsTrigger value="tasks" className="data-[state=active]:bg-[#0e0e0e] data-[state=active]:text-primary text-[11px] font-black uppercase tracking-widest h-7 px-4 rounded-none transition-none font-display">TAREFAS</TabsTrigger>
+              <TabsTrigger value="all" className="data-[state=active]:bg-[#0e0e0e] data-[state=active]:text-primary text-[11px] font-normal uppercase tracking-widest h-7 px-4 rounded-none transition-none font-display">TUDO</TabsTrigger>
+              <TabsTrigger value="opportunities" className="data-[state=active]:bg-[#0e0e0e] data-[state=active]:text-primary text-[11px] font-normal uppercase tracking-widest h-7 px-4 rounded-none transition-none font-display">OPORTUNIDADES</TabsTrigger>
+              <TabsTrigger value="tasks" className="data-[state=active]:bg-[#0e0e0e] data-[state=active]:text-primary text-[11px] font-normal uppercase tracking-widest h-7 px-4 rounded-none transition-none font-display">TAREFAS</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
