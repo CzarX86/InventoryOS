@@ -111,7 +111,7 @@ export default function Dashboard() {
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-xs"
         >
-          <h1 className="text-4xl font-black uppercase tracking-tight text-foreground mb-2 font-display">
+          <h1 className="text-4xl font-normal uppercase tracking-tight text-foreground mb-2 font-display">
             Inventory<br />OS
           </h1>
           <p className="text-base text-zinc-300 mb-1 leading-relaxed">
@@ -290,10 +290,10 @@ export default function Dashboard() {
         <aside className="hidden md:flex flex-col w-44 shrink-0 border-r border-[#484848]/20 bg-[#0e0e0e]">
           {/* Logo */}
           <div className="px-6 pt-8 pb-6 border-b border-[#484848]/20">
-            <h1 className="text-lg font-black uppercase tracking-tighter text-[#e7e5e5] leading-none font-display">
+            <h1 className="text-lg font-normal uppercase tracking-tighter text-[#e7e5e5] leading-none font-display">
               IOS<span className="text-[#97a5ff]">.</span>
               <br />
-              <span className="text-[8px] tracking-[0.3em] opacity-30 uppercase font-bold font-display">INVENTORY_OS</span>
+              <span className="text-[8px] tracking-[0.3em] opacity-30 uppercase font-normal font-display">INVENTORY_OS</span>
             </h1>
           </div>
 
@@ -349,7 +349,7 @@ export default function Dashboard() {
           {/* Top Bar / Header */}
           <header className="flex items-center h-14 gap-4 px-4 md:px-6 border-b border-[#484848]/10 shrink-0 bg-[#0e0e0e] z-30">
             {/* Mobile Brand indicator */}
-            <span className="md:hidden text-lg font-black uppercase tracking-tighter text-[#e7e5e5] bg-[#1f2020] px-2 py-0.5 rounded-none font-display">IOS</span>
+            <span className="md:hidden text-lg font-normal uppercase tracking-tighter text-[#e7e5e5] bg-[#1f2020] px-2 py-0.5 rounded-none font-display">IOS</span>
 
             {/* Search Input */}
             <div className="flex-1 max-w-md relative group">
@@ -609,7 +609,7 @@ function InventoryContent({ items, filteredItems, stats, loading, searchQuery, a
             STATUS_OPERACIONAL.SYS
           </Badge>
         </div>
-        <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter text-[#e7e5e5] leading-none font-display">
+        <h1 className="text-2xl md:text-3xl font-normal uppercase tracking-tighter text-[#e7e5e5] leading-none font-display">
           CENTRAL_DE_<span className="text-[#acabaa]/30">INVENTÁRIO</span>
         </h1>
       </div>
@@ -752,7 +752,7 @@ function ItemRow({ item, idx, isMenuOpen, onMenuToggle, onEdit, onDelete, onView
           {/* Item Bio */}
           <div className="flex-1 min-w-0 py-0.5">
             <div className="flex items-center gap-2 mb-0.5">
-              <span className="text-sm md:text-base font-bold text-[#e7e5e5] truncate uppercase tracking-tight font-display">{item.model}</span>
+              <span className="text-sm md:text-base font-normal text-[#e7e5e5] truncate uppercase tracking-tight font-display">{item.model}</span>
             </div>
             <div className="flex items-center gap-2 text-[11px] md:text-[12px] font-mono">
               <span className="font-semibold text-[#acabaa] uppercase">{item.brand}</span>

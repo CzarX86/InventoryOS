@@ -409,7 +409,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.05, delay: 0.1 }}
-                className="text-5xl font-display font-black uppercase tracking-tighter text-foreground mb-4 leading-none text-center"
+                className="text-5xl font-display font-normal uppercase tracking-tighter text-foreground mb-4 leading-none text-center"
               >
                 REGISTRADO
               </motion.h3>
@@ -425,7 +425,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
               <div className="flex flex-col w-full gap-px bg-foreground/10 border border-foreground/10 max-w-sm">
                 <Button
                   size="lg"
-                  className="w-full py-10 text-[10px] font-display font-black uppercase tracking-[0.25em] rounded-none bg-primary hover:bg-primary/90 text-primary-foreground transition-none"
+                  className="w-full py-10 text-[10px] font-display font-normal uppercase tracking-[0.25em] rounded-none bg-primary hover:bg-primary/90 text-primary-foreground transition-none"
                   onClick={() => {
                     setFormData(EMPTY_FORM);
                     setAudioBlob(null);
@@ -439,7 +439,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                 <Button
                   variant="outline"
                   size="lg"
-                  className="w-full py-10 text-[10px] font-display font-black uppercase tracking-[0.25em] rounded-none border-0 bg-obsidian-800 hover:bg-obsidian-750 text-foreground transition-none"
+                  className="w-full py-10 text-[10px] font-display font-normal uppercase tracking-[0.25em] rounded-none border-0 bg-obsidian-800 hover:bg-obsidian-750 text-foreground transition-none"
                   onClick={onClose}
                 >
                   VOLTAR_PAINEL
@@ -459,7 +459,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                 <div className="flex items-center gap-4">
                   <div className="w-2 h-8 bg-primary" />
                   <div>
-                    <DialogTitle className="text-lg font-display font-black uppercase tracking-[0.15em] text-foreground leading-none">
+                    <DialogTitle className="text-lg font-display font-normal uppercase tracking-[0.15em] text-foreground leading-none">
                       {editItem ? "EDIÇÃO_DE_ATIVO" : "SISTEMA_INGESTÃO_FORGE"}
                     </DialogTitle>
                     {editItem && (
@@ -494,7 +494,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                           </motion.div>
                         </div>
                         <div className="text-center">
-                          <p className="text-sm font-display font-black uppercase tracking-[0.4em] text-foreground">EXTRACTING_DATA</p>
+                          <p className="text-sm font-display font-normal uppercase tracking-[0.4em] text-foreground">EXTRACTING_DATA</p>
                           <p className="text-[9px] font-mono uppercase tracking-widest text-primary/60 mt-2 animate-pulse">
                             NEURAL_PATH_ENGAGED // STREAM_DATA...
                           </p>
@@ -512,7 +512,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
                           />
                           <Camera size={28} className="shrink-0 mb-5 text-muted-foreground group-hover:text-primary transition-none" />
-                          <p className="text-[10px] font-display font-black uppercase tracking-[0.2em] text-center text-foreground">ETIQUETA_OCR</p>
+                          <p className="text-[10px] font-display font-normal uppercase tracking-[0.2em] text-center text-foreground">ETIQUETA_OCR</p>
                           <div className="mt-4 px-2 py-0.5 border border-foreground/20 bg-[#0e0e0e] text-[8px] font-mono font-black uppercase tracking-widest text-muted-foreground group-hover:text-primary group-hover:border-primary">
                             INIT_SCAN
                           </div>
@@ -536,7 +536,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                           <div className={`shrink-0 mb-5 transition-none ${productImageFile ? "text-primary" : "text-muted-foreground group-hover:text-primary"}`}>
                             {productImageFile ? <Check size={28} strokeWidth={3} /> : <Camera size={28} />}
                           </div>
-                          <p className={`text-[10px] font-display font-black uppercase tracking-[0.2em] text-center ${productImageFile ? "text-primary" : "text-foreground"}`}>
+                          <p className={`text-[10px] font-display font-normal uppercase tracking-[0.2em] text-center ${productImageFile ? "text-primary" : "text-foreground"}`}>
                             FOTO_REFERÊN
                           </p>
                           <div className={`mt-4 px-2 py-0.5 border text-[8px] font-mono font-black uppercase tracking-widest ${productImageFile ? "border-primary/40 bg-primary/10 text-primary" : "border-foreground/20 bg-[#0e0e0e] text-muted-foreground group-hover:border-primary group-hover:text-primary"}`}>
@@ -554,7 +554,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                               <motion.div animate={{ opacity: [1, 0.4, 1] }} transition={{ duration: 0.3, repeat: Infinity }}>
                                 <Square size={28} className="mb-5 fill-red-500 text-red-500" />
                               </motion.div>
-                              <p className="text-[10px] font-display font-black uppercase tracking-[0.2em] text-red-500">STOP_RECORD</p>
+                              <p className="text-[10px] font-display font-normal uppercase tracking-[0.2em] text-red-500">STOP_RECORD</p>
                               <div className="mt-4 px-2 py-0.5 border border-red-500/40 bg-red-500/10 text-[8px] font-mono font-black uppercase tracking-widest text-red-500">
                                 REC_ACTIVE
                               </div>
@@ -562,7 +562,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                           ) : (
                             <>
                               <Mic size={28} className="shrink-0 mb-5 text-muted-foreground group-hover:text-primary transition-none" />
-                              <p className="text-[10px] font-display font-black uppercase tracking-[0.2em] text-center text-foreground">COMANDO_VOZ</p>
+                              <p className="text-[10px] font-display font-normal uppercase tracking-[0.2em] text-center text-foreground">COMANDO_VOZ</p>
                               <div className="mt-4 px-2 py-0.5 border border-foreground/20 bg-[#0e0e0e] text-[8px] font-mono font-black uppercase tracking-widest text-muted-foreground group-hover:border-primary group-hover:text-primary">
                                 VOICE_DRIVE
                               </div>
@@ -624,7 +624,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                   <div className="space-y-5">
                     <div className="flex items-center gap-3">
                       <div className="w-1.5 h-3 bg-primary/40" />
-                      <Label className="text-[10px] font-display font-black uppercase tracking-[0.25em] text-muted-foreground">ATIVO_STATUS_SYSTEM</Label>
+                      <Label className="text-[10px] font-display font-normal uppercase tracking-[0.25em] text-muted-foreground">ATIVO_STATUS_SYSTEM</Label>
                     </div>
                     <ToggleGroup 
                       type="single" 
@@ -636,7 +636,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                         <ToggleGroupItem
                           key={s}
                           value={s}
-                          className="px-6 h-12 text-[10px] font-display font-black uppercase tracking-[0.1em] rounded-none border-0 bg-[#0e0e0e] border-r border-foreground/5 data-[state=on]:bg-primary data-[state=on]:text-[#0e0e0e] hover:bg-white/5 transition-none flex-1"
+                          className="px-6 h-12 text-[10px] font-display font-normal uppercase tracking-[0.1em] rounded-none border-0 bg-[#0e0e0e] border-r border-foreground/5 data-[state=on]:bg-primary data-[state=on]:text-[#0e0e0e] hover:bg-white/5 transition-none flex-1"
                         >
                           {s}
                         </ToggleGroupItem>
@@ -656,7 +656,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                         <div className="flex items-center justify-between px-1">
                           <div className="flex items-center gap-2">
                             <div className="w-1 h-3 bg-primary/30" />
-                            <Label htmlFor={field.id} className="text-[10px] font-display font-black uppercase tracking-[0.2em] text-muted-foreground">
+                            <Label htmlFor={field.id} className="text-[10px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground">
                               {field.label}
                             </Label>
                           </div>
@@ -668,7 +668,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                         </div>
                         <Input
                           id={field.id}
-                          className={`h-12 rounded-none border-foreground/10 bg-[#131313]/60 focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary transition-none border-[1px] ${field.mono ? "font-mono text-sm tracking-tight" : "font-display font-black text-xs uppercase tracking-wider"} ${isAI(field.id) ? "border-primary/40 bg-primary/[0.02]" : ""}`}
+                          className={`h-12 rounded-none border-foreground/10 bg-[#131313]/60 focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary transition-none border-[1px] ${field.mono ? "font-mono text-sm tracking-tight" : "font-display font-normal text-xs uppercase tracking-wider"} ${isAI(field.id) ? "border-primary/40 bg-primary/[0.02]" : ""}`}
                           placeholder={field.placeholder}
                           value={formData[field.id]}
                           onChange={e => set(field.id, (e.target.value || "").toUpperCase())}
@@ -682,7 +682,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                     <div className="flex items-center justify-between px-1">
                       <div className="flex items-center gap-2">
                         <div className="w-1 h-3 bg-primary/30" />
-                        <Label className="text-[10px] font-display font-black uppercase tracking-[0.2em] text-muted-foreground">MOD_SPECIFICATIONS</Label>
+                        <Label className="text-[10px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground">MOD_SPECIFICATIONS</Label>
                       </div>
                       {isAI("specifications") && (
                         <div className="px-2 py-0.5 border border-primary/20 bg-primary/5 text-[8px] font-mono font-black text-primary uppercase tracking-tighter flex items-center gap-1.5">
@@ -718,7 +718,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                             <Sparkles size={28} />
                           </div>
                           <div>
-                            <p className="text-xs font-display font-black uppercase tracking-[0.25em] text-[#0e0e0e] leading-none mb-2">REVISÃO_PENDENTE</p>
+                            <p className="text-xs font-display font-normal uppercase tracking-[0.25em] text-[#0e0e0e] leading-none mb-2">REVISÃO_PENDENTE</p>
                             <p className="text-[9px] font-mono text-[#0e0e0e]/70 uppercase tracking-widest font-bold">ANALYTICS_COMPLETE // CONFIRM_REQUIRED</p>
                           </div>
                         </div>
@@ -726,14 +726,14 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                           <Button 
                             variant="outline" 
                             size="sm" 
-                            className="flex-1 sm:flex-none text-[10px] font-display font-black uppercase tracking-[0.2em] rounded-none border-0 bg-[#0e0e0e] text-white hover:bg-black/80 py-6 h-auto px-8 transition-none"
+                            className="flex-1 sm:flex-none text-[10px] font-display font-normal uppercase tracking-[0.2em] rounded-none border-0 bg-[#0e0e0e] text-white hover:bg-black/80 py-6 h-auto px-8 transition-none"
                             onClick={() => { setFormData(EMPTY_FORM); setAudioBlob(null); setValidationError(""); setSupportError(null); }}
                           >
                             DESCARTAR
                           </Button>
                           <Button 
                             size="sm" 
-                            className="flex-1 sm:flex-none text-[10px] font-display font-black uppercase tracking-[0.25em] rounded-none border-0 bg-white text-black hover:bg-white/90 py-6 h-auto px-10 transition-none"
+                            className="flex-1 sm:flex-none text-[10px] font-display font-normal uppercase tracking-[0.25em] rounded-none border-0 bg-white text-black hover:bg-white/90 py-6 h-auto px-10 transition-none"
                             onClick={() => { setValidationError(""); setSupportError(null); confirmSuggestions(); }}
                           >
                             SINCRONIZAR
@@ -749,7 +749,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
               <div className="flex p-px bg-foreground/10 border-t border-foreground/10 shrink-0 bg-[#0e0e0e] relative z-10">
                 <Button
                   variant="ghost"
-                  className="flex-1 font-display font-black uppercase tracking-[0.3em] text-[10px] h-20 rounded-none bg-[#131313] hover:bg-white/5 text-muted-foreground transition-none"
+                  className="flex-1 font-display font-normal uppercase tracking-[0.3em] text-[10px] h-20 rounded-none bg-[#131313] hover:bg-white/5 text-muted-foreground transition-none"
                   onClick={() => { setValidationError(""); setSupportError(null); onClose(); }}
                 >
                   ABORT_SESSION
@@ -757,7 +757,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                 <Button
                   disabled={saving || isExtracting || hasPendingConfirmation}
                   onClick={handleSubmit}
-                  className="flex-[2] font-display font-black uppercase tracking-[0.3em] text-[10px] h-20 rounded-none bg-primary hover:bg-primary/90 text-primary-foreground shadow-none transition-none border-l border-white/10"
+                  className="flex-[2] font-display font-normal uppercase tracking-[0.3em] text-[10px] h-20 rounded-none bg-primary hover:bg-primary/90 text-primary-foreground shadow-none transition-none border-l border-white/10"
                 >
                   {saving ? (
                     <>
