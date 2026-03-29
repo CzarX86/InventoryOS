@@ -111,7 +111,7 @@ export default function PWAInstallPrompt() {
 
   const handleMouseLeave = () => {
     setIsHovered(false);
-    setSpeedMultiplier((prev) => prev * 1.1); // 10% faster each time
+    setSpeedMultiplier(1.1); // 10% faster than initially
     lastTimeRef.current = undefined; // Reset delta check
   };
 
@@ -175,7 +175,7 @@ export default function PWAInstallPrompt() {
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2 mb-2">
-                  <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-white font-display">
+                  <h3 className="text-[10px] font-normal uppercase tracking-[0.2em] text-white font-display">
                     MODO_APLICATIVO
                   </h3>
                   <div className="px-1.5 py-0.5 border border-emerald-500/30 text-[8px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-500/5 font-mono">
@@ -194,7 +194,7 @@ export default function PWAInstallPrompt() {
               <Button
                 onClick={handleInstall}
                 disabled={isInstalling}
-                className="w-full h-12 bg-white text-black font-black uppercase tracking-[0.2em] text-[10px] rounded-none hover:bg-zinc-200 transition-all font-display"
+                className="w-full h-12 bg-white text-black font-normal uppercase tracking-[0.2em] text-[10px] rounded-none hover:bg-zinc-200 transition-all font-display"
               >
                 {isInstalling ? (
                   <>

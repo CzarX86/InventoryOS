@@ -161,7 +161,7 @@ export default function AdminDashboard({ items = [], user = null }) {
     return (
       <div className="flex items-center justify-center min-h-[400px] gap-3">
         <Loader2 className="animate-spin text-primary" size={24} />
-        <p className="text-sm font-display font-black uppercase tracking-[0.2em] text-muted-foreground">Sincronizando Ativos...</p>
+        <p className="text-sm font-display font-normal uppercase tracking-[0.2em] text-muted-foreground">Sincronizando Ativos...</p>
       </div>
     );
   }
@@ -170,7 +170,7 @@ export default function AdminDashboard({ items = [], user = null }) {
     <div className="space-y-6 pb-12">
       {/* Title */}
       <div className="px-4 md:px-6 pt-8 pb-6 border-b border-foreground/5 bg-background/80 backdrop-blur-md sticky top-0 z-10 font-display">
-        <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter text-foreground leading-none">
+        <h1 className="text-4xl md:text-5xl font-normal uppercase tracking-tighter text-foreground leading-none">
           Admin_Terminal<span className="text-primary italic">.exe</span>
         </h1>
       </div>
@@ -186,13 +186,13 @@ export default function AdminDashboard({ items = [], user = null }) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {/* Using tonal layering instead of shadows and borders */}
           <div className="bg-[#131313] p-6 rounded-none border-l-2 border-primary/20">
-            <span className="text-[10px] font-display font-black uppercase tracking-[0.2em] text-muted-foreground block mb-4">Stock_Status</span>
-            <p className="text-4xl font-display font-black text-foreground">{inventoryStats.inStock}</p>
+            <span className="text-[10px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground block mb-4">Stock_Status</span>
+            <p className="text-4xl font-display font-normal text-foreground">{inventoryStats.inStock}</p>
             <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-500/60 mt-2 block">Available_Units</span>
           </div>
           <div className="bg-[#131313] p-6 rounded-none border-l-2 border-foreground/5">
-            <span className="text-[10px] font-display font-black uppercase tracking-[0.2em] text-muted-foreground block mb-4">Outflow_Metrics</span>
-            <p className="text-4xl font-display font-black text-foreground">{inventoryStats.sold}</p>
+            <span className="text-[10px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground block mb-4">Outflow_Metrics</span>
+            <p className="text-4xl font-display font-normal text-foreground">{inventoryStats.sold}</p>
             <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/40 mt-2 block">Total_Sales_Confirmed</span>
           </div>
         </div>
@@ -205,8 +205,8 @@ export default function AdminDashboard({ items = [], user = null }) {
             { label: "DB_LATENCY", value: "14ms", mono: true },
           ].map(({ label, value, mono, highlight }) => (
             <div key={label} className="bg-[#131313] p-4 rounded-none">
-              <span className="text-[10px] font-display font-black uppercase tracking-[0.2em] text-muted-foreground mb-3 block">{label}</span>
-              <p className={`text-xl font-display font-black ${highlight ? "text-primary" : "text-foreground"} ${mono ? "font-mono" : ""}`}>{value}</p>
+              <span className="text-[10px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground mb-3 block">{label}</span>
+              <p className={`text-xl font-display font-normal ${highlight ? "text-primary" : "text-foreground"} ${mono ? "font-mono" : ""}`}>{value}</p>
             </div>
           ))}
         </div>
@@ -214,7 +214,7 @@ export default function AdminDashboard({ items = [], user = null }) {
         {/* Expansion flags */}
         <section className="space-y-4">
           <div className="flex items-end justify-between border-b border-foreground/5 pb-2">
-            <h2 className="text-lg font-display font-black uppercase tracking-[0.15em] text-foreground">Deployment_Control</h2>
+            <h2 className="text-lg font-display font-normal uppercase tracking-[0.15em] text-foreground">Deployment_Control</h2>
             <p className="text-[10px] font-mono text-muted-foreground uppercase opacity-50">
               {enabledCount} / {EXPANSION_FEATURE_FLAGS.length} ACTIVE_FLAGS
             </p>
@@ -230,7 +230,7 @@ export default function AdminDashboard({ items = [], user = null }) {
                         {flag}
                       </TableCell>
                       <TableCell className="text-right py-4">
-                        <Badge variant="outline" className={`rounded-none border-none text-[9px] font-display font-black uppercase tracking-widest px-3 ${enabled ? "bg-emerald-500/10 text-emerald-500" : "bg-muted/30 text-muted-foreground/40"}`}>
+                        <Badge variant="outline" className={`rounded-none border-none text-[9px] font-display font-normal uppercase tracking-widest px-3 ${enabled ? "bg-emerald-500/10 text-emerald-500" : "bg-muted/30 text-muted-foreground/40"}`}>
                           {enabled ? "Enabled" : "Disabled"}
                         </Badge>
                       </TableCell>
@@ -245,7 +245,7 @@ export default function AdminDashboard({ items = [], user = null }) {
         {/* WhatsApp Management */}
         {isFeatureEnabled(flags, "whatsappIngestion") && (
           <section className="space-y-4">
-            <h2 className="text-lg font-display font-black uppercase tracking-[0.15em] text-foreground">WA_Bridge_Protocol</h2>
+            <h2 className="text-lg font-display font-normal uppercase tracking-[0.15em] text-foreground">WA_Bridge_Protocol</h2>
             <div className="bg-[#131313] p-1 rounded-none border border-foreground/5">
               <WhatsappInstanceManager />
             </div>
@@ -254,20 +254,20 @@ export default function AdminDashboard({ items = [], user = null }) {
 
         {/* Token usage */}
         <section className="space-y-4">
-          <h2 className="text-lg font-display font-black uppercase tracking-[0.15em] text-foreground">AI_Resource_Consumption</h2>
+          <h2 className="text-lg font-display font-normal uppercase tracking-[0.15em] text-foreground">AI_Resource_Consumption</h2>
           <div className="bg-[#131313] rounded-none border border-foreground/5">
             {tokenUsage.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground font-display font-black uppercase tracking-[0.2em] text-[10px]">
+              <div className="py-12 text-center text-muted-foreground font-display font-normal uppercase tracking-[0.2em] text-[10px]">
                 No_Resource_Logs_Detected
               </div>
             ) : (
               <Table>
                 <TableHeader className="bg-[#1f2020]">
                   <TableRow className="hover:bg-transparent border-foreground/5">
-                    <TableHead className="uppercase tracking-[0.2em] text-[9px] font-display font-black text-muted-foreground">Log_Entry</TableHead>
-                    <TableHead className="uppercase tracking-[0.2em] text-[9px] font-display font-black text-muted-foreground hidden md:table-cell">Operation_Hash</TableHead>
-                    <TableHead className="uppercase tracking-[0.2em] text-[9px] font-display font-black text-muted-foreground">Tokens</TableHead>
-                    <TableHead className="uppercase tracking-[0.2em] text-[9px] font-display font-black text-muted-foreground text-right">Cost_USD</TableHead>
+                    <TableHead className="uppercase tracking-[0.2em] text-[9px] font-display font-normal text-muted-foreground">Log_Entry</TableHead>
+                    <TableHead className="uppercase tracking-[0.2em] text-[9px] font-display font-normal text-muted-foreground hidden md:table-cell">Operation_Hash</TableHead>
+                    <TableHead className="uppercase tracking-[0.2em] text-[9px] font-display font-normal text-muted-foreground">Tokens</TableHead>
+                    <TableHead className="uppercase tracking-[0.2em] text-[9px] font-display font-normal text-muted-foreground text-right">Cost_USD</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -275,7 +275,7 @@ export default function AdminDashboard({ items = [], user = null }) {
                     <TableRow key={task.id} className="hover:bg-[#1f2020] border-foreground/5 transition-none">
                       <TableCell>
                         <div className="flex flex-col">
-                          <span className="font-display font-black uppercase tracking-wider text-[11px]">{task.taskType}</span>
+                          <span className="font-display font-normal uppercase tracking-wider text-[11px]">{task.taskType}</span>
                           <span className="text-[10px] font-mono text-muted-foreground/60 uppercase">Actor: {task.actorId?.slice(0, 8)}</span>
                         </div>
                       </TableCell>
@@ -298,11 +298,11 @@ export default function AdminDashboard({ items = [], user = null }) {
 
         {/* Support inbox */}
         <section className="space-y-4">
-          <h2 className="text-lg font-display font-black uppercase tracking-[0.15em] text-foreground">System_Exceptions</h2>
+          <h2 className="text-lg font-display font-normal uppercase tracking-[0.15em] text-foreground">System_Exceptions</h2>
           <div className="grid grid-cols-1 gap-4">
             {errorReports.length === 0 ? (
               <div className="py-12 flex items-center justify-center bg-[#131313] border border-foreground/5 border-dashed">
-                <p className="text-[10px] font-display font-black uppercase tracking-[0.2em] text-muted-foreground/30">No_Exceptions_Recorded</p>
+                <p className="text-[10px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground/30">No_Exceptions_Recorded</p>
               </div>
             ) : (
               errorReports.map(report => (
@@ -310,20 +310,20 @@ export default function AdminDashboard({ items = [], user = null }) {
                   <div className="flex flex-row items-center justify-between p-4 border-b border-red-500/10 bg-red-500/[0.02]">
                     <div className="flex items-center gap-3 min-w-0">
                       <Bug size={14} className="text-red-500 shrink-0" />
-                      <span className="text-[10px] font-display font-black uppercase tracking-[0.1em]">
+                      <span className="text-[10px] font-display font-normal uppercase tracking-[0.1em]">
                         {report.action}
                       </span>
                       <span className="font-mono text-[10px] px-2 py-0.5 bg-red-500/10 text-red-400">
                         {report.errorId?.slice(0, 8)}
                       </span>
                     </div>
-                    <Badge variant="outline" className={`uppercase text-[9px] rounded-none border-none font-display font-black ${report.severity === 'high' ? 'bg-red-500 text-white' : 'bg-[#1f2020] text-muted-foreground'}`}>
+                    <Badge variant="outline" className={`uppercase text-[9px] rounded-none border-none font-display font-normal ${report.severity === 'high' ? 'bg-red-500 text-white' : 'bg-[#1f2020] text-muted-foreground'}`}>
                       {report.severity}
                     </Badge>
                   </div>
                   <div className="p-6 space-y-6">
                     <div>
-                      <p className="font-display font-black text-lg leading-tight uppercase tracking-tight">{report.humanMessage}</p>
+                      <p className="font-display font-normal text-lg leading-tight uppercase tracking-tight">{report.humanMessage}</p>
                       {report.knownReason && (
                         <p className="text-xs font-mono text-muted-foreground/60 mt-2 uppercase">{report.knownReason}</p>
                       )}
@@ -331,11 +331,11 @@ export default function AdminDashboard({ items = [], user = null }) {
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-foreground/5 border border-foreground/5">
                       <div className="bg-[#191a1a] p-4">
-                        <p className="text-[9px] font-display font-black uppercase tracking-[0.2em] text-muted-foreground mb-2 opacity-50">Origin_User</p>
+                        <p className="text-[9px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground mb-2 opacity-50">Origin_User</p>
                         <p className="font-mono text-[11px] truncate">{report.userEmail || report.userId || "UNDEFINED"}</p>
                       </div>
                       <div className="bg-[#191a1a] p-4">
-                        <p className="text-[9px] font-display font-black uppercase tracking-[0.2em] text-muted-foreground mb-2 opacity-50">Stack_Trace</p>
+                        <p className="text-[9px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground mb-2 opacity-50">Stack_Trace</p>
                         <p className="font-mono text-[10px] leading-relaxed break-all text-muted-foreground/60">{report.technicalMessage || "NO_DATA"}</p>
                       </div>
                     </div>
@@ -344,7 +344,7 @@ export default function AdminDashboard({ items = [], user = null }) {
                       <Button 
                         variant="ghost" 
                         size="sm" 
-                        className="bg-[#1f2020] text-[10px] uppercase font-display font-black tracking-[0.15em] rounded-none py-5 border-none hover:bg-foreground hover:text-background transition-none"
+                        className="bg-[#1f2020] text-[10px] uppercase font-display font-normal tracking-[0.15em] rounded-none py-5 border-none hover:bg-foreground hover:text-background transition-none"
                         onClick={() => handleCopyError(report)}
                       >
                         <Copy size={12} className="mr-2" /> Log_Copy
@@ -352,7 +352,7 @@ export default function AdminDashboard({ items = [], user = null }) {
                       <Button 
                         variant="ghost" 
                         size="sm" 
-                        className="bg-[#1f2020] text-[10px] uppercase font-display font-black tracking-[0.15em] rounded-none py-5 border-none hover:bg-primary hover:text-primary-foreground transition-none"
+                        className="bg-[#1f2020] text-[10px] uppercase font-display font-normal tracking-[0.15em] rounded-none py-5 border-none hover:bg-primary hover:text-primary-foreground transition-none"
                         disabled={updatingErrorId === report.id}
                         onClick={() => handleErrorStatus(report, "acknowledged")}
                       >
@@ -360,7 +360,7 @@ export default function AdminDashboard({ items = [], user = null }) {
                       </Button>
                       <Button 
                         size="sm" 
-                        className="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] uppercase font-display font-black tracking-[0.15em] rounded-none py-5 border-none transition-none ml-auto"
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] uppercase font-display font-normal tracking-[0.15em] rounded-none py-5 border-none transition-none ml-auto"
                         disabled={updatingErrorId === report.id}
                         onClick={() => handleErrorStatus(report, "resolved")}
                       >
@@ -376,10 +376,10 @@ export default function AdminDashboard({ items = [], user = null }) {
 
         {/* Activity history */}
         <section className="space-y-4">
-          <h2 className="text-lg font-display font-black uppercase tracking-[0.15em] text-foreground">Global_Operations_Log</h2>
+          <h2 className="text-lg font-display font-normal uppercase tracking-[0.15em] text-foreground">Global_Operations_Log</h2>
           <div className="bg-[#131313] rounded-none border border-foreground/5">
             {activityLog.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground font-display font-black uppercase tracking-[0.2em] text-[10px]">
+              <div className="py-12 text-center text-muted-foreground font-display font-normal uppercase tracking-[0.2em] text-[10px]">
                 No_Activity_Streaming
               </div>
             ) : (
@@ -395,7 +395,7 @@ export default function AdminDashboard({ items = [], user = null }) {
                           {activity.createdAt?.toDate?.()?.toLocaleTimeString?.(undefined, { hour12: false }) || "--:--:--"}
                         </TableCell>
                         <TableCell>
-                          <span className="font-display font-black uppercase tracking-wider text-[11px] text-foreground">
+                          <span className="font-display font-normal uppercase tracking-wider text-[11px] text-foreground">
                             {activity.actionType}
                           </span>
                         </TableCell>
@@ -407,12 +407,12 @@ export default function AdminDashboard({ items = [], user = null }) {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-3">
-                            {undone && <span className="text-muted-foreground/40 text-[9px] uppercase font-display font-black italic tracking-widest">Cancelled</span>}
+                            {undone && <span className="text-muted-foreground/40 text-[9px] uppercase font-display font-normal italic tracking-widest">Cancelled</span>}
                             {canUndo && (
                               <Button
                                 variant="ghost"
                                 size="xs"
-                                className="font-display font-black uppercase tracking-[0.2em] text-[10px] rounded-none h-8 px-4 bg-[#1f2020] text-primary hover:bg-primary hover:text-primary-foreground transition-none"
+                                className="font-display font-normal uppercase tracking-[0.2em] text-[10px] rounded-none h-8 px-4 bg-[#1f2020] text-primary hover:bg-primary hover:text-primary-foreground transition-none"
                                 onClick={() => handleUndo(activity)}
                                 disabled={undoingId === activity.id}
                               >
@@ -433,18 +433,18 @@ export default function AdminDashboard({ items = [], user = null }) {
         {/* Telemetry */}
         <section className="space-y-4">
           <div className="flex items-center justify-between border-b border-foreground/5 pb-2">
-            <h2 className="text-lg font-display font-black uppercase tracking-[0.15em] text-foreground">Live_Telemetry_Feed</h2>
+            <h2 className="text-lg font-display font-normal uppercase tracking-[0.15em] text-foreground">Live_Telemetry_Feed</h2>
             <div className="flex items-center gap-2 bg-emerald-500/10 px-3 py-1">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
               </span>
-              <span className="text-[9px] font-display font-black tracking-widest text-emerald-500 uppercase">Streaming</span>
+              <span className="text-[9px] font-display font-normal tracking-widest text-emerald-500 uppercase">Streaming</span>
             </div>
           </div>
           <div className="bg-[#131313] rounded-none border border-foreground/5">
             {telemetry.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground font-display font-black uppercase tracking-[0.2em] text-[10px]">
+              <div className="py-12 text-center text-muted-foreground font-display font-normal uppercase tracking-[0.2em] text-[10px]">
                 No_Data_Packets
               </div>
             ) : (
@@ -456,7 +456,7 @@ export default function AdminDashboard({ items = [], user = null }) {
                         {log.timestamp?.toDate()?.toLocaleTimeString(undefined, { hour12: false })}
                       </TableCell>
                       <TableCell>
-                        <span className={`font-display font-black uppercase tracking-wider text-[11px] ${log.type?.includes('ERROR') ? 'text-red-500' : 'text-primary/60'}`}>
+                        <span className={`font-display font-normal uppercase tracking-wider text-[11px] ${log.type?.includes('ERROR') ? 'text-red-500' : 'text-primary/60'}`}>
                           {log.type}
                         </span>
                       </TableCell>

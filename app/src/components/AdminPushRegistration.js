@@ -63,11 +63,11 @@ export default function AdminPushRegistration({ user, isAdmin }) {
         </div>
         <div className="space-y-1">
           <div className="flex items-center gap-3">
-            <h3 className="text-sm font-display font-black uppercase tracking-[0.2em] text-foreground">
+            <h3 className="text-sm font-display font-normal uppercase tracking-[0.2em] text-foreground">
               ADMIN_NOTIFICATION_BRIDGE_V1
             </h3>
             {status === "enabled" && (
-              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-none h-5 px-2 text-[9px] font-display font-black uppercase tracking-widest rounded-none">
+              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-none h-5 px-2 text-[9px] font-display font-normal uppercase tracking-widest rounded-none">
                 ONLINE
               </Badge>
             )}
@@ -80,7 +80,7 @@ export default function AdminPushRegistration({ user, isAdmin }) {
 
       <div className="flex items-center gap-3">
         {status === "error" && (
-          <div className="flex items-center gap-2 text-[10px] font-display font-black text-red-500 uppercase mr-2 tracking-widest">
+          <div className="flex items-center gap-2 text-[10px] font-display font-normal text-red-500 uppercase mr-2 tracking-widest">
             <AlertCircle size={14} /> ERR_SYNC_FAIL
           </div>
         )}
@@ -89,7 +89,7 @@ export default function AdminPushRegistration({ user, isAdmin }) {
           size="sm"
           onClick={enablePush}
           disabled={status === "processing" || status === "enabled" || status === "unsupported"}
-          className={`rounded-none h-10 px-6 text-[10px] font-display font-black uppercase tracking-[0.2em] transition-none border-none
+          className={`rounded-none h-10 px-6 text-[10px] font-display font-normal uppercase tracking-[0.2em] transition-none border-none
             ${status === "enabled" 
               ? "bg-foreground/5 text-muted-foreground/40" 
               : "bg-primary text-primary-foreground hover:bg-primary/90"}`}

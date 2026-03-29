@@ -81,14 +81,14 @@ export default function AdminUsageStats() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
                 </span>
-                <span className="text-[8px] font-display font-black tracking-widest text-emerald-500 uppercase">Live</span>
+                <span className="text-[8px] font-display font-normal tracking-widest text-emerald-500 uppercase">Live</span>
               </div>
             )}
           </div>
           
           <div className="space-y-1">
-            <p className="text-[10px] font-display font-black uppercase tracking-[0.2em] text-muted-foreground/60">{metric.label}</p>
-            <p className="text-3xl font-display font-black text-foreground tracking-tighter">
+            <p className="text-[10px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground/60">{metric.label}</p>
+            <p className="text-3xl font-display font-normal text-foreground tracking-tighter">
               {metric.value}
             </p>
           </div>

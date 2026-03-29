@@ -39,7 +39,7 @@ export default function SettingsView() {
             SYSTEM_PREFERENCES.CFG
           </Badge>
         </div>
-        <h1 className="text-3xl md:text-4xl font-black uppercase tracking-tighter text-[#e7e5e5] leading-none font-display">
+        <h1 className="text-3xl md:text-4xl font-normal uppercase tracking-tighter text-[#e7e5e5] leading-none font-display">
           CONFIGURAÇÕES_<span className="text-[#acabaa]/30">DO_AMBIENTE</span>
         </h1>
       </div>
@@ -48,7 +48,7 @@ export default function SettingsView() {
         {/* AI Workflow Selection */}
         <section>
           <div className="px-4 md:px-6 py-4">
-            <h2 className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#acabaa]/50 font-display">
+            <h2 className="text-[10px] font-normal uppercase tracking-[0.25em] text-[#acabaa]/50 font-display">
               CORE_AI_EXTRACTION_ENGINE
             </h2>
           </div>
@@ -68,7 +68,7 @@ export default function SettingsView() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1.5">
-                      <p className={`text-sm font-bold uppercase tracking-widest font-display ${active ? "text-[#e7e5e5]" : "text-[#acabaa]/40"}`}>
+                      <p className={`text-sm font-normal uppercase tracking-widest font-display ${active ? "text-[#e7e5e5]" : "text-[#acabaa]/40"}`}>
                         {name.toUpperCase()}_MODE
                       </p>
                       {active && (
@@ -93,7 +93,7 @@ export default function SettingsView() {
         {/* Profile & Security */}
         <section>
           <div className="px-4 md:px-6 py-4">
-            <h2 className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#acabaa]/50 font-display">
+            <h2 className="text-[10px] font-normal uppercase tracking-[0.25em] text-[#acabaa]/50 font-display">
               AUTH_SESSION_CONTROL
             </h2>
           </div>
@@ -107,7 +107,7 @@ export default function SettingsView() {
                 <div>
                   <p className="text-sm font-bold text-[#e7e5e5] leading-none mb-1.5 font-mono uppercase tracking-tight">{user?.email}</p>
                   <div className="flex items-center gap-2">
-                    <Badge variant={isAdmin ? "default" : "secondary"} className={`h-5 px-1.5 text-[8px] font-bold uppercase tracking-widest rounded-none font-display ${isAdmin ? "bg-[#293e48] text-[#acc3ce]" : "bg-[#191a1a] text-[#acabaa]"}`}>
+                    <Badge variant={isAdmin ? "default" : "secondary"} className={`h-5 px-1.5 text-[8px] font-normal uppercase tracking-widest rounded-none font-display ${isAdmin ? "bg-[#293e48] text-[#acc3ce]" : "bg-[#191a1a] text-[#acabaa]"}`}>
                       {isAdmin ? "SYSTEM_ROOT" : "AUTH_USER"}
                     </Badge>
                     <span className="text-[8px] text-[#acabaa]/30 uppercase font-bold tracking-widest font-mono">FIREBASE_JWT_PROVIDER</span>
@@ -118,7 +118,7 @@ export default function SettingsView() {
                 variant="outline" 
                 size="sm" 
                 onClick={logout}
-                className="text-[9px] font-bold uppercase tracking-widest border-[#7f2927]/20 text-[#ee7d77] hover:bg-[#7f2927]/10 rounded-none transition-none font-display h-10 px-6"
+                className="text-[9px] font-normal uppercase tracking-widest border-[#7f2927]/20 text-[#ee7d77] hover:bg-[#7f2927]/10 rounded-none transition-none font-display h-10 px-6"
               >
                 <LogOut size={14} className="mr-2" /> EXIT_SESSION
               </Button>
@@ -133,7 +133,7 @@ export default function SettingsView() {
           <div className="flex flex-col gap-6">
             <Button
               variant="outline"
-              className="text-[10px] font-bold uppercase tracking-[0.25em] h-14 justify-start border-[#484848]/20 bg-[#0e0e0e] hover:bg-[#131313] rounded-none transition-none font-display text-[#acabaa]"
+              className="text-[10px] font-normal uppercase tracking-[0.25em] h-14 justify-start border-[#484848]/20 bg-[#0e0e0e] hover:bg-[#131313] rounded-none transition-none font-display text-[#acabaa]"
               onClick={async () => {
                 if (window.confirm("CONFIRM_ACTION: CLEAR_CACHE_AND_FORCE_REBOOT?")) {
                   try {
@@ -164,7 +164,7 @@ export default function SettingsView() {
               <p className="text-[8px] font-bold uppercase tracking-[0.4em] text-[#acabaa]/20 font-mono">
                 IOS_SYSTEM_CORE_V{process.env.NEXT_PUBLIC_APP_VERSION || "1.0.2"}
               </p>
-              <Badge variant="outline" className="text-[7px] font-bold uppercase tracking-widest border-[#484848]/10 text-[#acabaa]/20 rounded-none font-display">
+              <Badge variant="outline" className="text-[7px] font-normal uppercase tracking-widest border-[#484848]/10 text-[#acabaa]/20 rounded-none font-display">
                 DEPLOYED_STABLE_BUILD
               </Badge>
             </div>
