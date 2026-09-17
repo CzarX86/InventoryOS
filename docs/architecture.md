@@ -4,7 +4,7 @@
 ### 1. Frontend: Next.js 15 (App Router)
 - **Framework**: `Next.js 15` with `React`.
 - **Styling**: `Tailwind CSS`, `shadcn/ui` for new components.
-- **PWA**: PWA integration for mobile-first operational access.
+- **PWA**: PWA integration for mobile-first operational access. The app shell uses `100dvh`, `viewport-fit=cover`, and a safe-area-aware bottom navigation so Safari browser chrome does not cover mobile actions.
 - **State Management**: React Context, Firebase Hooks.
 - **AI Integration**: Client-side Gemini SDK for immediate interaction.
 

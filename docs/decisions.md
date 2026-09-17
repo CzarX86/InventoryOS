@@ -214,6 +214,12 @@ Location: `system_usage/ai_usage_summary_{YYYYMM}`
 - **Implications**: Grouping is a presentation concern applied after search and brand filtering. Missing brands appear under “Sem marca” and missing types under “Geral”.
 - **Status**: Active.
 
+## Decision: Mobile Safari safe-area navigation
+- **Decision**: Use the dynamic viewport (`100dvh`), `viewport-fit=cover`, and a safe-area-aware bottom navigation with a minimum breathing room on mobile Safari.
+- **Reason**: Safari's browser chrome and the iOS home indicator can overlap a bottom navigation when the app is used in the browser instead of as an installed PWA.
+- **Implications**: The mobile shell reserves the extra inset without changing the desktop layout; browsers without a reported inset still receive a small bottom buffer.
+- **Status**: Active.
+
 ## Technical Reference
 - **Project Context**: [agent_context.md](file:///Users/juliocezar/Dev/personal/InventoryOS/docs/agent_context.md)
 - **Architecture Overview**: [architecture.md](file:///Users/juliocezar/Dev/personal/InventoryOS/docs/architecture.md)

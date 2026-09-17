@@ -28,6 +28,7 @@ InventoryOS is an operational platform currently focused on inventory and item m
 
 - **FinOps & Observability**: Implemented a real-time AI cost dashboard with MTD (Month-To-Date) tracking and run-rate projections. Added a background aggregator for cost summaries to minimize read costs.
 - **UI Migration**: New features are using `shadcn/ui` components; legacy components coexist.
+- **Mobile shell**: The authenticated workspace uses the dynamic viewport and reserves the iOS safe area for its bottom navigation, including Safari browser mode.
 - **Development Flow**: Work is organized in the `codex/expansion-foundation` branch with PR-first workflow to `main`.
 - **Access Control**: Google sign-in is now followed by a server-owned `pending`/`approved`/`revoked` lifecycle. Firestore claims gate all workspace reads, admins approve/revoke users through callable functions, and in-app notifications announce new requests. The platform owner is bootstrapped from `PLATFORM_OWNER_EMAIL`, receives hidden-owner treatment, and is excluded from user management results; `PLATFORM_ADMIN_EMAIL` bootstraps the visible administrator account.
 - **CRM v1**: The approved workspace includes company/contact grouping, contact roles and locality, interaction history, next-contact follow-up state, equipment links for interests and installed base, and optional WhatsApp remote-ID linking. Processed WhatsApp batches create timeline events and AI next-contact dates only when a matching contact exists; manual dates are preserved.
