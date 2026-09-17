@@ -74,6 +74,28 @@ Crie dois environments no repositório: `staging` e `production`.
 | `FIREBASE_SERVICE_ACCOUNT` | JSON completo da service account com permissão para deploy de Hosting, Firestore, Storage e Functions |
 | `NEXT_PUBLIC_GEMINI_API_KEY` | API key do Gemini |
 
+### Secrets do runtime das Cloud Functions
+
+As Functions de controle de acesso e processamento WhatsApp usam Secret Manager do Firebase/GCP. Configure os valores em cada projeto antes do deploy:
+
+| Secret | Uso |
+|---|---|
+| `PLATFORM_OWNER_EMAIL` | E-mail Google verificado do proprietário que recebe acesso inicial e fica oculto na plataforma |
+| `PLATFORM_ADMIN_EMAIL` | E-mail Google verificado do administrador inicial, que recebe acesso administrativo e permanece visível na gestão de usuários |
+| `PLATFORM_WORKSPACE_ID` | Identificador estável do workspace compartilhado por todos os usuários aprovados |
+
+Esses três secrets também devem existir nos environments `staging` e `production` do GitHub. Os workflows os sincronizam com o Secret Manager do respectivo projeto Firebase antes do deploy.
+
+Exemplo interativo, executado uma vez por projeto:
+
+```bash
+firebase functions:secrets:set PLATFORM_OWNER_EMAIL
+firebase functions:secrets:set PLATFORM_ADMIN_EMAIL
+firebase functions:secrets:set PLATFORM_WORKSPACE_ID
+```
+
+Não salve esses valores em `.env`, no repositório ou no bundle público do frontend.
+
 ## Configuração inicial do GCP (uma vez por projeto Firebase)
 
 Ao configurar um novo projeto Firebase para deploy de Cloud Functions Gen 2, é necessário:

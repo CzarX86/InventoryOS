@@ -52,8 +52,8 @@ function DropdownMenuGroup({
 }
 
 function DropdownMenuItem({
-  className,
-  inset,
+  className = "",
+  inset = false,
   variant = "default",
   ...props
 }) {
@@ -133,8 +133,8 @@ function DropdownMenuRadioItem({
 }
 
 function DropdownMenuLabel({
-  className,
-  inset,
+  className = "",
+  inset = false,
   ...props
 }) {
   return (
@@ -150,7 +150,7 @@ function DropdownMenuLabel({
 }
 
 function DropdownMenuSeparator({
-  className,
+  className = "",
   ...props
 }) {
   return (

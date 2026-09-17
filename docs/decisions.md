@@ -45,6 +45,12 @@ active_decisions:
   - id: finops_kill_switch
     name: FinOps Monthly Budget Kill Switch
     status: Active
+  - id: access_approval_gate
+    name: Server-owned access approval and workspace claims
+    status: Active
+  - id: crm_company_contact_history
+    name: Company/contact CRM with immutable interaction history
+    status: Active
 ---
 
 # Technical Decisions Log (ADR)
@@ -182,6 +188,18 @@ Location: `system_usage/ai_usage_summary_{YYYYMM}`
   - O orçamento é configurado no documento Firestore `system/config` (campo: `aiMonthlyBudgetLimitUsd`).
   - Se o documento não existir, o limite padrão é **$10.00 USD**.
   - Violações de limite geram um log de categoria `finops` na coleção `system_audit_logs`.
+- **Status**: Active.
+
+## Decision: Server-owned access approval and workspace claims
+- **Decision**: Treat Google authentication as identity only. New users remain `pending` until an approved admin changes the status, and Firestore access is gated by server-issued `accessApproved`, `accessAdmin`, and `workspaceId` claims.
+- **Reason**: Prevent authenticated-but-unapproved users from reading or mutating inventory and CRM data, while keeping approval inside the platform.
+- **Implications**: Production requires `PLATFORM_OWNER_EMAIL`, `PLATFORM_ADMIN_EMAIL`, and a stable `PLATFORM_WORKSPACE_ID` configured as Firebase Function secrets. The owner is deliberately excluded from access lists and identity UI, while the configured administrator is visible and can be managed by the owner.
+- **Status**: Active.
+
+## Decision: Company/contact CRM with immutable interaction history
+- **Decision**: Model `accounts` as companies, `contacts` as people, and `crm_events` as the interaction timeline. Equipment relationships use `interests` and `installed_base`; WhatsApp matching uses explicit remote ID first and normalized phone as fallback.
+- **Reason**: Preserve the customer's spreadsheet shape while supporting multiple contacts per company, roles, follow-up dates, equipment context, and asynchronous WhatsApp enrichment.
+- **Implications**: Manual next-contact dates cannot be overwritten by AI. WhatsApp enrichment is applied only when a CRM contact is linked, and all records carry the shared `workspaceId` boundary.
 - **Status**: Active.
 
 ## Technical Reference

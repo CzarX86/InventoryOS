@@ -1,61 +1,150 @@
-import { useState, useEffect } from 'react';
-import { auth, db, googleProvider } from '@/lib/firebase';
-import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { buildDefaultAccountId } from '@/lib/ownership';
+import { useEffect, useState } from "react";
+import { auth, db, googleProvider } from "@/lib/firebase";
+import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { initializeAccessProfile } from "@/lib/accessControl";
+
+const profileBootstrapPromises = new Map();
+
+function getProfileBootstrap(firebaseUser) {
+  if (!profileBootstrapPromises.has(firebaseUser.uid)) {
+    profileBootstrapPromises.set(firebaseUser.uid, initializeAccessProfile());
+  }
+  return profileBootstrapPromises.get(firebaseUser.uid);
+}
+
+function mergeUserProfile(firebaseUser, profile = {}) {
+  return {
+    ...firebaseUser,
+    ...profile,
+    uid: firebaseUser.uid,
+    email: profile.email || firebaseUser.email || null,
+    displayName: profile.displayName || firebaseUser.displayName || null,
+    accessStatus: profile.accessStatus || "pending",
+    role: profile.role || "user",
+  };
+}
 
 export default function useAuth() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isApproved, setIsApproved] = useState(false);
+  const [accessStatus, setAccessStatus] = useState("pending");
+  const [accessError, setAccessError] = useState(null);
 
   useEffect(() => {
-    if (!auth) return;
+    if (!auth) {
+      setLoading(false);
+      return undefined;
+    }
 
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        // Get user profile from Firestore
-        const userRef = doc(db, "users", firebaseUser.uid);
-        const userSnap = await getDoc(userRef);
+    let active = true;
+    let unsubscribeProfile = () => undefined;
 
-        if (userSnap.exists()) {
-          const userData = userSnap.data();
-          setUser({ ...firebaseUser, ...userData });
-          setIsAdmin(userData.role === 'admin');
-        } else {
-          // If profile doesn't exist, create a default 'user' profile
-          const ownerId = firebaseUser.uid;
-          const initialData = {
-            email: firebaseUser.email,
-            ownerId,
-            defaultAccountId: buildDefaultAccountId(ownerId),
-            role: 'user', 
-            aiWorkflow: 'real-time',
-            createdAt: new Date().toISOString()
-          };
-          await setDoc(userRef, initialData);
-          setUser({ ...firebaseUser, ...initialData });
-          setIsAdmin(false);
-        }
-      } else {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!firebaseUser) {
+        profileBootstrapPromises.clear();
+        unsubscribeProfile();
+        if (!active) return;
         setUser(null);
         setIsAdmin(false);
+        setIsApproved(false);
+        setAccessStatus("pending");
+        setAccessError(null);
+        setLoading(false);
+        return;
       }
-      setLoading(false);
+
+      if (!active) return;
+      setLoading(true);
+      setAccessError(null);
+      setUser(mergeUserProfile(firebaseUser));
+
+      try {
+        const initialProfile = await getProfileBootstrap(firebaseUser);
+        if (!active) return;
+
+        const applyProfile = async (profile) => {
+          const nextUser = mergeUserProfile(firebaseUser, profile);
+          const nextStatus = nextUser.accessStatus || "pending";
+          const nextIsAdmin = nextStatus === "approved" && nextUser.role === "admin";
+          setUser(nextUser);
+          setAccessStatus(nextStatus);
+          setIsApproved(nextStatus === "approved");
+          setIsAdmin(nextIsAdmin);
+
+          if ((nextStatus === "approved" || nextStatus === "revoked") && firebaseUser.getIdToken) {
+            try {
+              await firebaseUser.getIdToken(true);
+            } catch {
+              // The Firestore profile remains authoritative for the gate while the token refresh retries.
+            }
+          }
+        };
+
+        await applyProfile(initialProfile);
+
+        if (db) {
+          unsubscribeProfile();
+          unsubscribeProfile = onSnapshot(doc(db, "users", firebaseUser.uid), async (snapshot) => {
+            if (!snapshot.exists()) return;
+            await applyProfile({ uid: firebaseUser.uid, ...snapshot.data() });
+          }, (error) => {
+            if (active) setAccessError(error);
+          });
+        }
+      } catch (error) {
+        profileBootstrapPromises.delete(firebaseUser.uid);
+        if (!active) return;
+        setAccessError(error);
+        setUser(mergeUserProfile(firebaseUser, { accessStatus: "pending", role: "user" }));
+        setAccessStatus("pending");
+        setIsApproved(false);
+        setIsAdmin(false);
+      } finally {
+        if (active) setLoading(false);
+      }
     });
 
-    return () => unsubscribe();
+    return () => {
+      active = false;
+      unsubscribeProfile();
+      unsubscribeAuth();
+    };
   }, []);
 
-  const login = () => signInWithPopup(auth, googleProvider);
-  const logout = () => signOut(auth);
-
-  const updateSettings = async (newSettings) => {
-    if (!user) return;
-    const userRef = doc(db, "users", user.uid);
-    await setDoc(userRef, newSettings, { merge: true });
-    setUser(prev => ({ ...prev, ...newSettings }));
+  const login = () => {
+    if (!auth) throw new Error("Firebase Auth indisponível neste ambiente.");
+    return signInWithPopup(auth, googleProvider);
   };
 
-  return { user, loading, isAdmin, login, logout, updateSettings };
+  const logout = () => {
+    if (!auth) return Promise.resolve();
+    return signOut(auth);
+  };
+
+  const updateSettings = async (newSettings = {}) => {
+    if (!user || !db) return;
+    const safeSettings = Object.fromEntries(
+      Object.entries(newSettings).filter(([key]) => key === "aiWorkflow"),
+    );
+    if (!Object.keys(safeSettings).length) return;
+    const userRef = doc(db, "users", user.uid);
+    await setDoc(userRef, safeSettings, { merge: true });
+    setUser((previous) => ({ ...previous, ...safeSettings }));
+  };
+
+  return {
+    user,
+    loading,
+    isAdmin,
+    isApproved,
+    accessStatus,
+    accessError,
+    isHiddenOwner: Boolean(user?.isHiddenOwner),
+    login,
+    logout,
+    updateSettings,
+  };
 }

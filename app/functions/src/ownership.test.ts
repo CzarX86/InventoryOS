@@ -16,12 +16,14 @@ describe("functions ownership helpers", () => {
     expect(context).toEqual({
       ownerId: "user-123",
       defaultAccountId: "acct_user-123",
+      workspaceId: "acct_user-123",
     });
 
     expect(applyOwnershipContext({ kind: "message" }, context)).toEqual({
       kind: "message",
       ownerId: "user-123",
       accountId: "acct_user-123",
+      workspaceId: "acct_user-123",
     });
 
     expect(hasOwnershipBoundary({ ownerId: "user-123", accountId: "acct_user-123" } as any)).toBe(true);
@@ -29,13 +31,14 @@ describe("functions ownership helpers", () => {
 
   it("should PREVENT malicious override of ownerId if context is provided", () => {
     const maliciousPayload = { ownerId: "other-user", data: "secret" };
-    const safeContext = { ownerId: "real-user", defaultAccountId: "acct_real-user" };
+    const safeContext = { ownerId: "real-user", defaultAccountId: "acct_real-user", workspaceId: "workspace-1" };
     
     const result = applyOwnershipContext(maliciousPayload, safeContext);
     
     // The context should ALWAYS override the payload ownerId
     expect(result.ownerId).toBe("real-user");
     expect(result.accountId).toBe("acct_real-user");
+    expect(result.workspaceId).toBe("workspace-1");
   });
 
   it("should handle null/empty context gracefully", () => {
@@ -43,5 +46,6 @@ describe("functions ownership helpers", () => {
     const result = applyOwnershipContext(payload, null as any);
     expect(result.ownerId).toBeNull();
     expect(result.accountId).toBeNull();
+    expect(result.workspaceId).toBeNull();
   });
 });

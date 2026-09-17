@@ -18,12 +18,18 @@ const firebaseConfig = {
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
+const hasFirebaseConfig = Object.values(firebaseConfig).every(Boolean);
 
 // Only initialize if we're in the browser or have a valid project ID
+/** @type {import('firebase/app').FirebaseApp | undefined} */
 let app;
+/** @type {import('firebase/auth').Auth | undefined} */
 let auth;
+/** @type {import('firebase/firestore').Firestore | undefined} */
 let db;
+/** @type {import('firebase/storage').FirebaseStorage | undefined} */
 let storage;
+/** @type {import('firebase/functions').Functions | undefined} */
 let functions;
 
 const googleProvider = new GoogleAuthProvider(); // Define googleProvider here
@@ -36,7 +42,7 @@ const authEmulatorHost = process.env.NEXT_PUBLIC_AUTH_EMULATOR_HOST || "127.0.0.
 const functionsEmulatorHost = process.env.NEXT_PUBLIC_FUNCTIONS_EMULATOR_HOST || "127.0.0.1";
 const functionsEmulatorPort = Number(process.env.NEXT_PUBLIC_FUNCTIONS_EMULATOR_PORT || 5001);
 
-if (typeof window !== "undefined") {
+if (typeof window !== "undefined" && hasFirebaseConfig) {
   app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
   auth = getAuth(app);
   

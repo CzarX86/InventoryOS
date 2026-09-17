@@ -5,13 +5,44 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Access claims are written only by Cloud Functions/Admin SDK.
+    function isApprovedMember() {
+      return isSignedIn() && request.auth.token.accessApproved == true;
+    }
+
     function isAdmin() {
-      return isSignedIn() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+      return isSignedIn() && request.auth.token.accessAdmin == true;
+    }
+
+    function workspaceId() {
+      return request.auth.token.workspaceId;
+    }
+
+    function recordWorkspace(data) {
+      return data.workspaceId == null ? data.accountId : data.workspaceId;
+    }
+
+    function sameWorkspace(data) {
+      return isApprovedMember() && recordWorkspace(data) == workspaceId();
+    }
+
+    function canCreateSharedResource() {
+      return sameWorkspace(request.resource.data) &&
+        request.resource.data.ownerId == request.auth.uid;
+    }
+
+    function canReadSharedResource() {
+      return sameWorkspace(resource.data);
+    }
+
+    function canWriteSharedResource() {
+      return sameWorkspace(resource.data) &&
+        sameWorkspace(request.resource.data) &&
+        request.resource.data.ownerId == resource.data.ownerId;
     }
 
     function canEscalateOwnError() {
-      return isSignedIn() &&
+      return isApprovedMember() &&
         resource.data.userId == request.auth.uid &&
         request.resource.data.diff(resource.data).changedKeys().hasOnly([
           "reportedByUser",
@@ -21,135 +52,134 @@ service cloud.firestore {
         ]);
     }
 
-    function userDoc() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-    }
-
-    function requestOwnerId() {
-      return request.resource.data.ownerId;
-    }
-
-    function requestAccountId() {
-      return request.resource.data.accountId;
-    }
-
-    function resourceOwnerId() {
-      return resource.data.ownerId;
-    }
-
-    function resourceAccountId() {
-      return resource.data.accountId;
-    }
-
-    function matchesOwnBoundary(ownerId, accountId) {
-      return isSignedIn() &&
-        ownerId == request.auth.uid &&
-        accountId == userDoc().defaultAccountId;
-    }
-
-    function canCreateOwnedResource() {
-      return matchesOwnBoundary(requestOwnerId(), requestAccountId());
-    }
-
-    function canReadOwnedResource() {
-      return matchesOwnBoundary(resourceOwnerId(), resourceAccountId());
-    }
-
     match /users/{userId} {
-      allow read, write: if isSignedIn() || userId == "demo-user";
+      // Profiles and access state are server-owned. A user can only read
+      // their own profile and update harmless preferences.
+      allow read: if isSignedIn() && userId == request.auth.uid;
+      allow update: if isSignedIn() && userId == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "aiWorkflow",
+          "displayName",
+          "photoURL"
+        ]);
+      allow create, delete: if false;
+    }
+
+    match /in_app_notifications/{notificationId} {
+      allow read: if isSignedIn() && resource.data.recipientUserId == request.auth.uid;
+      allow update: if isSignedIn() &&
+        resource.data.recipientUserId == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["readAt"]);
+      allow create, delete: if false;
     }
 
     match /inventory/{itemId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if isApprovedMember();
     }
 
     match /telemetry/{logId} {
-      allow read, write: if isSignedIn();
+      allow read: if isAdmin();
+      allow write: if false;
     }
 
     match /system/{docId} {
-      allow read, write: if isSignedIn();
+      allow read: if docId != "access_control" && (isAdmin() || (isApprovedMember() && docId == "feature_flags"));
+      allow write: if false;
+    }
+
+    match /system/access_control {
+      allow read, write: if false;
     }
 
     match /usage_stats/{userId} {
-      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
-      allow create, update: if isSignedIn() && request.auth.uid == userId;
+      allow read: if isAdmin() || (isApprovedMember() && request.auth.uid == userId);
+      allow create, update: if isApprovedMember() && request.auth.uid == userId;
       allow delete: if isAdmin();
     }
 
     match /task_ai_usage/{taskId} {
-      allow create: if isSignedIn() && request.resource.data.actorId == request.auth.uid;
+      allow create: if isApprovedMember() && request.resource.data.actorId == request.auth.uid;
       allow read, update, delete: if isAdmin();
     }
 
     match /ai_runs/{runId} {
-      allow create: if canCreateOwnedResource() || request.resource.data.ownerId == "demo-user";
-      allow read, update, delete: if isAdmin() || canReadOwnedResource() || resource.data.ownerId == "demo-user";
+      allow create: if canCreateSharedResource();
+      allow read, update, delete: if isAdmin() || canReadSharedResource();
     }
 
     match /ai_cost_policies/{policyId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateSharedResource();
+      allow read, update, delete: if isAdmin() || canReadSharedResource();
     }
 
     match /prompt_templates/{templateId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateSharedResource();
+      allow read, update, delete: if isAdmin() || canReadSharedResource();
     }
 
     match /style_profiles/{profileId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateSharedResource();
+      allow read, update, delete: if isAdmin() || canReadSharedResource();
     }
 
+    // Raw WhatsApp data and instance control remain administrative surfaces.
     match /whatsapp_instances/{instanceId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow read, write: if isAdmin();
     }
 
     match /whatsapp_webhook_events/{eventId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow read: if isAdmin();
+      allow write: if false;
     }
 
     match /whatsapp_messages/{messageId} {
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
-      allow create: if canCreateOwnedResource();
+      allow read: if isAdmin();
+      allow write: if false;
     }
 
     match /whatsapp_extracted_transactions/{transactionId} {
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
-      allow create: if canCreateOwnedResource();
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /whatsapp_contacts/{contactId} {
+      allow read, update: if isAdmin();
+      allow create, delete: if false;
+    }
+
+    match /whatsapp_groups/{groupId} {
+      allow read, update: if isAdmin();
+      allow create, delete: if false;
     }
 
     match /history_backfill_jobs/{jobId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateSharedResource();
+      allow read, update, delete: if isAdmin() || canReadSharedResource();
     }
 
     match /txt_import_jobs/{jobId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateSharedResource();
+      allow read, update, delete: if isAdmin() || canReadSharedResource();
     }
 
     match /message_dispatch_jobs/{jobId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateSharedResource();
+      allow read, update, delete: if isAdmin() || canReadSharedResource();
     }
 
     match /activity_log/{eventId} {
-      allow create: if isSignedIn() && request.resource.data.actorId == request.auth.uid;
+      allow create: if isApprovedMember() && request.resource.data.actorId == request.auth.uid;
       allow read, update, delete: if isAdmin();
     }
 
     match /error_reports/{errorId} {
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow create: if isApprovedMember() && request.resource.data.userId == request.auth.uid;
       allow update: if canEscalateOwnError() || isAdmin();
       allow read, delete: if isAdmin();
     }
 
     match /support_tickets/{ticketId} {
-      allow create: if isSignedIn() &&
+      allow create: if isApprovedMember() &&
         request.resource.data.createdByUserId == request.auth.uid &&
         get(/databases/$(database)/documents/error_reports/$(request.resource.data.errorId)).data.userId == request.auth.uid;
       allow read, update, delete: if isAdmin();
@@ -161,119 +191,138 @@ service cloud.firestore {
       allow read: if isAdmin();
     }
 
+    // Expansion Track resources use accountId as a legacy workspace alias;
+    // new records carry workspaceId and companyId independently.
     match /accounts/{accountId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateSharedResource();
+      allow read: if canReadSharedResource();
+      allow update, delete: if canWriteSharedResource() || isAdmin();
     }
 
     match /contacts/{contactId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateSharedResource();
+      allow read: if canReadSharedResource();
+      allow update, delete: if canWriteSharedResource() || isAdmin();
     }
 
     match /contact_channels/{channelId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateSharedResource();
+      allow read: if canReadSharedResource();
+      allow update, delete: if canWriteSharedResource() || isAdmin();
     }
 
     match /conversations/{conversationId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateSharedResource();
+      allow read: if canReadSharedResource();
+      allow update, delete: if canWriteSharedResource() || isAdmin();
     }
 
     match /messages/{messageId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateSharedResource();
+      allow read: if canReadSharedResource();
+      allow update, delete: if canWriteSharedResource() || isAdmin();
     }
 
     match /opportunities/{opportunityId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateSharedResource();
+      allow read: if canReadSharedResource();
+      allow update, delete: if canWriteSharedResource() || isAdmin();
     }
 
     match /contracts/{contractId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateSharedResource();
+      allow read: if canReadSharedResource();
+      allow update, delete: if canWriteSharedResource() || isAdmin();
     }
 
     match /crm_events/{eventId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateSharedResource();
+      allow read: if canReadSharedResource();
+      allow update, delete: if canWriteSharedResource() || isAdmin();
     }
 
     match /tasks/{taskId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateSharedResource();
+      allow read: if canReadSharedResource();
+      allow update, delete: if canWriteSharedResource() || isAdmin();
     }
 
     match /interests/{interestId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateSharedResource();
+      allow read: if canReadSharedResource();
+      allow update, delete: if canWriteSharedResource() || isAdmin();
     }
 
     match /catalog_items/{itemId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateSharedResource();
+      allow read: if canReadSharedResource();
+      allow update, delete: if canWriteSharedResource() || isAdmin();
     }
 
     match /inventory_items/{itemId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateSharedResource();
+      allow read: if canReadSharedResource();
+      allow update, delete: if canWriteSharedResource() || isAdmin();
     }
 
     match /installed_base/{itemId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateSharedResource();
+      allow read: if canReadSharedResource();
+      allow update, delete: if canWriteSharedResource() || isAdmin();
     }
 
     match /maintenance_rules/{ruleId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateSharedResource();
+      allow read: if canReadSharedResource();
+      allow update, delete: if canWriteSharedResource() || isAdmin();
     }
 
     match /item_relationships/{relationshipId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateSharedResource();
+      allow read: if canReadSharedResource();
+      allow update, delete: if canWriteSharedResource() || isAdmin();
     }
 
     match /supplier_accounts/{supplierId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateSharedResource();
+      allow read: if canReadSharedResource();
+      allow update, delete: if canWriteSharedResource() || isAdmin();
     }
 
     match /supplier_contacts/{contactId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateSharedResource();
+      allow read: if canReadSharedResource();
+      allow update, delete: if canWriteSharedResource() || isAdmin();
     }
 
     match /quote_requests/{requestId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateSharedResource();
+      allow read: if canReadSharedResource();
+      allow update, delete: if canWriteSharedResource() || isAdmin();
     }
 
     match /quote_responses/{responseId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateSharedResource();
+      allow read: if canReadSharedResource();
+      allow update, delete: if canWriteSharedResource() || isAdmin();
     }
 
-    match /ai_usage_stats/{accountId} {
-      allow read: if isAdmin() || canReadOwnedResource();
-      allow create, update: if canCreateOwnedResource(); // For simplified accounting
-    }
-
-    match /ai_runs/{runId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+    match /ai_usage_stats/{statsId} {
+      allow read: if isAdmin() || canReadSharedResource();
+      allow create, update: if canCreateSharedResource();
+      allow delete: if isAdmin();
     }
 
     match /supplier_performance_profiles/{profileId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateSharedResource();
+      allow read: if canReadSharedResource();
+      allow update, delete: if canWriteSharedResource() || isAdmin();
     }
 
     match /procurement_opportunities/{opportunityId} {
-      allow create: if canCreateOwnedResource();
-      allow read, update, delete: if isAdmin() || canReadOwnedResource();
+      allow create: if canCreateSharedResource();
+      allow read: if canReadSharedResource();
+      allow update, delete: if canWriteSharedResource() || isAdmin();
     }
   }
 }

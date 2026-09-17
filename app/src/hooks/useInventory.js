@@ -12,14 +12,16 @@ import {
 } from "firebase/firestore";
 import { recordAppError, toUserFacingError } from "@/lib/errorReporting";
 
-export default function useInventory(user = null) {
+export default function useInventory(user = null, enabled = true) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [syncError, setSyncError] = useState(null);
 
   useEffect(() => {
-    if (!db) return;
+    if (!db || !enabled) {
+      return undefined;
+    }
 
     const q = query(collection(db, "inventory"), orderBy("createdAt", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -48,7 +50,7 @@ export default function useInventory(user = null) {
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, enabled]);
 
   const updateItem = async (id, data) => {
     const itemRef = doc(db, "inventory", id);
@@ -79,12 +81,12 @@ export default function useInventory(user = null) {
   }, [items, searchQuery]);
 
   return {
-    items,
-    loading,
+    items: enabled ? items : [],
+    loading: enabled ? loading : false,
     searchQuery,
     setSearchQuery,
     filteredItems,
-    syncError,
+    syncError: enabled ? syncError : null,
     updateItem,
     deleteItem
   };
