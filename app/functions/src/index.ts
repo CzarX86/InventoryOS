@@ -1078,7 +1078,7 @@ export const triggerWhatsappBatch = onCall({
  * for creating profiles and changing approval state.
  */
 export const initializeAccessProfile = onCall({
-  secrets: ["PLATFORM_OWNER_EMAIL", "PLATFORM_WORKSPACE_ID"],
+  secrets: ["PLATFORM_OWNER_EMAIL", "PLATFORM_ADMIN_EMAIL", "PLATFORM_WORKSPACE_ID"],
 }, withCallErrorHandling(async (request: any) => {
   return initializeAccessProfileRecord(request.auth);
 }));

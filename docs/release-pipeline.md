@@ -81,14 +81,16 @@ As Functions de controle de acesso e processamento WhatsApp usam Secret Manager 
 | Secret | Uso |
 |---|---|
 | `PLATFORM_OWNER_EMAIL` | E-mail Google verificado do proprietário que recebe acesso inicial e fica oculto na plataforma |
+| `PLATFORM_ADMIN_EMAIL` | E-mail Google verificado do administrador inicial, que recebe acesso administrativo e permanece visível na gestão de usuários |
 | `PLATFORM_WORKSPACE_ID` | Identificador estável do workspace compartilhado por todos os usuários aprovados |
 
-Esses dois secrets também devem existir nos environments `staging` e `production` do GitHub. Os workflows os sincronizam com o Secret Manager do respectivo projeto Firebase antes do deploy.
+Esses três secrets também devem existir nos environments `staging` e `production` do GitHub. Os workflows os sincronizam com o Secret Manager do respectivo projeto Firebase antes do deploy.
 
 Exemplo interativo, executado uma vez por projeto:
 
 ```bash
 firebase functions:secrets:set PLATFORM_OWNER_EMAIL
+firebase functions:secrets:set PLATFORM_ADMIN_EMAIL
 firebase functions:secrets:set PLATFORM_WORKSPACE_ID
 ```
 

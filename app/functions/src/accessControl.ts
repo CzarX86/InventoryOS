@@ -31,6 +31,12 @@ export function isConfiguredOwner(auth: any, configuredOwnerEmail: string | unde
   return verifiedEmail && Boolean(configuredOwnerEmail) && authEmail === normalizeEmail(configuredOwnerEmail);
 }
 
+export function isConfiguredAdmin(auth: any, configuredAdminEmail: string | undefined) {
+  const verifiedEmail = Boolean(auth?.token?.email_verified ?? auth?.email_verified);
+  const authEmail = normalizeEmail(auth?.token?.email || auth?.email);
+  return verifiedEmail && Boolean(configuredAdminEmail) && authEmail === normalizeEmail(configuredAdminEmail);
+}
+
 function timestampOrNull(value: unknown) {
   return value || null;
 }
@@ -108,16 +114,19 @@ export async function initializeAccessProfile(auth: any) {
   const userRef = db.collection("users").doc(auth.uid);
   const existing = await userRef.get();
   const isOwner = auth.uid === ownerUid;
+  const isConfiguredAdministrator = isConfiguredAdmin(auth, process.env.PLATFORM_ADMIN_EMAIL);
   const existingData = existing.exists ? (existing.data() || {}) : {};
   const existingStatus: AccessStatus | null = ACCESS_STATUSES.includes(existingData.accessStatus)
     ? existingData.accessStatus
     : null;
   const hasExplicitAccessStatus = Boolean(existingStatus);
   const isLegacyAdmin = existingData.role === "admin" && !hasExplicitAccessStatus;
-  const nextStatus: AccessStatus = isOwner
+  const nextStatus: AccessStatus = isOwner || (isConfiguredAdministrator && existingStatus !== "revoked")
     ? "approved"
     : (existingStatus || (isLegacyAdmin ? "approved" : "pending"));
-  const nextRole: AccessRole = isOwner ? "admin" : (existingData.role === "admin" ? "admin" : "user");
+  const nextRole: AccessRole = isOwner || isConfiguredAdministrator || existingData.role === "admin"
+    ? "admin"
+    : "user";
   const profile = {
     email: auth.token?.email || auth.email || existingData.email || null,
     displayName: auth.token?.name || auth.name || existingData.displayName || null,
@@ -133,7 +142,9 @@ export async function initializeAccessProfile(auth: any) {
     requestedAt: existingData.requestedAt || FieldValue.serverTimestamp(),
     ...(nextStatus === "approved" && !existingData.approvedAt ? {
       approvedAt: FieldValue.serverTimestamp(),
-      approvedBy: isOwner ? "system_bootstrap" : "migration",
+      approvedBy: isOwner
+        ? "system_bootstrap"
+        : (isConfiguredAdministrator ? "system_admin_bootstrap" : "migration"),
     } : {}),
   };
 

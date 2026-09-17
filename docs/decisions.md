@@ -193,7 +193,7 @@ Location: `system_usage/ai_usage_summary_{YYYYMM}`
 ## Decision: Server-owned access approval and workspace claims
 - **Decision**: Treat Google authentication as identity only. New users remain `pending` until an approved admin changes the status, and Firestore access is gated by server-issued `accessApproved`, `accessAdmin`, and `workspaceId` claims.
 - **Reason**: Prevent authenticated-but-unapproved users from reading or mutating inventory and CRM data, while keeping approval inside the platform.
-- **Implications**: Production requires `PLATFORM_OWNER_EMAIL` and a stable `PLATFORM_WORKSPACE_ID` configured as Firebase Function secrets. The owner is deliberately excluded from access lists and identity UI, while security logs retain server-side audit context.
+- **Implications**: Production requires `PLATFORM_OWNER_EMAIL`, `PLATFORM_ADMIN_EMAIL`, and a stable `PLATFORM_WORKSPACE_ID` configured as Firebase Function secrets. The owner is deliberately excluded from access lists and identity UI, while the configured administrator is visible and can be managed by the owner.
 - **Status**: Active.
 
 ## Decision: Company/contact CRM with immutable interaction history
