@@ -132,9 +132,7 @@ const PROJECT_PREFIX = "ios_";
 /**
  * Proxy: List all instances
  */
-export const listWhatsappInstances = onCall({
-  secrets: ["EVOLUTION_API_URL", "EVOLUTION_API_KEY"],
-}, async (request: CallableRequest) => {
+export const listWhatsappInstances = onCall(async (request: CallableRequest) => {
   await ensureAdmin(request.auth);
   
   let result;
@@ -194,9 +192,7 @@ export const listWhatsappInstances = onCall({
 /**
  * Proxy: Create a new instance
  */
-export const createWhatsappInstance = onCall({
-  secrets: ["EVOLUTION_API_URL", "EVOLUTION_API_KEY"],
-}, async (request: CallableRequest) => {
+export const createWhatsappInstance = onCall(async (request: CallableRequest) => {
   await ensureAdmin(request.auth);
   const { instanceName } = request.data;
   if (!instanceName) {
@@ -217,9 +213,7 @@ export const createWhatsappInstance = onCall({
 /**
  * Proxy: Get QR Code
  */
-export const getWhatsappQrCode = onCall({
-  secrets: ["EVOLUTION_API_URL", "EVOLUTION_API_KEY"],
-}, async (request: CallableRequest) => {
+export const getWhatsappQrCode = onCall(async (request: CallableRequest) => {
   await ensureAdmin(request.auth);
   const { instanceName } = request.data;
   return await evolutionProxy("GET", `/instance/connect/${instanceName}`);
@@ -228,9 +222,7 @@ export const getWhatsappQrCode = onCall({
 /**
  * Proxy: Logout instance
  */
-export const logoutWhatsappInstance = onCall({
-  secrets: ["EVOLUTION_API_URL", "EVOLUTION_API_KEY"],
-}, async (request: CallableRequest) => {
+export const logoutWhatsappInstance = onCall(async (request: CallableRequest) => {
   await ensureAdmin(request.auth);
   const { instanceName } = request.data;
   return await evolutionProxy("DELETE", `/instance/logout/${instanceName}`);
@@ -239,9 +231,7 @@ export const logoutWhatsappInstance = onCall({
 /**
  * Proxy: Delete instance
  */
-export const deleteWhatsappInstance = onCall({
-  secrets: ["EVOLUTION_API_URL", "EVOLUTION_API_KEY"],
-}, async (request: CallableRequest) => {
+export const deleteWhatsappInstance = onCall(async (request: CallableRequest) => {
   await ensureAdmin(request.auth);
   const { instanceName } = request.data;
   return await evolutionProxy("DELETE", `/instance/delete/${instanceName}`);
@@ -250,9 +240,7 @@ export const deleteWhatsappInstance = onCall({
 /**
  * Proxy: Set Webhook
  */
-export const setWhatsappWebhook = onCall({
-  secrets: ["EVOLUTION_API_URL", "EVOLUTION_API_KEY", "EVOLUTION_WEBHOOK_SECRET"],
-}, async (request: CallableRequest) => {
+export const setWhatsappWebhook = onCall(async (request: CallableRequest) => {
   await ensureAdmin(request.auth);
   const { instanceName } = request.data;
   const webhookUrl = `https://us-central1-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/evolutionWebhook`;
@@ -332,9 +320,7 @@ function verifySignature(rawBody: Buffer, signature: string, secret: string) {
 /**
  * Webhook endpoint for Evolution API.
  */
-export const evolutionWebhook = onRequest({
-  secrets: ["EVOLUTION_WEBHOOK_SECRET"],
-}, withHttpErrorHandling(async (req: any, res: any, logger: any) => {
+export const evolutionWebhook = onRequest(withHttpErrorHandling(async (req: any, res: any, logger: any) => {
   const secret = process.env.EVOLUTION_WEBHOOK_SECRET;
   const signature = req.headers["x-hub-signature-256"] || req.headers["x-evolution-signature"];
   
@@ -399,9 +385,7 @@ export const evolutionWebhook = onRequest({
 /**
  * Fetches all groups from the Evolution API and populates the whatsapp_groups cache.
  */
-export const syncWhatsappGroups = onCall({
-  secrets: ["EVOLUTION_API_URL", "EVOLUTION_API_KEY"],
-}, async (request: CallableRequest) => {
+export const syncWhatsappGroups = onCall(async (request: CallableRequest) => {
   const { instanceName } = request.data;
   if (!instanceName) {
     throw new HttpsError("invalid-argument", "Nome da instância é obrigatório.");
@@ -687,7 +671,7 @@ export const notifyAdminOnSupportTicket = onDocumentCreated("support_tickets/{ti
  */
 export const onWhatsappMessageCreated = onDocumentCreated({
   document: "whatsapp_messages/{messageId}",
-  secrets: ["GEMINI_API_KEY", "DEEPSEEK_API_KEY"]
+  secrets: ["GEMINI_API_KEY"]
 }, withEventErrorHandling(async (event: any, logger: any) => {
   const messageId = event.params.messageId;
   const messageData = event.data?.data();
@@ -1044,7 +1028,7 @@ async function processPendingWhatsappBatches() {
  */
 export const scheduledWhatsappBatchProcess = onSchedule({
   schedule: "every 20 minutes",
-  secrets: ["GEMINI_API_KEY", "DEEPSEEK_API_KEY", "PLATFORM_WORKSPACE_ID"]
+  secrets: ["GEMINI_API_KEY", "PLATFORM_WORKSPACE_ID"]
 }, withEventErrorHandling(async (event: ScheduledEvent, logger: any) => {
   logger.info("Starting scheduled whatsapp batch process");
   await processPendingWhatsappBatches();
@@ -1056,7 +1040,7 @@ export const scheduledWhatsappBatchProcess = onSchedule({
  * Manual trigger for testing the batch processing
  */
 export const triggerWhatsappBatch = onCall({
-  secrets: ["GEMINI_API_KEY", "DEEPSEEK_API_KEY", "PLATFORM_WORKSPACE_ID"]
+  secrets: ["GEMINI_API_KEY", "PLATFORM_WORKSPACE_ID"]
 }, withCallErrorHandling(async (request: any, logger: any) => {
   await ensureAdmin(request.auth);
   logger.info("Manual trigger for whatsapp batch process");

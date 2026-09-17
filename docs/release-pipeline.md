@@ -83,8 +83,9 @@ As Functions de controle de acesso e processamento WhatsApp usam Secret Manager 
 | `PLATFORM_OWNER_EMAIL` | E-mail Google verificado do proprietário que recebe acesso inicial e fica oculto na plataforma |
 | `PLATFORM_ADMIN_EMAIL` | E-mail Google verificado do administrador inicial, que recebe acesso administrativo e permanece visível na gestão de usuários |
 | `PLATFORM_WORKSPACE_ID` | Identificador estável do workspace compartilhado por todos os usuários aprovados |
+| `GEMINI_API_KEY` | Chave usada pelas Functions para tarefas de IA; o workflow a sincroniza a partir do secret `NEXT_PUBLIC_GEMINI_API_KEY` do GitHub |
 
-Esses três secrets também devem existir nos environments `staging` e `production` do GitHub. Os workflows os sincronizam com o Secret Manager do respectivo projeto Firebase antes do deploy.
+Os três secrets `PLATFORM_*` devem existir nos environments `staging` e `production` do GitHub. O valor de `GEMINI_API_KEY` é derivado do secret existente `NEXT_PUBLIC_GEMINI_API_KEY`. Os workflows sincronizam todos eles com o Secret Manager do respectivo projeto Firebase antes do deploy.
 
 Exemplo interativo, executado uma vez por projeto:
 
@@ -95,6 +96,8 @@ firebase functions:secrets:set PLATFORM_WORKSPACE_ID
 ```
 
 Não salve esses valores em `.env`, no repositório ou no bundle público do frontend.
+
+As credenciais `EVOLUTION_API_URL`, `EVOLUTION_API_KEY`, `EVOLUTION_WEBHOOK_SECRET` e `DEEPSEEK_API_KEY` são opcionais. Sem elas, a integração Evolution fica desabilitada e as tarefas roteadas para DeepSeek usam Gemini como fallback; o deploy não cria valores fictícios nem publica credenciais vazias.
 
 ## Configuração inicial do GCP (uma vez por projeto Firebase)
 
