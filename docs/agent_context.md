@@ -31,6 +31,7 @@ InventoryOS is an operational platform currently focused on inventory and item m
 - **Development Flow**: Work is organized in the `codex/expansion-foundation` branch with PR-first workflow to `main`.
 - **Access Control**: Google sign-in is now followed by a server-owned `pending`/`approved`/`revoked` lifecycle. Firestore claims gate all workspace reads, admins approve/revoke users through callable functions, and in-app notifications announce new requests. The platform owner is bootstrapped from `PLATFORM_OWNER_EMAIL`, receives hidden-owner treatment, and is excluded from user management results; `PLATFORM_ADMIN_EMAIL` bootstraps the visible administrator account.
 - **CRM v1**: The approved workspace includes company/contact grouping, contact roles and locality, interaction history, next-contact follow-up state, equipment links for interests and installed base, and optional WhatsApp remote-ID linking. Processed WhatsApp batches create timeline events and AI next-contact dates only when a matching contact exists; manual dates are preserved.
+- **CRM interaction UX**: The CRM is now being expanded with task-oriented tabs and audio interaction capture. Audio is stored with its transcript and analysis; explicit contact fields can be enriched automatically, while extracted opportunities, tasks, and equipment remain reviewable suggestions.
 - **Current implementation branch**: `codex/access-control-crm`, based on `codex/expansion-foundation`. Changes are local and require CI/PR before integration into `main`.
 
 ## New Customer Input (September 2026)

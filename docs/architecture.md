@@ -64,6 +64,14 @@ graph TD
 4. **Frontend Update**: Firestore Snapshot Listener -> Real-time UI update in Next.js.
 5. **Direct User Action**: User interacts on UI (e.g., approve action) -> Request to Cloud Functions -> Final database update.
 
+### CRM audio interaction flow
+
+The CRM interaction composer accepts either a microphone recording from the current device or an approved audio file. The browser sends the audio to the existing client-side Gemini multimodal helper, then uploads the original to Firebase Storage and commits the transcript, AI analysis, and contact update in one Firestore batch. No base64 audio is persisted in Firestore.
+
+- Storage path: `crm_audio/{workspaceId}/{contactId}/{generatedFileId}.{extension}`
+- Timeline fields: `audioUrl`, `audioStoragePath`, `audioName`, `audioMimeType`, `audioSizeBytes`, `transcript`, and `aiAnalysis`
+- Automatic enrichment is limited to explicitly heard contact fields and a next-contact date; opportunities, tasks, and equipment are retained as reviewable suggestions in the event.
+
 ## Key Architectural Patterns
 - **Expansion Track Separation**: Strict adherence to logically separating new modules from legacy inventory.
 - **AI Orchestrator**: Logic to `plan`, `execute`, `query context`, and `write results` to ensure trackability.

@@ -67,4 +67,34 @@ describe("AI extraction helpers", () => {
       message: "RESOURCE_EXHAUSTED: quota exceeded",
     });
   });
+
+  it("returns a structured CRM interaction extracted from audio", async () => {
+    const { extractCrmInteractionFromAudio } = await buildModule({
+      "gemini-2.0-flash": {
+        text: () => JSON.stringify({
+          transcript: "Vamos enviar a proposta na próxima terça-feira.",
+          summary: "Cliente pediu uma proposta.",
+          nextContactAt: "2026-09-22T10:00:00-03:00",
+          contactUpdates: { notesAppend: "Solicitou proposta comercial." },
+          opportunities: [],
+          tasks: [{ title: "Enviar proposta", summary: "Proposta comercial", dueAt: null }],
+          equipmentLinks: [],
+          confidence: 0.92,
+        }),
+        usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 20, totalTokenCount: 30 },
+      },
+    });
+
+    const result = await extractCrmInteractionFromAudio("base64-audio", "audio/webm", {
+      contactName: "Rafael",
+      companyName: "Test",
+    });
+
+    expect(result).toMatchObject({
+      transcript: "Vamos enviar a proposta na próxima terça-feira.",
+      summary: "Cliente pediu uma proposta.",
+      contactUpdates: { notesAppend: "Solicitou proposta comercial." },
+      confidence: 0.92,
+    });
+  });
 });
