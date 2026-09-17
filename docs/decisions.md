@@ -214,6 +214,12 @@ Location: `system_usage/ai_usage_summary_{YYYYMM}`
 - **Implications**: Grouping is a presentation concern applied after search and brand filtering. Missing brands appear under “Sem marca” and missing types under “Geral”.
 - **Status**: Active.
 
+## Decision: Tabbed CRM workspace and audio interaction capture
+- **Decision**: Separate CRM work into overview, contact creation, directory, and history/actions tabs. Interaction history accepts microphone recordings or audio files, sends them to the existing client-side Gemini multimodal path for transcription/extraction, and stores the original audio in Firebase Storage alongside the immutable `crm_events` record.
+- **Reason**: The previous single-screen layout mixed setup, navigation, and follow-up work. Audio capture reduces manual note-taking during calls and meetings while preserving an auditable source artifact.
+- **Implications**: Approved workspace members can upload up to 15 MB of audio. Explicitly extracted contact fields can be applied automatically; opportunities, tasks, and equipment are stored as reviewable AI suggestions rather than silently creating business entities. Client-side Gemini remains subject to the existing public-key restriction and FinOps monitoring; a server-side asynchronous transcription path remains a future hardening step for sensitive recordings.
+- **Status**: Active.
+
 ## Technical Reference
 - **Project Context**: [agent_context.md](file:///Users/juliocezar/Dev/personal/InventoryOS/docs/agent_context.md)
 - **Architecture Overview**: [architecture.md](file:///Users/juliocezar/Dev/personal/InventoryOS/docs/architecture.md)

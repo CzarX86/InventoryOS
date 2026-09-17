@@ -17,6 +17,8 @@ InventoryOS is an operational workspace for inventory, customer relationships, a
 - Approvals and revocations are reversible in data, but require an accessible confirmation dialog.
 - CRM records are grouped by company, with role and locality visible before opening a contact.
 - Every interaction has a channel, date, summary, and next-contact signal. Manual dates take precedence over AI suggestions.
+- The CRM uses tabs as a task boundary: overview, new contact, company/contact directory, and history/actions. The selected contact remains the working context when moving into history.
+- Audio capture is a deliberate blue-gray action rail inside the interaction composer. It supports microphone recording and file upload, keeps a playable original, and exposes transcription and AI suggestions progressively in the timeline.
 - Loading, empty, error, and disabled states are visible and do not use browser alerts.
 
 ## Language
