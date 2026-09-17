@@ -287,7 +287,7 @@ export default function Dashboard() {
         {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
       </AnimatePresence>
 
-      <div className="flex h-screen overflow-hidden bg-background text-foreground selection:bg-primary/20 selection:text-primary">
+      <div className="app-shell-height flex overflow-hidden bg-background text-foreground selection:bg-primary/20 selection:text-primary">
         <style jsx global>{`
           html, body {
             overflow: hidden;
@@ -432,7 +432,7 @@ export default function Dashboard() {
           </header>
 
           {/* Main area scrollable */}
-          <main className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth">
+          <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scroll-smooth">
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeTab}
@@ -474,29 +474,35 @@ export default function Dashboard() {
             <PWAInstallPrompt />
           </main>
 
-          {/* Mobile bottom nav using shadcn/ui buttons */}
-          <div className="md:hidden flex border-t border-foreground/2 shrink-0 bg-background h-16 items-center justify-around px-2 z-40">
-            {navItems.map(({ id, label, icon: Icon }) => (
-              <Button
-                key={id}
-                variant="ghost"
-                onClick={() => setActiveTab(id)}
-                className={`flex-1 flex flex-col items-center justify-center gap-1.5 h-16 py-0 hover:bg-transparent rounded-none ${
-                  activeTab === id ? "text-primary" : "text-muted-foreground/40"
-                }`}
-              >
-                <Icon size={16} strokeWidth={activeTab === id ? 3 : 2} className={activeTab === id ? "drop-shadow-[0_0_8px_rgba(var(--primary),0.5)]" : ""} />
-                <span className="text-[10px] font-normal font-display uppercase tracking-[0.15em]">{label}</span>
-                {activeTab === id && (
-                  <motion.div 
-                    layoutId="activeTabDot" 
-                    className="w-1.5 h-1.5 rounded-none bg-primary"
-                    transition={{ type: "spring", stiffness: 350, damping: 30 }}
-                  />
-                )}
-              </Button>
-            ))}
-          </div>
+          {/* Mobile bottom nav reserves room for Safari's browser chrome and the iOS home indicator. */}
+          <nav
+            aria-label="Navegação principal"
+            className="md:hidden mobile-bottom-nav-safe-area flex shrink-0 border-t border-foreground/2 bg-background px-2 z-40"
+          >
+            <div className="flex h-16 w-full items-center justify-around">
+              {navItems.map(({ id, label, icon: Icon }) => (
+                <Button
+                  key={id}
+                  variant="ghost"
+                  aria-current={activeTab === id ? "page" : undefined}
+                  onClick={() => setActiveTab(id)}
+                  className={`flex-1 flex flex-col items-center justify-center gap-1.5 h-16 py-0 hover:bg-transparent rounded-none ${
+                    activeTab === id ? "text-primary" : "text-muted-foreground/40"
+                  }`}
+                >
+                  <Icon size={16} strokeWidth={activeTab === id ? 3 : 2} className={activeTab === id ? "drop-shadow-[0_0_8px_rgba(var(--primary),0.5)]" : ""} />
+                  <span className="text-[10px] font-normal font-display uppercase tracking-[0.15em]">{label}</span>
+                  {activeTab === id && (
+                    <motion.div
+                      layoutId="activeTabDot"
+                      className="w-1.5 h-1.5 rounded-none bg-primary"
+                      transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                    />
+                  )}
+                </Button>
+              ))}
+            </div>
+          </nav>
         </div>
       </div>
 

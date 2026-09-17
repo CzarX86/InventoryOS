@@ -21,6 +21,7 @@
 - Client reads and writes are constrained by Firebase claims and workspace membership; admin mutations use callable functions.
 - Destructive access changes require a confirmation dialog.
 - User-facing failures use inline alerts or status regions with recovery actions.
+- On mobile, the bottom navigation must not be covered by Safari's browser chrome or the iOS home indicator; the shell uses the dynamic viewport and reserves the safe area.
 
 ## Localization
 

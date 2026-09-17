@@ -18,6 +18,7 @@ InventoryOS is an operational workspace for inventory, customer relationships, a
 - CRM records are grouped by company, with role and locality visible before opening a contact.
 - Every interaction has a channel, date, summary, and next-contact signal. Manual dates take precedence over AI suggestions.
 - Loading, empty, error, and disabled states are visible and do not use browser alerts.
+- On mobile, the bottom navigation stays inside Safari's usable viewport and reserves space for the iOS safe area, including when the app is not installed as a PWA.
 
 ## Language
 
