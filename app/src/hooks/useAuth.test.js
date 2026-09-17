@@ -2,8 +2,9 @@ import { renderHook, waitFor } from "@testing-library/react";
 import useAuth from "./useAuth";
 
 const mockSetDoc = jest.fn();
-const mockGetDoc = jest.fn();
 const mockOnAuthStateChanged = jest.fn();
+const mockOnSnapshot = jest.fn();
+const mockInitializeAccessProfile = jest.fn();
 
 jest.mock("@/lib/firebase", () => ({
   auth: {},
@@ -19,8 +20,12 @@ jest.mock("firebase/auth", () => ({
 
 jest.mock("firebase/firestore", () => ({
   doc: jest.fn((db, collectionName, id) => ({ collectionName, id })),
-  getDoc: (...args) => mockGetDoc(...args),
+  onSnapshot: (...args) => mockOnSnapshot(...args),
   setDoc: (...args) => mockSetDoc(...args),
+}));
+
+jest.mock("@/lib/accessControl", () => ({
+  initializeAccessProfile: (...args) => mockInitializeAccessProfile(...args),
 }));
 
 describe("useAuth", () => {
@@ -28,9 +33,24 @@ describe("useAuth", () => {
     jest.clearAllMocks();
   });
 
-  it("creates a default ownership boundary when the user profile does not exist", async () => {
-    mockGetDoc.mockResolvedValue({
-      exists: () => false,
+  it("keeps a newly registered user pending until an admin approves access", async () => {
+    const profile = {
+      uid: "user-123",
+      email: "owner@example.com",
+      ownerId: "user-123",
+      defaultAccountId: "workspace-1",
+      workspaceId: "workspace-1",
+      accessStatus: "pending",
+      role: "user",
+      isHiddenOwner: false,
+    };
+    mockInitializeAccessProfile.mockResolvedValue(profile);
+    mockOnSnapshot.mockImplementation((reference, callback) => {
+      callback({
+        exists: () => true,
+        data: () => profile,
+      });
+      return jest.fn();
     });
 
     mockOnAuthStateChanged.mockImplementation((auth, callback) => {
@@ -46,17 +66,12 @@ describe("useAuth", () => {
 
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    expect(mockSetDoc).toHaveBeenCalledWith(
-      { collectionName: "users", id: "user-123" },
-      expect.objectContaining({
-        email: "owner@example.com",
-        ownerId: "user-123",
-        defaultAccountId: "acct_user-123",
-        role: "user",
-      })
-    );
+    expect(mockInitializeAccessProfile).toHaveBeenCalledTimes(1);
+    expect(mockSetDoc).not.toHaveBeenCalled();
 
     expect(result.current.user.ownerId).toBe("user-123");
-    expect(result.current.user.defaultAccountId).toBe("acct_user-123");
+    expect(result.current.user.defaultAccountId).toBe("workspace-1");
+    expect(result.current.isApproved).toBe(false);
+    expect(result.current.accessStatus).toBe("pending");
   });
 });

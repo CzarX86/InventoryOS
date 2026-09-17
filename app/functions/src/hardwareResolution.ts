@@ -39,7 +39,7 @@ export async function resolveHardwareMention(mention: string, brandHint?: string
 /**
  * Processes identified interests and updates the Installed Base (inferred assets).
  */
-export async function processHardwareInterests(interests: any[], context: { remoteJid: string, aiRunId: string, ownership: any }) {
+export async function processHardwareInterests(interests: any[], context: { remoteJid: string, contactId?: string | null, companyId?: string | null, aiRunId: string, ownership: any }) {
   if (!interests || interests.length === 0) return [];
 
   const results = [];
@@ -54,6 +54,8 @@ export async function processHardwareInterests(interests: any[], context: { remo
       const installedRecord = createInstalledBaseRecord({
         catalogItemId: resolved.id,
         crmContactId: context.remoteJid, // Link to whatsapp contact
+        contactId: context.contactId || null,
+        companyId: context.companyId || null,
         confidence: interest.confidence || 0.8,
         source: "ai_inferred",
         observedAt: FieldValue.serverTimestamp(),

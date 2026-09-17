@@ -2,6 +2,7 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
+/** @param {React.TextareaHTMLAttributes<HTMLTextAreaElement> & { className?: string }} props */
 function Textarea({
   className,
   ...props

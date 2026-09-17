@@ -78,11 +78,14 @@ export function createAccountRecord(payload = {}, ownershipContext = {}) {
 export function createContactRecord(payload = {}, ownershipContext = {}) {
   return buildBaseRecord("contact", {
     accountId: payload.accountId || ownershipContext?.defaultAccountId || null,
+    companyId: payload.companyId || null,
     name: payload.name || null,
     displayName: payload.displayName || payload.name || null,
     role: payload.role || null,
     status: payload.status || "active",
     phoneNumber: payload.phoneNumber || null,
+    phoneDigits: payload.phoneDigits || null,
+    whatsappRemoteJid: payload.whatsappRemoteJid || null,
     email: payload.email || null,
     source: payload.source || "manual",
     notes: payload.notes || null,
@@ -104,7 +107,9 @@ export function createContactChannelRecord(payload = {}, ownershipContext = {}) 
 export function createConversationRecord(payload = {}, ownershipContext = {}) {
   return buildBaseRecord("conversation", {
     accountId: payload.accountId || ownershipContext?.defaultAccountId || null,
+    companyId: payload.companyId || null,
     contactId: payload.contactId || null,
+    remoteJid: payload.remoteJid || null,
     channelType: payload.channelType || "whatsapp",
     channelId: payload.channelId || null,
     status: payload.status || "active",
@@ -117,6 +122,7 @@ export function createConversationRecord(payload = {}, ownershipContext = {}) {
 export function createMessageRecord(payload = {}, ownershipContext = {}) {
   return buildBaseRecord("message", {
     accountId: payload.accountId || ownershipContext?.defaultAccountId || null,
+    companyId: payload.companyId || null,
     contactId: payload.contactId || null,
     conversationId: payload.conversationId || null,
     channelType: payload.channelType || "whatsapp",
@@ -126,13 +132,16 @@ export function createMessageRecord(payload = {}, ownershipContext = {}) {
     relevanceType: payload.relevanceType || "unknown",
     sourceMessageId: payload.sourceMessageId || null,
     sourceProvider: payload.sourceProvider || "internal",
+    remoteJid: payload.remoteJid || null,
   }, ownershipContext);
 }
 
 export function createOpportunityRecord(payload = {}, ownershipContext = {}) {
   return buildBaseRecord("opportunity", {
     accountId: payload.accountId || ownershipContext?.defaultAccountId || null,
+    companyId: payload.companyId || null,
     contactId: payload.contactId || null,
+    remoteJid: payload.remoteJid || null,
     title: payload.title || null,
     stage: payload.stage || "new",
     status: payload.status || "open",
@@ -146,6 +155,7 @@ export function createOpportunityRecord(payload = {}, ownershipContext = {}) {
 export function createContractRecord(payload = {}, ownershipContext = {}) {
   return buildBaseRecord("contract", {
     accountId: payload.accountId || ownershipContext?.defaultAccountId || null,
+    companyId: payload.companyId || null,
     contactId: payload.contactId || null,
     opportunityId: payload.opportunityId || null,
     status: payload.status || "active",
@@ -159,11 +169,16 @@ export function createContractRecord(payload = {}, ownershipContext = {}) {
 export function createCrmEventRecord(payload = {}, ownershipContext = {}) {
   return buildBaseRecord("crm_event", {
     accountId: payload.accountId || ownershipContext?.defaultAccountId || null,
+    companyId: payload.companyId || null,
     contactId: payload.contactId || null,
     opportunityId: payload.opportunityId || null,
     contractId: payload.contractId || null,
     eventType: payload.eventType || "unknown",
+    channelType: payload.channelType || null,
+    source: payload.source || "manual",
     occurredAt: payload.occurredAt || null,
+    nextContactAt: payload.nextContactAt || null,
+    remoteJid: payload.remoteJid || null,
     confidence: payload.confidence ?? null,
     sourceMessageIds: payload.sourceMessageIds || [],
     summary: payload.summary || null,
@@ -173,7 +188,9 @@ export function createCrmEventRecord(payload = {}, ownershipContext = {}) {
 export function createTaskRecord(payload = {}, ownershipContext = {}) {
   return buildBaseRecord("task", {
     accountId: payload.accountId || ownershipContext?.defaultAccountId || null,
+    companyId: payload.companyId || null,
     contactId: payload.contactId || null,
+    remoteJid: payload.remoteJid || null,
     opportunityId: payload.opportunityId || null,
     contractId: payload.contractId || null,
     title: payload.title || null,
@@ -181,13 +198,16 @@ export function createTaskRecord(payload = {}, ownershipContext = {}) {
     status: payload.status || "pending",
     dueAt: payload.dueAt || null,
     assignedToUserId: payload.assignedToUserId || ownershipContext?.ownerId || null,
+    sourceMessageIds: payload.sourceMessageIds || [],
   }, ownershipContext);
 }
 
 export function createInterestRecord(payload = {}, ownershipContext = {}) {
   return buildBaseRecord("interest", {
     accountId: payload.accountId || ownershipContext?.defaultAccountId || null,
+    companyId: payload.companyId || null,
     contactId: payload.contactId || null,
+    remoteJid: payload.remoteJid || null,
     opportunityId: payload.opportunityId || null,
     catalogItemId: payload.catalogItemId || null,
     interestType: payload.interestType || "hardware",
@@ -196,4 +216,3 @@ export function createInterestRecord(payload = {}, ownershipContext = {}) {
     summary: payload.summary || null,
   }, ownershipContext);
 }
-

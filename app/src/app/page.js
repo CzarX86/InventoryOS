@@ -3,7 +3,7 @@ import { useState, useRef, useMemo, useEffect } from "react";
 import {
   Search, Plus, Mic, Package, Boxes, Settings,
   Shield, LogOut, MoreHorizontal, Loader2, X, Share2, Trash2, MessageSquare,
-  CheckSquare
+  CheckSquare, UserRound
 } from "lucide-react";
 import { motion, AnimatePresence, useMotionValue, useTransform, useAnimation } from "framer-motion";
 import AddItemModal from "@/components/AddItemModal";
@@ -14,6 +14,9 @@ import SettingsView from "@/components/SettingsView";
 import WhatsappView from "@/components/WhatsappView";
 import SplashScreen from "@/components/SplashScreen";
 import ActionInbox from "@/components/ActionInbox";
+import CrmView from "@/components/CrmView";
+import AccessGate from "@/components/AccessGate";
+import NotificationsBell from "@/components/NotificationsBell";
 import PWAInstallPrompt from "@/components/PWAInstallPrompt"; // Added PWAInstallPrompt import
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,8 +64,8 @@ export default function Dashboard() {
   const [activeMenuId, setActiveMenuId] = useState(null);
   const [showSplash, setShowSplash] = useState(true);
 
-  const { user, loading: authLoading, isAdmin, login, logout } = useAuth();
-  const { loading: invLoading, searchQuery, setSearchQuery, filteredItems, items, deleteItem, syncError } = useInventory(user);
+  const { user, loading: authLoading, isAdmin, isApproved, isHiddenOwner, accessStatus, login, logout } = useAuth();
+  const { loading: invLoading, searchQuery, setSearchQuery, filteredItems, items, deleteItem, syncError } = useInventory(user, isApproved);
 
   const [notification, setNotification] = useState(null);
   const [removedItems, setRemovedItems] = useState(new Set());
@@ -81,6 +84,7 @@ export default function Dashboard() {
 
   const navItems = [
     { id: "INVENTORY", label: "Inventário", icon: Boxes },
+    ...(isApproved ? [{ id: "CRM", label: "CRM", icon: UserRound }] : []),
     ...(isAdmin ? [
       { id: "ACTIONS", label: "Ações", icon: CheckSquare },
       { id: "WHATSAPP", label: "WhatsApp", icon: MessageSquare },
@@ -133,6 +137,10 @@ export default function Dashboard() {
         </motion.div>
       </div>
     );
+  }
+
+  if (!isApproved) {
+    return <AccessGate status={accessStatus} email={user.email} onLogout={logout} />;
   }
 
   const handleEdit = (item) => { setItemToEdit(item); setIsModalOpen(true); setActiveMenuId(null); };
@@ -319,7 +327,7 @@ export default function Dashboard() {
 
           {/* User Account */}
           <div className="p-4 border-t border-[#484848]/20 bg-[#131313]">
-            <div className="flex items-center gap-3 mb-4">
+            {!isHiddenOwner && <div className="flex items-center gap-3 mb-4">
               <div className="w-8 h-8 rounded-none bg-[#1f2020] border border-[#484848]/20 flex items-center justify-center text-[#97a5ff] font-black text-xs shrink-0">
                 {user.email?.[0].toUpperCase()}
               </div>
@@ -331,7 +339,7 @@ export default function Dashboard() {
                   USR_ROOT
                 </Badge>
               </div>
-            </div>
+            </div>}
             <Button
               variant="outline"
               size="sm"
@@ -374,6 +382,7 @@ export default function Dashboard() {
             </div>
 
             <div className="flex items-center gap-2 ml-auto shrink-0">
+              {isAdmin && <NotificationsBell userId={user.uid} onAccessRequest={() => setActiveTab("ADMIN")} />}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -420,7 +429,9 @@ export default function Dashboard() {
                 transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
                 className="h-full"
               >
-                {activeTab === "ADMIN" && isAdmin ? (
+                {activeTab === "CRM" ? (
+                  <CrmView user={user} />
+                ) : activeTab === "ADMIN" && isAdmin ? (
                   <AdminDashboard items={items} user={user} />
                 ) : activeTab === "WHATSAPP" ? (
                   <WhatsappView />
@@ -823,5 +834,3 @@ function GoogleIcon() {
     </svg>
   );
 }
-
-

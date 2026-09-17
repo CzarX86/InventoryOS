@@ -24,6 +24,13 @@ import {
 } from "./crmDomain";
 import { processHardwareInterests } from "./hardwareResolution";
 import { processPendingContactClassifications } from "./whatsappClassification";
+import {
+  ensureAccessAdmin,
+  getAccessConfig,
+  initializeAccessProfile as initializeAccessProfileRecord,
+  listAccessUsers as listAccessUsersData,
+  updateAccessStatus,
+} from "./accessControl";
 
 
 
@@ -33,16 +40,37 @@ import { processPendingContactClassifications } from "./whatsappClassification";
  * Helper to ensure user is an admin for onCall functions.
  */
 async function ensureAdmin(auth: any) {
-  if (!auth) {
-    throw new HttpsError("unauthenticated", "Authentication required");
-  }
+  await ensureAccessAdmin(auth, getFirestore());
+}
 
-  const db = getFirestore();
-  const userDoc = await db.collection("users").doc(auth.uid).get();
-  
-  if (!userDoc.exists || userDoc.data()?.role !== "admin") {
-    throw new HttpsError("permission-denied", "Admin role required");
-  }
+function normalizePhoneDigits(value: any) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+async function findLinkedCrmContact(db: FirebaseFirestore.Firestore, workspaceId: string, remoteJid: string) {
+  if (!workspaceId || !remoteJid) return null;
+
+  const exactSnapshot = await db.collection("contacts")
+    .where("workspaceId", "==", workspaceId)
+    .where("whatsappRemoteJid", "==", remoteJid)
+    .limit(1)
+    .get();
+  if (!exactSnapshot.empty) return exactSnapshot.docs[0];
+
+  const phoneDigits = normalizePhoneDigits(remoteJid.split("@")[0]);
+  if (!phoneDigits) return null;
+  const phoneSnapshot = await db.collection("contacts")
+    .where("workspaceId", "==", workspaceId)
+    .where("phoneDigits", "==", phoneDigits)
+    .limit(1)
+    .get();
+  return phoneSnapshot.empty ? null : phoneSnapshot.docs[0];
+}
+
+function parseOptionalDate(value: any) {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 /**
@@ -718,6 +746,7 @@ export const onWhatsappMessageCreated = onDocumentCreated({
  */
 async function processPendingWhatsappBatches() {
   const db = getFirestore();
+  const { workspaceId } = await getAccessConfig(db);
   const pendingMessagesSnap = await db.collection("whatsapp_messages")
     .where("extracted", "in", ["pending_batch", "waiting_context"])
     .orderBy("timestamp", "asc")
@@ -824,8 +853,18 @@ async function processPendingWhatsappBatches() {
        }
 
        const extractedData = runResult.output;
+       const linkedContactSnapshot = await findLinkedCrmContact(db, workspaceId, remoteJid);
+       const linkedContact = linkedContactSnapshot?.data() || null;
+       const linkedContactId = linkedContactSnapshot?.id || null;
+       const linkedCompanyId = linkedContact?.companyId || null;
+       const sourceMessageIds = messages.map((message: any) => message.id);
+       const lastMessageDate = new Date(lastMessageTime);
+       const extractedNextContactAt = parseOptionalDate(extractedData.nextContactDate);
+       const nextContactAt = linkedContact?.nextContactSource === "manual"
+         ? null
+         : (extractedNextContactAt || new Date(lastMessageTime + (10 * 24 * 60 * 60 * 1000)));
        const crmBatch = db.batch();
-       const ownershipContext = { ownerId: "system", defaultAccountId: "system" }; // Simplified context for AI automated runs
+       const ownershipContext = { ownerId: "system", defaultAccountId: workspaceId, workspaceId }; // Server-owned automation in the shared workspace
 
        // 3.1 Save Extracted Transactions (Inventory)
        if (extractedData.inventoryTransactions?.length > 0) {
@@ -844,7 +883,7 @@ async function processPendingWhatsappBatches() {
                model: runResult.model,
                batchMessageIds: messages.map((m: any) => m.id) 
              }
-           });
+           }, ownershipContext);
            crmBatch.set(extractionRef, extractionRecord);
          });
        }
@@ -855,6 +894,8 @@ async function processPendingWhatsappBatches() {
            const oppRef = db.collection(CRM_COLLECTIONS.opportunities).doc();
            const oppRecord = createOpportunityRecord({
              ...opp,
+             contactId: opp.contactId || linkedContactId,
+             companyId: opp.companyId || linkedCompanyId,
              remoteJid: remoteJid, // Link to whatsapp
              _lineage: { aiRunId: runResult.runId }
            }, ownershipContext);
@@ -868,6 +909,12 @@ async function processPendingWhatsappBatches() {
            const taskRef = db.collection(CRM_COLLECTIONS.tasks).doc();
            const taskRecord = createTaskRecord({
              ...task,
+             contactId: task.contactId || linkedContactId,
+             companyId: task.companyId || linkedCompanyId,
+             dueAt: task.dueAt || (Number.isFinite(Number(task.dueDaysFromNow))
+               ? new Date(now + (Number(task.dueDaysFromNow) * 24 * 60 * 60 * 1000))
+               : null),
+             sourceMessageIds,
              remoteJid: remoteJid, // Link to whatsapp
              _lineage: { aiRunId: runResult.runId }
            }, ownershipContext);
@@ -882,6 +929,11 @@ async function processPendingWhatsappBatches() {
            const evtRef = db.collection(CRM_COLLECTIONS.crmEvents).doc();
            const evtRecord = createCrmEventRecord({
              ...evt,
+             contactId: evt.contactId || linkedContactId,
+             companyId: evt.companyId || linkedCompanyId,
+             channelType: "whatsapp",
+             source: "whatsapp",
+             sourceMessageIds: evt.sourceMessageIds?.length ? evt.sourceMessageIds : sourceMessageIds,
              remoteJid: remoteJid, // Link to whatsapp
              _lineage: { aiRunId: runResult.runId }
            }, ownershipContext);
@@ -889,12 +941,44 @@ async function processPendingWhatsappBatches() {
          });
        }
 
+       // Every processed WhatsApp batch becomes a timeline entry when it can be linked to a CRM contact.
+       if (linkedContactId) {
+         const interactionRef = db.collection(CRM_COLLECTIONS.crmEvents).doc();
+         crmBatch.set(interactionRef, createCrmEventRecord({
+           contactId: linkedContactId,
+           companyId: linkedCompanyId,
+           eventType: "contact_interaction",
+           channelType: "whatsapp",
+           source: "whatsapp",
+           remoteJid,
+           occurredAt: lastMessageDate,
+           nextContactAt,
+           sourceMessageIds,
+           summary: extractedData.summary || "Interação recebida pelo WhatsApp.",
+           confidence: extractedData.confidence ?? null,
+           _lineage: { aiRunId: runResult.runId },
+         }, ownershipContext));
+
+         const contactUpdate: Record<string, any> = {
+           lastContactAt: lastMessageDate,
+           updatedAt: FieldValue.serverTimestamp(),
+         };
+         if (nextContactAt) {
+           contactUpdate.nextContactAt = nextContactAt;
+           contactUpdate.nextContactSource = "ai";
+           contactUpdate.followUpStatus = "green";
+         }
+         crmBatch.update(db.collection("contacts").doc(linkedContactId), contactUpdate);
+       }
+
        // 3.5 Process Hardware Interests
        if (extractedData.interests?.length > 0) {
          await processHardwareInterests(
            extractedData.interests.map((it: any) => ({ ...it, name: it.catalogItemId })),
-           { 
-             remoteJid, 
+           {
+             remoteJid,
+             contactId: linkedContactId,
+             companyId: linkedCompanyId,
              aiRunId: runResult.runId, 
              ownership: ownershipContext 
            }
@@ -960,7 +1044,7 @@ async function processPendingWhatsappBatches() {
  */
 export const scheduledWhatsappBatchProcess = onSchedule({
   schedule: "every 20 minutes",
-  secrets: ["GEMINI_API_KEY", "DEEPSEEK_API_KEY"]
+  secrets: ["GEMINI_API_KEY", "DEEPSEEK_API_KEY", "PLATFORM_WORKSPACE_ID"]
 }, withEventErrorHandling(async (event: ScheduledEvent, logger: any) => {
   logger.info("Starting scheduled whatsapp batch process");
   await processPendingWhatsappBatches();
@@ -972,7 +1056,7 @@ export const scheduledWhatsappBatchProcess = onSchedule({
  * Manual trigger for testing the batch processing
  */
 export const triggerWhatsappBatch = onCall({
-  secrets: ["GEMINI_API_KEY", "DEEPSEEK_API_KEY"]
+  secrets: ["GEMINI_API_KEY", "DEEPSEEK_API_KEY", "PLATFORM_WORKSPACE_ID"]
 }, withCallErrorHandling(async (request: any, logger: any) => {
   await ensureAdmin(request.auth);
   logger.info("Manual trigger for whatsapp batch process");
@@ -987,6 +1071,34 @@ export const triggerWhatsappBatch = onCall({
     extraction: extractionResult, 
     classification: classificationResult 
   };
+}));
+
+/**
+ * Access control lifecycle. These functions are the only client entry point
+ * for creating profiles and changing approval state.
+ */
+export const initializeAccessProfile = onCall({
+  secrets: ["PLATFORM_OWNER_EMAIL", "PLATFORM_WORKSPACE_ID"],
+}, withCallErrorHandling(async (request: any) => {
+  return initializeAccessProfileRecord(request.auth);
+}));
+
+export const listAccessUsers = onCall({
+  secrets: ["PLATFORM_WORKSPACE_ID"],
+}, withCallErrorHandling(async (request: any) => {
+  return listAccessUsersData(request.auth, request.data?.status);
+}));
+
+export const approveAccessRequest = onCall({
+  secrets: ["PLATFORM_WORKSPACE_ID"],
+}, withCallErrorHandling(async (request: any) => {
+  return updateAccessStatus(request.auth, request.data?.targetUid, "approved");
+}));
+
+export const revokeAccess = onCall({
+  secrets: ["PLATFORM_WORKSPACE_ID"],
+}, withCallErrorHandling(async (request: any) => {
+  return updateAccessStatus(request.auth, request.data?.targetUid, "revoked");
 }));
 
 

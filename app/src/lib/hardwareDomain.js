@@ -123,6 +123,8 @@ export function createInventoryItemRecord(payload = {}, ownershipContext = {}) {
 export function createInstalledBaseRecord(payload = {}, ownershipContext = {}) {
   return buildBaseRecord("installed_base_item", {
     accountId: payload.accountId || ownershipContext?.defaultAccountId || null,
+    companyId: payload.companyId || null,
+    contactId: payload.contactId || null,
     crmAccountId: payload.crmAccountId || null,
     crmContactId: payload.crmContactId || null,
     catalogItemId: payload.catalogItemId || null,

@@ -6,10 +6,12 @@ export function buildDefaultAccountId(ownerId: string | null) {
 export function buildOwnershipContext(user: any = null) {
   const ownerId = user?.ownerId || user?.uid || null;
   const defaultAccountId = user?.defaultAccountId || buildDefaultAccountId(ownerId);
+  const workspaceId = user?.workspaceId || defaultAccountId || null;
 
   return {
     ownerId,
     defaultAccountId,
+    workspaceId,
   };
 }
 
@@ -18,6 +20,7 @@ export function applyOwnershipContext(payload: any = {}, context: any = {}) {
     ...payload,
     ownerId: context?.ownerId || null,
     accountId: payload?.accountId || context?.defaultAccountId || null,
+    workspaceId: payload?.workspaceId || context?.workspaceId || context?.defaultAccountId || null,
   };
 }
 

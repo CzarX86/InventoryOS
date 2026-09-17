@@ -7,6 +7,7 @@ describe("Unified Business Extraction Prompt", () => {
     expect(UNIFIED_BUSINESS_EXTRACTION_PROMPT).toContain("tasks");
     expect(UNIFIED_BUSINESS_EXTRACTION_PROMPT).toContain("events");
     expect(UNIFIED_BUSINESS_EXTRACTION_PROMPT).toContain("interests");
+    expect(UNIFIED_BUSINESS_EXTRACTION_PROMPT).toContain("nextContactDate");
   });
 
   it("handles the structured output request correctly", () => {

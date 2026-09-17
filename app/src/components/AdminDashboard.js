@@ -12,6 +12,7 @@ import AdminUsageStats from "@/components/AdminUsageStats";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import AccessManagement from "@/components/AccessManagement";
 
 function extractTimestampValue(value) {
   if (!value) return 0;
@@ -61,6 +62,10 @@ export default function AdminDashboard({ items = [], user = null }) {
   const [updatingErrorId, setUpdatingErrorId] = useState(null);
   const [loading, setLoading] = useState(true);
   const { flags, enabledCount } = useFeatureFlags(user);
+  const displayActorId = (actorId, fallback = "system") => {
+    if (!actorId || (user?.isHiddenOwner && actorId === user.uid)) return fallback;
+    return actorId.slice(0, 8);
+  };
 
   useEffect(() => {
     if (!db) return;
@@ -182,6 +187,8 @@ export default function AdminDashboard({ items = [], user = null }) {
           <AdminUsageStats />
         </div>
 
+        <AccessManagement currentUser={user} />
+
         {/* Inventory Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {/* Using tonal layering instead of shadows and borders */}
@@ -276,7 +283,7 @@ export default function AdminDashboard({ items = [], user = null }) {
                       <TableCell>
                         <div className="flex flex-col">
                           <span className="font-display font-normal uppercase tracking-wider text-[11px]">{task.taskType}</span>
-                          <span className="text-[10px] font-mono text-muted-foreground/60 uppercase">Actor: {task.actorId?.slice(0, 8)}</span>
+                          <span className="text-[10px] font-mono text-muted-foreground/60 uppercase">Actor: {displayActorId(task.actorId)}</span>
                         </div>
                       </TableCell>
                       <TableCell className="font-mono text-[9px] text-muted-foreground/40 hidden md:table-cell uppercase">
@@ -332,7 +339,7 @@ export default function AdminDashboard({ items = [], user = null }) {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-foreground/5 border border-foreground/5">
                       <div className="bg-[#191a1a] p-4">
                         <p className="text-[9px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground mb-2 opacity-50">Origin_User</p>
-                        <p className="font-mono text-[11px] truncate">{report.userEmail || report.userId || "UNDEFINED"}</p>
+                        <p className="font-mono text-[11px] truncate">{user?.isHiddenOwner && (report.userId === user.uid || report.userEmail === user.email) ? "SYSTEM" : (report.userEmail || report.userId || "UNDEFINED")}</p>
                       </div>
                       <div className="bg-[#191a1a] p-4">
                         <p className="text-[9px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground mb-2 opacity-50">Stack_Trace</p>
@@ -403,7 +410,7 @@ export default function AdminDashboard({ items = [], user = null }) {
                           {activity.targetType}/{activity.targetId?.slice(0, 8)}…
                         </TableCell>
                         <TableCell className="hidden md:table-cell text-[10px] font-mono text-muted-foreground/30 uppercase">
-                          User: {activity.actorId?.slice(0, 8) || "system"}
+                          User: {displayActorId(activity.actorId)}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-3">
@@ -461,7 +468,7 @@ export default function AdminDashboard({ items = [], user = null }) {
                         </span>
                       </TableCell>
                       <TableCell className="font-mono text-[10px] text-muted-foreground/30 hidden md:table-cell uppercase">
-                        Origin: {log.userId?.slice(0, 8) || "Global"}
+                        Origin: {displayActorId(log.userId, "Global")}
                       </TableCell>
                       <TableCell className="font-mono text-[10px] max-w-[300px] truncate text-muted-foreground/60 uppercase">
                         {JSON.stringify(log.metadata)}

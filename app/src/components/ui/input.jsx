@@ -2,9 +2,10 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
+/** @param {React.InputHTMLAttributes<HTMLInputElement> & { className?: string, type?: string }} props */
 function Input({
-  className,
-  type,
+  className = "",
+  type = "text",
   ...props
 }) {
   return (
