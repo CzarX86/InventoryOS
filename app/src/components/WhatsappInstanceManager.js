@@ -23,6 +23,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
+import { AI_STATUS_LABELS, WHATSAPP_EVENT_STATUS_LABELS, uiLabel } from "@/lib/uiText";
 
 export default function WhatsappInstanceManager() {
   const [instances, setInstances] = useState([]);
@@ -289,11 +290,11 @@ export default function WhatsappInstanceManager() {
     <div className="flex flex-col gap-6 p-4 md:p-8 bg-[#0e0e0e]">
       {/* Header & Create */}
       <div className="border border-[#484848]/20 bg-[#131313] relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-3 text-[8px] font-mono text-[#484848] uppercase tracking-widest">WAPP_INSTANCE_CONTROLLER</div>
+        <div className="absolute top-0 right-0 p-3 text-[8px] font-mono text-[#484848] uppercase tracking-widest">CONTROLADOR_DE_INSTÂNCIAS_WHATSAPP</div>
         <div className="p-8 flex flex-col md:flex-row md:items-center justify-between gap-8 relative z-10">
           <div className="space-y-2">
             <Badge variant="outline" className="h-5 px-2 bg-[#1f2020] text-[#97a5ff] border-[#484848]/20 text-[9px] font-normal uppercase tracking-[0.2em] rounded-none font-display">
-              OPS_INITIATOR
+              INICIADOR_DE_OPERAÇÕES
             </Badge>
             <h2 className="text-2xl font-normal uppercase tracking-tighter text-[#e7e5e5] font-display">INSTÂNCIAS_<span className="text-[#acabaa]/30">WHATSAPP</span></h2>
             <p className="text-[10px] text-[#acabaa]/40 font-mono uppercase tracking-widest">PROTOCOLO_DE_CONEXÃO_MULTI_DISPOSITIVO</p>
@@ -306,7 +307,7 @@ export default function WhatsappInstanceManager() {
               </div>
               <Input
                 type="text"
-                placeholder="ID_INSTÂNCIA (ALPHA_NUM)"
+                placeholder="ID_DA_INSTÂNCIA (ALFANUMÉRICO)"
                 value={newInstanceName}
                 onChange={(e) => setNewInstanceName(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ""))}
                 className="w-full md:w-64 font-mono text-xs uppercase tracking-tight h-12 border-0 bg-transparent focus-visible:ring-0 rounded-none text-[#e7e5e5]"
@@ -322,7 +323,7 @@ export default function WhatsappInstanceManager() {
               ) : (
                 <Plus size={14} className="mr-3" />
               )}
-              PROLONG_STORAGE
+              CRIAR_INSTÂNCIA
             </Button>
           </div>
         </div>
@@ -332,7 +333,7 @@ export default function WhatsappInstanceManager() {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {instances.length === 0 ? (
           <div className="col-span-full border border-dashed border-[#484848]/20 bg-transparent p-12 text-center rounded-none">
-            <p className="text-[10px] font-normal uppercase tracking-[0.3em] text-[#acabaa]/30 font-display">SYSTEM_EMPTY: NO_ACTIVE_INSTANCES</p>
+            <p className="text-[10px] font-normal uppercase tracking-[0.3em] text-[#acabaa]/30 font-display">SISTEMA_VAZIO: NENHUMA_INSTÂNCIA_ATIVA</p>
           </div>
         ) : (
           instances.map((inst) => {
@@ -361,7 +362,7 @@ export default function WhatsappInstanceManager() {
                       <h3 className="text-lg font-normal uppercase tracking-tighter text-[#e7e5e5] font-display">{instanceName}</h3>
                       <div className="flex items-center gap-3 mt-1.5">
                         <Badge variant="outline" className={`h-4 px-2 text-[8px] font-bold uppercase tracking-[0.2em] rounded-none font-mono ${isConnected ? "border-emerald-500/20 text-emerald-500" : "border-amber-500/20 text-amber-500"}`}>
-                          {isConnected ? "STABLE_CONNECTION" : "LINK_REQUIRED"}
+                          {isConnected ? "CONEXÃO_ESTÁVEL" : "CONEXÃO_NECESSÁRIA"}
                         </Badge>
                       </div>
                     </div>
@@ -376,11 +377,12 @@ export default function WhatsappInstanceManager() {
                           onClick={() => handleDeleteInstance(instanceName)}
                           className="h-9 px-4 text-[8px] font-normal uppercase tracking-widest rounded-none bg-[#7f2927] hover:bg-[#9e3330] transition-none font-display"
                         >
-                          CONFIRM_PURGE
+                          CONFIRMAR_EXCLUSÃO
                         </Button>
                         <Button 
                           size="icon"
                           variant="ghost"
+                          aria-label="Cancelar exclusão da instância"
                           onClick={() => setConfirmDelete(null)}
                           className="h-9 w-9 bg-[#1f2020] text-[#acabaa] rounded-none hover:bg-[#2a2b2b] transition-none"
                         >
@@ -392,6 +394,7 @@ export default function WhatsappInstanceManager() {
                         <Button 
                             variant="ghost"
                             size="icon"
+                            aria-label={pausedInstances[instanceName] ? "Retomar instância" : "Pausar instância"}
                             onClick={() => toggleInstancePause(instanceName)}
                             className={`h-10 w-10 rounded-none border border-transparent transition-none ${pausedInstances[instanceName] ? "text-amber-500 bg-amber-500/10 border-amber-500/20" : "text-[#acabaa]/40 hover:text-[#e7e5e5] hover:bg-[#1f2020]"}`}
                         >
@@ -401,6 +404,7 @@ export default function WhatsappInstanceManager() {
                         <Button 
                           variant="ghost"
                           size="icon"
+                          aria-label="Configurar webhook da instância"
                           onClick={() => handleSetWebhook(instanceName)}
                           className={`h-10 w-10 rounded-none border border-transparent transition-none ${isConnected ? "text-emerald-500 bg-emerald-500/10 border-emerald-500/20" : "text-[#acabaa]/40 hover:text-[#e7e5e5] hover:bg-[#1f2020]"}`}
                         >
@@ -410,6 +414,7 @@ export default function WhatsappInstanceManager() {
                         <Button 
                           variant="ghost"
                           size="icon"
+                          aria-label="Sincronizar grupos da instância"
                           onClick={() => handleSyncGroups(instanceName)}
                           className="h-10 w-10 rounded-none text-[#acabaa]/40 hover:text-emerald-500 hover:bg-emerald-500/10 hover:border-emerald-500/20 border border-transparent transition-none"
                         >
@@ -419,6 +424,7 @@ export default function WhatsappInstanceManager() {
                         <Button 
                           variant="ghost"
                           size="icon"
+                          aria-label="Excluir instância"
                           onClick={() => setConfirmDelete(instanceName)}
                           className="h-10 w-10 rounded-none text-[#acabaa]/40 hover:text-red-500 hover:bg-red-500/10 hover:border-red-500/20 border border-transparent transition-none"
                         >
@@ -444,7 +450,7 @@ export default function WhatsappInstanceManager() {
                           ) : (
                             <>
                               {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={qrCode} alt="WhatsApp QR Code" className="h-48 w-48" />
+                          <img src={qrCode} alt="Código QR do WhatsApp" className="h-48 w-48" />
                               <div className="mt-6 px-4 py-1.5 bg-[#0e0e0e] text-[#e7e5e5] text-[10px] font-normal uppercase tracking-[0.2em] rounded-none font-display border border-primary/20 anim-pulse">
 
                                 AGUARDANDO_ESCANEAMENTO
@@ -458,20 +464,20 @@ export default function WhatsappInstanceManager() {
                           className="w-full h-14 bg-emerald-600 hover:bg-emerald-500 text-[#0e0e0e] font-normal uppercase tracking-[0.3em] rounded-none transition-none font-display text-xs"
                         >
                           <QrCode size={18} className="mr-3" />
-                          INIT_CONNECT_SEQUENCE
+                          INICIAR_CONEXÃO
                         </Button>
                       )}
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 gap-4">
                         <div className="bg-[#1f2020] p-4 rounded-none border border-[#484848]/10 flex flex-col gap-2">
-                          <span className="text-[9px] font-bold uppercase tracking-widest text-[#acabaa]/30 font-mono">BATERIA_LVL</span>
+                          <span className="text-[9px] font-bold uppercase tracking-widest text-[#acabaa]/30 font-mono">NÍVEL_DA_BATERIA</span>
                           <span className="text-sm font-bold text-[#e7e5e5] font-mono">
                             {inst.battery !== undefined && inst.battery !== null ? `${inst.battery}%` : (inst.instance?.batteryLevel ?? "---")}
                           </span>
                         </div>
                         <div className="bg-[#1f2020] p-4 rounded-none border border-[#484848]/10 flex flex-col gap-2">
-                          <span className="text-[9px] font-bold uppercase tracking-widest text-[#acabaa]/30 font-mono">OS_ARCH_TYPE</span>
+                          <span className="text-[9px] font-bold uppercase tracking-widest text-[#acabaa]/30 font-mono">TIPO_DE_PLATAFORMA</span>
                           <span className="text-sm font-bold text-[#e7e5e5] uppercase font-mono tracking-tighter">
                             {inst.platform || inst.instance?.platform || "---"}
                           </span>
@@ -482,7 +488,7 @@ export default function WhatsappInstanceManager() {
                           className="col-span-2 h-12 mt-4 font-normal uppercase tracking-[0.25em] border-[#7f2927]/20 bg-[#0e0e0e] hover:bg-[#7f2927]/10 text-[#ee7d77] rounded-none transition-none font-display text-[10px]"
                         >
                           <LogOut size={16} className="mr-3" />
-                          EXIT_INSTANCE_SESSION
+                          ENCERRAR_SESSÃO_DA_INSTÂNCIA
                         </Button>
                       </div>
                   )}
@@ -502,7 +508,7 @@ export default function WhatsappInstanceManager() {
             </div>
             <div className="flex-1">
               <p className="text-[10px] font-normal uppercase tracking-[0.25em] text-[#acabaa]/40 mb-2 font-display">
-                SYSTEM_EVENT:// {notification.type === "error" ? "CRITICAL_ERROR" : "OP_SUCCESS"}
+                EVENTO_DO_SISTEMA:// {notification.type === "error" ? "ERRO_CRÍTICO" : "OPERAÇÃO_CONCLUÍDA"}
               </p>
               <p className="text-sm font-bold text-[#e7e5e5] uppercase font-mono leading-tight tracking-tight">
                 {notification.message}
@@ -521,12 +527,12 @@ export default function WhatsappInstanceManager() {
               <h2 className="text-sm font-normal uppercase tracking-[0.4em] text-[#e7e5e5] font-display">
                 MONITOR_ATIVIDADE_GLOBAL
               </h2>
-              <p className="text-[9px] font-mono uppercase tracking-widest text-[#acabaa]/30 mt-1">REALTIME_EVENT_STREAM_V2</p>
+            <p className="text-[9px] font-mono uppercase tracking-widest text-[#acabaa]/30 mt-1">FLUXO_DE_EVENTOS_EM_TEMPO_REAL_V2</p>
             </div>
           </div>
           <div className="flex items-center gap-3 px-4 py-2 bg-[#0e0e0e] border border-emerald-500/20 relative z-10">
             <span className="w-1.5 h-1.5 rounded-none bg-emerald-500 animate-pulse" />
-            <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-emerald-500 font-mono">LINK_ACTIVE</span>
+            <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-emerald-500 font-mono">CONEXÃO_ATIVA</span>
           </div>
         </div>
         
@@ -535,10 +541,10 @@ export default function WhatsappInstanceManager() {
             <TableHeader className="bg-[#1f2020] border-b border-[#484848]/20">
               <TableRow className="hover:bg-transparent border-none h-14">
                 <TableHead className="w-12"></TableHead>
-                <TableHead className="text-[9px] font-normal uppercase tracking-[0.2em] text-[#acabaa]/40 font-display">TYPE_ID</TableHead>
-                <TableHead className="text-[9px] font-normal uppercase tracking-[0.2em] text-[#acabaa]/40 font-display">ENDPOINT_CONTEXT</TableHead>
-                <TableHead className="text-[9px] font-normal uppercase tracking-[0.2em] text-[#acabaa]/40 font-display">PROCESSING_STATE</TableHead>
-                <TableHead className="text-right text-[9px] font-normal uppercase tracking-[0.2em] text-[#acabaa]/40 font-display">TIMESTAMP</TableHead>
+                <TableHead className="text-[9px] font-normal uppercase tracking-[0.2em] text-[#acabaa]/40 font-display">TIPO_ID</TableHead>
+                <TableHead className="text-[9px] font-normal uppercase tracking-[0.2em] text-[#acabaa]/40 font-display">CONTEXTO_DO_ENDPOINT</TableHead>
+                <TableHead className="text-[9px] font-normal uppercase tracking-[0.2em] text-[#acabaa]/40 font-display">ESTADO_DO_PROCESSAMENTO</TableHead>
+                <TableHead className="text-right text-[9px] font-normal uppercase tracking-[0.2em] text-[#acabaa]/40 font-display">DATA_E_HORA</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -566,7 +572,7 @@ export default function WhatsappInstanceManager() {
                         <TableCell>
                           <div className="flex flex-col gap-1.5">
                             <span className="text-[10px] font-normal uppercase tracking-tight group-hover:text-[#97a5ff] text-[#e7e5e5] font-display">
-                              {event.eventType || "MESSAGES_UPSERT"}
+                              {uiLabel(event.eventType || "MESSAGES_UPSERT", { MESSAGES_UPSERT: "ATUALIZAÇÃO_DE_MENSAGENS" })}
                             </span>
                             <span className="text-[8px] font-mono uppercase tracking-widest text-[#acabaa]/30 font-bold">UID_{event.id.slice(-8)}</span>
                           </div>
@@ -599,7 +605,7 @@ export default function WhatsappInstanceManager() {
                               event.status === "failed" ? "bg-red-500/10 text-red-500" :
                               "bg-[#1f2020] text-[#acabaa]/40"
                             }`}>
-                              {event.status === "processed" ? "SYNC_COMPLETE" : (event.status ? event.status.toUpperCase() : "RECEIVED")}
+                              {uiLabel(event.status || "received", WHATSAPP_EVENT_STATUS_LABELS)}
                             </Badge>
                             
                             {event.payload?.data?.message && (
@@ -609,8 +615,8 @@ export default function WhatsappInstanceManager() {
                                 "bg-[#1f2020] text-[#acabaa]/20"
                               }`}>
                                 <Bot size={10} />
-                                {event.aiExtractionStatus === "processed" ? (event.aiClassification ? event.aiClassification.toUpperCase() : "EXTRACTED") : 
-                                 event.aiExtractionStatus === "failed" ? "ENGINE_ERR" : "QUEUE_ACTIVE"}
+                                {event.aiExtractionStatus === "processed" ? (event.aiClassification ? uiLabel(event.aiClassification, AI_STATUS_LABELS) : "EXTRAÍDO") :
+                                 event.aiExtractionStatus === "failed" ? "FALHA_NO_MOTOR" : "NA_FILA"}
                               </Badge>
                             )}
                           </div>
@@ -633,8 +639,8 @@ export default function WhatsappInstanceManager() {
                             <div className="flex flex-col gap-8 animate-in fade-in duration-200">
                               {previewText && (
                                 <div className="p-6 bg-[#0e0e0e] border border-[#484848]/20 rounded-none relative">
-                                  <div className="absolute top-0 right-0 p-2 text-[7px] font-mono text-[#484848] uppercase tracking-[0.4em]">RAW_STRING_BUFFER</div>
-                                  <span className="text-[9px] font-normal uppercase tracking-[0.2em] text-[#97a5ff] mb-4 block font-display">PREVIEW_DE_FRAGMENTO</span>
+                                  <div className="absolute top-0 right-0 p-2 text-[7px] font-mono text-[#484848] uppercase tracking-[0.4em]">BUFFER_DE_TEXTO_BRUTO</div>
+                                  <span className="text-[9px] font-normal uppercase tracking-[0.2em] text-[#97a5ff] mb-4 block font-display">VISUALIZAÇÃO_DE_FRAGMENTO</span>
                                   <p className="text-sm text-[#e7e5e5]/80 font-mono leading-relaxed border-l-2 border-[#484848]/40 pl-4">{previewText}</p>
                                 </div>
                               )}
@@ -646,12 +652,12 @@ export default function WhatsappInstanceManager() {
                                       <Bot size={18}/>
                                     </div>
                                     <div className="flex flex-col">
-                                      <span className="text-[9px] font-normal uppercase tracking-widest text-[#acabaa]/40 font-display">ENGINE_CLASSIFIER</span>
-                                      <span className="text-xs font-bold text-[#e7e5e5] uppercase font-mono">{event.aiExtraction ? "OPTIMIZED_EXTRACTION" : "WAITING_IN_BUFFER..."}</span>
+                                      <span className="text-[9px] font-normal uppercase tracking-widest text-[#acabaa]/40 font-display">CLASSIFICADOR_DO_MOTOR</span>
+                                      <span className="text-xs font-bold text-[#e7e5e5] uppercase font-mono">{event.aiExtraction ? "EXTRAÇÃO_OTIMIZADA" : "AGUARDANDO_NA_FILA..."}</span>
                                     </div>
                                   </div>
                                   <Button variant="outline" size="sm" className="h-9 px-6 text-[8px] font-normal uppercase tracking-widest rounded-none border-[#484848]/20 font-display transition-none hover:bg-[#1f2020]">
-                                    <Eye size={14} className="mr-2" /> REVISAR_LOG
+                                    <Eye size={14} className="mr-2" /> REVISAR_REGISTRO
                                   </Button>
                                 </div>
 
@@ -662,7 +668,7 @@ export default function WhatsappInstanceManager() {
                                         <Users size={18}/>
                                       </div>
                                       <div className="flex flex-col min-w-0">
-                                        <span className="text-[9px] font-normal uppercase tracking-widest text-[#acabaa]/40 font-display">MONITOR_POLICY</span>
+                                        <span className="text-[9px] font-normal uppercase tracking-widest text-[#acabaa]/40 font-display">POLÍTICA_DE_MONITORAMENTO</span>
                                         <span className="text-xs font-bold text-[#e7e5e5] uppercase font-mono truncate">{contact.groupName}</span>
                                       </div>
                                     </div>
@@ -673,7 +679,7 @@ export default function WhatsappInstanceManager() {
                                       className={`h-9 px-6 text-[8px] font-normal uppercase tracking-widest rounded-none transition-none font-display ${ignoredGroups[contact.groupId] ? "bg-amber-600 hover:bg-amber-500 text-[#0e0e0e] border-none" : "border-[#484848]/20 hover:bg-[#1f2020]"}`}
                                     >
                                       {actionLoading === `group-${contact.groupId}` ? <Loader2 size={12} className="animate-spin" /> : (ignoredGroups[contact.groupId] ? <PlayCircle size={14} className="mr-2" /> : <PowerOff size={14} className="mr-2" />)}
-                                      {ignoredGroups[contact.groupId] ? "ENABLE_LISTEN" : "MUTE_DOMAIN"}
+                                      {ignoredGroups[contact.groupId] ? "ATIVAR_MONITORAMENTO" : "SILENCIAR_GRUPO"}
                                     </Button>
                                   </div>
                                 )}
@@ -681,7 +687,7 @@ export default function WhatsappInstanceManager() {
 
                               <div className="space-y-3">
                                 <div className="flex justify-between items-center px-1">
-                                  <span className="text-[9px] font-normal uppercase tracking-[0.25em] text-[#acabaa]/20 font-display">METADATA_EXTRACT_REPT</span>
+                                  <span className="text-[9px] font-normal uppercase tracking-[0.25em] text-[#acabaa]/20 font-display">RELATÓRIO_DE_EXTRAÇÃO_DE_METADADOS</span>
                                   <Button 
                                     variant="ghost" 
                                     size="sm"
@@ -691,7 +697,7 @@ export default function WhatsappInstanceManager() {
                                     }}
                                     className="h-8 text-[8px] font-normal uppercase tracking-widest text-[#acabaa]/30 hover:text-[#e7e5e5] transition-none font-display"
                                   >
-                                    <Copy size={12} className="mr-2" /> CLONE_JSON_NODE
+                                    <Copy size={12} className="mr-2" /> COPIAR_DADOS_JSON
                                   </Button>
                                 </div>
                                 <div className="h-48 w-full border border-[#484848]/10 bg-[#0e0e0e] p-6 font-mono text-[10px] overflow-auto custom-scrollbar">

@@ -18,3 +18,8 @@ InventoryOS is an operational workspace for inventory, customer relationships, a
 - CRM records are grouped by company, with role and locality visible before opening a contact.
 - Every interaction has a channel, date, summary, and next-contact signal. Manual dates take precedence over AI suggestions.
 - Loading, empty, error, and disabled states are visible and do not use browser alerts.
+
+## Language
+
+- All user-facing copy, statuses, empty states, errors, tooltips, and accessibility labels use Brazilian Portuguese (`pt-BR`).
+- Technical identifiers, API names, collection names, and persisted status codes remain unchanged internally; when shown in the interface, known values receive a Portuguese display label.

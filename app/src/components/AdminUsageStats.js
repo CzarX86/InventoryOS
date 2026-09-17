@@ -38,26 +38,26 @@ export default function AdminUsageStats() {
 
   const metrics = [
     {
-      label: "AI_MONTHLY_EXPENDITURE",
+      label: "GASTO_MENSAL_DA_IA",
       value: `US$ ${mtdCost.toFixed(3)}`,
       icon: DollarSign,
       color: "text-emerald-500",
-      detail: "MTD_REALTIME_SYNC",
+      detail: "SINCRONIZAÇÃO_DO_MÊS_EM_TEMPO_REAL",
       live: true
     },
     {
-      label: "PROJECTED_RUNRATE",
+      label: "PROJEÇÃO_MENSAL",
       value: `US$ ${runRate.toFixed(2)}`,
       icon: TrendingUp,
       color: "text-primary",
-      detail: `EST_END_${now.toLocaleString('en-US', { month: 'short' }).toUpperCase()}`
+      detail: `ESTIMATIVA_FIM_${now.toLocaleString('pt-BR', { month: 'short' }).toUpperCase()}`
     },
     {
-      label: "AVG_TASK_UNIT_COST",
+      label: "CUSTO_MÉDIO_POR_TAREFA",
       value: `US$ ${avgCostPerTask.toFixed(4)}`,
       icon: Brain,
       color: "text-primary/60",
-      detail: `${totalTasks}_LOGGED_EXECUTIONS`
+      detail: `${totalTasks}_EXECUÇÕES_REGISTRADAS`
     }
   ];
 
@@ -81,7 +81,7 @@ export default function AdminUsageStats() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
                 </span>
-                <span className="text-[8px] font-display font-normal tracking-widest text-emerald-500 uppercase">Live</span>
+                <span className="text-[8px] font-display font-normal tracking-widest text-emerald-500 uppercase">Ao_vivo</span>
               </div>
             )}
           </div>
@@ -106,4 +106,3 @@ export default function AdminUsageStats() {
     </div>
   );
 }
-

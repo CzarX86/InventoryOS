@@ -31,24 +31,29 @@ import { buildActivityEvent, logInventoryActivity } from "@/lib/audit";
 import { escalateErrorReport, recordAppError, toUserFacingError } from "@/lib/errorReporting";
 import { db } from "@/lib/firebase";
 import { getBrandMeta } from "@/lib/utils";
+import { INVENTORY_STATUS_LABELS } from "@/lib/uiText";
 
 const STATUS_CONFIG = {
   "IN STOCK":  { 
+    label: INVENTORY_STATUS_LABELS["IN STOCK"],
     cls: "text-[#acc3ce]", // on_secondary_container
     dot: "bg-[#8ba1ac]", // secondary
     bg: "bg-[#293e48]"   // secondary_container
   },
   "SOLD":      { 
+    label: INVENTORY_STATUS_LABELS.SOLD,
     cls: "text-[#acabaa]", // on_surface_variant
     dot: "bg-[#484848]", // outline_variant
     bg: "bg-[#191a1a]"   // surface_container
   },
   "REPAIR":    { 
+    label: INVENTORY_STATUS_LABELS.REPAIR,
     cls: "text-[#ee7d77]", // error
     dot: "bg-[#7f2927]", // error_container
     bg: "bg-[#7f2927]/20"
   },
   "RESERVED":  { 
+    label: INVENTORY_STATUS_LABELS.RESERVED,
     cls: "text-[#97a5ff]", // tertiary
     dot: "bg-[#8596ff]", // tertiary_container
     bg: "bg-[#8596ff]/10"
@@ -88,7 +93,7 @@ export default function Dashboard() {
     ...(isAdmin ? [
       { id: "ACTIONS", label: "Ações", icon: CheckSquare },
       { id: "WHATSAPP", label: "WhatsApp", icon: MessageSquare },
-      { id: "ADMIN", label: "Admin", icon: Shield }
+      { id: "ADMIN", label: "Administração", icon: Shield }
     ] : []),
     { id: "SETTINGS", label: "Config.", icon: Settings },
   ];
@@ -336,7 +341,7 @@ export default function Dashboard() {
                   {user.displayName || user.email?.split("@")[0]}
                 </p>
                 <Badge variant="outline" className="h-4 px-1.5 py-0 border-[#97a5ff]/20 text-[#97a5ff] bg-[#97a5ff]/5 text-[10px] font-normal uppercase tracking-widest shadow-none rounded-none font-display">
-                  USR_ROOT
+                  ADMINISTRADOR
                 </Badge>
               </div>
             </div>}
@@ -346,7 +351,7 @@ export default function Dashboard() {
               onClick={logout}
               className="w-full justify-center gap-2 h-8 text-[11px] font-normal uppercase tracking-widest border-[#ee7d77]/10 text-[#ee7d77] hover:bg-[#ee7d77]/10 hover:border-[#ee7d77]/20 transition-none rounded-none font-display"
             >
-              <LogOut size={12} /> TERMINATE_SESSION
+              <LogOut size={12} /> ENCERRAR_SESSÃO
             </Button>
           </div>
         </aside>
@@ -364,7 +369,7 @@ export default function Dashboard() {
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#acabaa]/30 group-focus-within:text-[#97a5ff] transition-none" />
               <Input
                 type="text"
-                placeholder="SEARCH_MANIFEST_DB..."
+                placeholder="BUSCAR_NO_INVENTÁRIO..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 className="pl-10 h-9 bg-[#131313] border-none shadow-none focus-visible:ring-1 focus-visible:ring-[#97a5ff]/20 placeholder:text-[#acabaa]/20 text-[11px] font-normal uppercase tracking-[0.1em] transition-none rounded-none font-display"
@@ -373,6 +378,7 @@ export default function Dashboard() {
                 <Button 
                   variant="ghost" 
                   size="icon" 
+                  aria-label="Limpar pesquisa"
                   onClick={() => setSearchQuery("")}
                   className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-[#acabaa]/30 hover:text-[#e7e5e5] transition-none rounded-none"
                 >
@@ -388,6 +394,7 @@ export default function Dashboard() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    aria-label="Pesquisar por voz"
                     onClick={() => setIsVoiceOpen(true)}
                     className="h-9 w-9 text-muted-foreground/30 hover:text-primary hover:bg-primary/5 transition-all rounded-none"
                   >
@@ -404,12 +411,13 @@ export default function Dashboard() {
                 className="gap-2 bg-[#e7e5e5] hover:bg-[#c6c6c7] text-[#0e0e0e] text-[11px] font-normal uppercase tracking-widest h-9 px-4 shadow-none rounded-none transition-none font-display border border-[#484848]/10"
               >
                 <Plus size={16} />
-                <span className="hidden sm:inline">ADD_NEW_ENTRY</span>
+                <span className="hidden sm:inline">ADICIONAR_ITEM</span>
               </Button>
 
               <Button
                 variant="ghost"
                 size="icon"
+                aria-label="Encerrar sessão"
                 onClick={logout}
                 className="md:hidden h-9 w-9 text-destructive/40 bg-destructive/5 hover:bg-destructive/20 hover:text-destructive transition-all border border-destructive/10 rounded-none"
               >
@@ -628,9 +636,9 @@ function InventoryContent({ items, filteredItems, stats, loading, searchQuery, a
       {/* Industrial Stats Grid */}
       <div className="grid grid-cols-3 border-y border-[#484848]/20 bg-[#131313] divide-x divide-[#484848]/20">
         {[
-          { label: "TOTAL_ATV",      value: stats.total,   color: "text-[#e7e5e5]" },
+          { label: "TOTAL_DE_ITENS",      value: stats.total,   color: "text-[#e7e5e5]" },
           { label: "EM_ESTOQUE",    value: stats.inStock,  color: "text-[#acc3ce]" },
-          { label: "VENDIDOS_LOG",   value: stats.sold,     color: "text-[#acabaa]/40" },
+          { label: "VENDIDOS",   value: stats.sold,     color: "text-[#acabaa]/40" },
         ].map(({ label, value, color }) => (
           <div key={label} className="p-3 md:p-5 space-y-1">
             <p className="text-[10px] font-normal uppercase tracking-[0.2em] text-[#acabaa]/50 font-display">{label}</p>
@@ -673,9 +681,9 @@ function InventoryContent({ items, filteredItems, stats, loading, searchQuery, a
             {/* Desktop Table Header */}
             <div className="hidden md:flex items-center gap-6 px-8 py-3 bg-[#131313] text-[10px] font-normal uppercase tracking-[0.3em] text-[#acabaa]/40 border-b border-[#484848]/10 font-display">
               <span className="flex-1">ESPECIFICAÇÕES_DO_ATIVO</span>
-              <span className="w-32">CATEGORIA_IDX</span>
-              <span className="w-32 px-4">STATUS_FLG</span>
-              <span className="w-10 text-right">ACT</span>
+              <span className="w-32">CATEGORIA</span>
+              <span className="w-32 px-4">STATUS</span>
+              <span className="w-10 text-right">AÇÕES</span>
             </div>
 
             {displayItems.map((item, idx) => (
@@ -719,7 +727,7 @@ function ItemRow({ item, idx, isMenuOpen, onMenuToggle, onEdit, onDelete, onView
       >
         <div className="flex flex-col items-center gap-1 text-white">
           <Share2 size={18} />
-          <span className="text-[10px] font-black uppercase tracking-tighter">SHARE</span>
+            <span className="text-[10px] font-black uppercase tracking-tighter">COMPARTILHAR</span>
         </div>
       </motion.div>
 
@@ -730,7 +738,7 @@ function ItemRow({ item, idx, isMenuOpen, onMenuToggle, onEdit, onDelete, onView
       >
         <div className="flex flex-col items-center gap-1 text-white">
           <Trash2 size={18} />
-          <span className="text-[10px] font-black uppercase tracking-tighter">DELETE</span>
+          <span className="text-[10px] font-black uppercase tracking-tighter">EXCLUIR</span>
         </div>
       </motion.div>
 
@@ -788,7 +796,7 @@ function ItemRow({ item, idx, isMenuOpen, onMenuToggle, onEdit, onDelete, onView
           <div className="w-24 shrink-0 flex items-center gap-2 px-2 font-mono">
             <div className={`w-1 h-1 rounded-none ${status.dot}`} />
             <span className={`text-[10px] font-normal font-display uppercase tracking-[0.1em] ${status.cls}`}>
-              {item.status}
+              {status.label}
             </span>
           </div>
 
@@ -796,24 +804,24 @@ function ItemRow({ item, idx, isMenuOpen, onMenuToggle, onEdit, onDelete, onView
           <div className="w-10 shrink-0 flex justify-end">
             <DropdownMenu open={isMenuOpen} onOpenChange={onMenuToggle}>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-[#484848] hover:text-[#e7e5e5] transition-none rounded-none">
+                <Button variant="ghost" size="icon" aria-label="Abrir ações do item" className="h-8 w-8 text-[#484848] hover:text-[#e7e5e5] transition-none rounded-none">
                   <MoreHorizontal size={16} />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48 bg-[#1f2020] border-[#484848] rounded-none shadow-none">
                 <DropdownMenuItem onClick={() => onEdit(item)} className="text-[11px] font-normal uppercase tracking-widest py-3 cursor-pointer transition-none font-display">
-                  EDIT_ACTIVE_RECORD
+                  EDITAR_REGISTRO
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-[#484848]/20" />
                 <DropdownMenuItem onClick={() => onShare(item, "whatsapp")} className="text-[9px] font-normal uppercase tracking-widest py-3 text-[#acc3ce] cursor-pointer transition-none font-display">
-                  WHATSAPP_EXPORT
+                  EXPORTAR_PARA_WHATSAPP
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onShare(item)} className="text-[9px] font-normal uppercase tracking-widest py-3 cursor-pointer transition-none font-display">
-                  PDF_TELEMETRY
+                  GERAR_PDF
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-[#484848]/20" />
                 <DropdownMenuItem onClick={() => onDelete(item)} className="text-[9px] font-normal uppercase tracking-widest py-3 text-[#ee7d77] cursor-pointer transition-none font-display">
-                  WIPE_DATA_ENTRY
+                  EXCLUIR_REGISTRO
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

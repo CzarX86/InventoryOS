@@ -53,7 +53,7 @@ function UpdateToast({ onClose }) {
           <p className="text-xs font-black uppercase tracking-widest text-white">App Atualizado</p>
           <p className="text-[11px] text-zinc-400 mt-0.5">InventoryOS {version && `v${version}`} ativo.</p>
         </div>
-        <button onClick={onClose} className="p-1 text-zinc-500 hover:text-white transition-colors">
+        <button onClick={onClose} aria-label="Fechar aviso de atualização" className="p-1 text-zinc-500 hover:text-white transition-colors">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>

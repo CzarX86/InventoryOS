@@ -21,3 +21,8 @@
 - Client reads and writes are constrained by Firebase claims and workspace membership; admin mutations use callable functions.
 - Destructive access changes require a confirmation dialog.
 - User-facing failures use inline alerts or status regions with recovery actions.
+
+## Localization
+
+- The interface is presented in Brazilian Portuguese, including operational labels, dynamic status values, onboarding/update prompts, and accessibility labels.
+- Localization never changes persisted values or protocol identifiers; translations are applied at the presentation boundary.
