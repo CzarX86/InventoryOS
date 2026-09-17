@@ -202,6 +202,18 @@ Location: `system_usage/ai_usage_summary_{YYYYMM}`
 - **Implications**: Manual next-contact dates cannot be overwritten by AI. WhatsApp enrichment is applied only when a CRM contact is linked, and all records carry the shared `workspaceId` boundary.
 - **Status**: Active.
 
+## Decision: User-friendly phone input and reusable autocomplete
+- **Decision**: The CRM accepts only a human-readable phone number in the interface. The client persists canonical digits with the Brazilian country code and derives the internal WhatsApp remote JID at the persistence boundary; backend matching keeps compatibility with legacy local-format numbers.
+- **Reason**: Hide integration identifiers from users without breaking existing WhatsApp links, while making phone entry familiar and consistent.
+- **Implications**: A shared autocomplete component may suggest values already loaded for the authorized workspace across CRM, inventory forms, and inventory search, but always permits new free-text values. Suggestions are filtered locally from scoped data and never expose internal identifiers.
+- **Status**: Active.
+
+## Decision: Optional client-side inventory grouping
+- **Decision**: Inventory users can group the current filtered result set by brand or equipment type through an accessible accordion; the default remains ungrouped.
+- **Reason**: Improve scanning of large inventories without changing the underlying item schema or forcing a permanent organizational choice.
+- **Implications**: Grouping is a presentation concern applied after search and brand filtering. Missing brands appear under “Sem marca” and missing types under “Geral”.
+- **Status**: Active.
+
 ## Technical Reference
 - **Project Context**: [agent_context.md](file:///Users/juliocezar/Dev/personal/InventoryOS/docs/agent_context.md)
 - **Architecture Overview**: [architecture.md](file:///Users/juliocezar/Dev/personal/InventoryOS/docs/architecture.md)

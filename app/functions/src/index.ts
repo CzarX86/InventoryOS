@@ -31,6 +31,7 @@ import {
   listAccessUsers as listAccessUsersData,
   updateAccessStatus,
 } from "./accessControl";
+import { normalizePhoneDigits, withoutBrazilCountryCode } from "./phone";
 
 
 
@@ -41,10 +42,6 @@ import {
  */
 async function ensureAdmin(auth: any) {
   await ensureAccessAdmin(auth, getFirestore());
-}
-
-function normalizePhoneDigits(value: any) {
-  return String(value || "").replace(/\D/g, "");
 }
 
 async function findLinkedCrmContact(db: FirebaseFirestore.Firestore, workspaceId: string, remoteJid: string) {
@@ -59,12 +56,18 @@ async function findLinkedCrmContact(db: FirebaseFirestore.Firestore, workspaceId
 
   const phoneDigits = normalizePhoneDigits(remoteJid.split("@")[0]);
   if (!phoneDigits) return null;
-  const phoneSnapshot = await db.collection("contacts")
-    .where("workspaceId", "==", workspaceId)
-    .where("phoneDigits", "==", phoneDigits)
-    .limit(1)
-    .get();
-  return phoneSnapshot.empty ? null : phoneSnapshot.docs[0];
+  const phoneCandidates = [phoneDigits, withoutBrazilCountryCode(phoneDigits)].filter((candidate, index, values) => candidate && values.indexOf(candidate) === index);
+
+  for (const candidate of phoneCandidates) {
+    const phoneSnapshot = await db.collection("contacts")
+      .where("workspaceId", "==", workspaceId)
+      .where("phoneDigits", "==", candidate)
+      .limit(1)
+      .get();
+    if (!phoneSnapshot.empty) return phoneSnapshot.docs[0];
+  }
+
+  return null;
 }
 
 function parseOptionalDate(value: any) {

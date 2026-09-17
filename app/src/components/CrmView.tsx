@@ -19,6 +19,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import AutocompleteInput, { type AutocompleteOption } from "@/components/AutocompleteInput";
+import { buildWhatsappRemoteJid, normalizePhoneDigits } from "@/lib/phone";
 import { CRM_CHANNEL_LABELS } from "@/lib/uiText";
 
 const db = firebaseDb as unknown as Firestore | undefined;
@@ -78,6 +80,7 @@ type EquipmentLink = {
 };
 
 const EMPTY_CONTACT = {
+  companyId: null as string | null,
   companyName: "",
   companySector: "",
   companyLocality: "",
@@ -86,7 +89,6 @@ const EMPTY_CONTACT = {
   sector: "",
   email: "",
   phoneNumber: "",
-  whatsappRemoteJid: "",
   locality: "",
   notes: "",
 };
@@ -144,6 +146,25 @@ function channelLabel(channelType?: string | null) {
     : "OUTRO";
 }
 
+function normalizeOptionValue(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
+}
+
+function buildTextOptions(values: Array<string | null | undefined>) {
+  const seen = new Set<string>();
+  const options: AutocompleteOption[] = [];
+
+  values.forEach((value) => {
+    const label = String(value || "").trim();
+    const key = normalizeOptionValue(label);
+    if (!label || seen.has(key)) return;
+    seen.add(key);
+    options.push({ value: label, label });
+  });
+
+  return options.sort((left, right) => left.label!.localeCompare(right.label!, "pt-BR", { sensitivity: "base" }));
+}
+
 export default function CrmView({ user }: { user: CrmUser }) {
   const workspaceId = user?.workspaceId || user?.defaultAccountId || null;
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -161,6 +182,28 @@ export default function CrmView({ user }: { user: CrmUser }) {
   const [error, setError] = useState<string | null>(null);
 
   const selectedContact = contacts.find((contact) => contact.id === selectedContactId) || null;
+
+  const companyOptions = useMemo<AutocompleteOption[]>(() => companies
+    .filter((company) => String(company.name || "").trim())
+    .map((company) => ({
+      id: company.id,
+      value: String(company.name).trim(),
+      label: String(company.name).trim(),
+      description: [company.sector, company.locality].filter(Boolean).join(" · ") || "Empresa cadastrada",
+    })), [companies]);
+  const contactNameOptions = useMemo(() => buildTextOptions(contacts.map((contact) => contact.displayName || contact.name)), [contacts]);
+  const roleOptions = useMemo(() => buildTextOptions(contacts.map((contact) => contact.role)), [contacts]);
+  const sectorOptions = useMemo(() => buildTextOptions([
+    ...contacts.map((contact) => contact.sector),
+    ...companies.map((company) => company.sector),
+  ]), [companies, contacts]);
+  const localityOptions = useMemo(() => buildTextOptions([
+    ...contacts.map((contact) => contact.locality),
+    ...companies.map((company) => company.locality),
+  ]), [companies, contacts]);
+  const equipmentTypeOptions = useMemo(() => buildTextOptions(catalogItems.map((item) => item.itemType)), [catalogItems]);
+  const equipmentBrandOptions = useMemo(() => buildTextOptions(catalogItems.map((item) => item.brand)), [catalogItems]);
+  const equipmentModelOptions = useMemo(() => buildTextOptions(catalogItems.map((item) => item.model)), [catalogItems]);
 
   useEffect(() => {
     if (!db || !workspaceId) return undefined;
@@ -226,8 +269,10 @@ export default function CrmView({ user }: { user: CrmUser }) {
     setSavingContact(true);
     setError(null);
     try {
-      const normalizedName = contactForm.companyName.trim().toLowerCase();
-      const existingCompany = companies.find((company) => String(company.name || "").trim().toLowerCase() === normalizedName);
+      const normalizedName = normalizeOptionValue(contactForm.companyName.trim());
+      const existingCompany = (contactForm.companyId && companies.find((company) => company.id === contactForm.companyId))
+        || companies.find((company) => normalizeOptionValue(String(company.name || "").trim()) === normalizedName);
+      const phoneDigits = normalizePhoneDigits(contactForm.phoneNumber);
       const companyId = existingCompany?.id || (await addDoc(collection(db, "accounts"), {
         type: "account",
         name: contactForm.companyName.trim(),
@@ -249,8 +294,8 @@ export default function CrmView({ user }: { user: CrmUser }) {
         sector: contactForm.sector.trim() || contactForm.companySector.trim() || null,
         email: contactForm.email.trim() || null,
         phoneNumber: contactForm.phoneNumber.trim() || null,
-        phoneDigits: contactForm.phoneNumber.replace(/\D/g, "") || null,
-        whatsappRemoteJid: contactForm.whatsappRemoteJid.trim() || null,
+        phoneDigits: phoneDigits || null,
+        whatsappRemoteJid: buildWhatsappRemoteJid(contactForm.phoneNumber),
         locality: contactForm.locality.trim() || contactForm.companyLocality.trim() || null,
         notes: contactForm.notes.trim() || null,
         status: "active",
@@ -358,14 +403,13 @@ export default function CrmView({ user }: { user: CrmUser }) {
             <CardHeader className="border-b border-[#484848]/20 px-4 py-4"><CardTitle className="flex items-center gap-2 font-mono text-[10px] font-normal uppercase tracking-[0.2em] text-[#acabaa]/60"><Plus size={14} className="text-[#97a5ff]" /> Novo contato</CardTitle></CardHeader>
             <CardContent className="p-4">
               <form onSubmit={handleContactSubmit} noValidate className="grid gap-4 md:grid-cols-2">
-                <div className="md:col-span-2"><Label htmlFor="companyName">Empresa</Label><Input id="companyName" value={contactForm.companyName} onChange={(event) => setContactForm({ ...contactForm, companyName: event.target.value })} className={fieldClassName()} placeholder="Nome da empresa" /></div>
-                <div><Label htmlFor="contactName">Responsável</Label><Input id="contactName" value={contactForm.name} onChange={(event) => setContactForm({ ...contactForm, name: event.target.value })} className={fieldClassName()} placeholder="Nome do contato" /></div>
-                <div><Label htmlFor="contactRole">Função</Label><Input id="contactRole" value={contactForm.role} onChange={(event) => setContactForm({ ...contactForm, role: event.target.value })} className={fieldClassName()} placeholder="Compras, manutenção..." /></div>
-                <div><Label htmlFor="contactSector">Setor</Label><Input id="contactSector" value={contactForm.sector} onChange={(event) => setContactForm({ ...contactForm, sector: event.target.value })} className={fieldClassName()} placeholder="Setor da empresa" /></div>
-                <div><Label htmlFor="contactLocality">Localidade</Label><Input id="contactLocality" value={contactForm.locality} onChange={(event) => setContactForm({ ...contactForm, locality: event.target.value })} className={fieldClassName()} placeholder="Cidade / UF" /></div>
+                <div className="md:col-span-2"><Label htmlFor="companyName">Empresa</Label><AutocompleteInput id="companyName" value={contactForm.companyName} options={companyOptions} onValueChange={(value) => setContactForm((current) => ({ ...current, companyName: value, companyId: null }))} onOptionSelect={(option) => setContactForm((current) => ({ ...current, companyName: option.value, companyId: option.id || null }))} className={fieldClassName()} placeholder="Nome da empresa" autoComplete="organization" /></div>
+                <div><Label htmlFor="contactName">Responsável</Label><AutocompleteInput id="contactName" value={contactForm.name} options={contactNameOptions} onValueChange={(value) => setContactForm((current) => ({ ...current, name: value }))} className={fieldClassName()} placeholder="Nome do contato" autoComplete="name" /></div>
+                <div><Label htmlFor="contactRole">Função</Label><AutocompleteInput id="contactRole" value={contactForm.role} options={roleOptions} onValueChange={(value) => setContactForm((current) => ({ ...current, role: value }))} className={fieldClassName()} placeholder="Compras, manutenção..." autoComplete="organization-title" /></div>
+                <div><Label htmlFor="contactSector">Setor</Label><AutocompleteInput id="contactSector" value={contactForm.sector} options={sectorOptions} onValueChange={(value) => setContactForm((current) => ({ ...current, sector: value }))} className={fieldClassName()} placeholder="Setor da empresa" /></div>
+                <div><Label htmlFor="contactLocality">Localidade</Label><AutocompleteInput id="contactLocality" value={contactForm.locality} options={localityOptions} onValueChange={(value) => setContactForm((current) => ({ ...current, locality: value }))} className={fieldClassName()} placeholder="Cidade / UF" autoComplete="address-level2" /></div>
                 <div><Label htmlFor="contactEmail">E-mail</Label><Input id="contactEmail" type="email" value={contactForm.email} onChange={(event) => setContactForm({ ...contactForm, email: event.target.value })} className={fieldClassName()} placeholder="contato@empresa.com" /></div>
-                <div><Label htmlFor="contactPhone">Telefone</Label><Input id="contactPhone" type="tel" value={contactForm.phoneNumber} onChange={(event) => setContactForm({ ...contactForm, phoneNumber: event.target.value })} className={fieldClassName()} placeholder="(00) 00000-0000" /></div>
-                <div><Label htmlFor="contactWhatsappRemoteJid">ID WhatsApp</Label><Input id="contactWhatsappRemoteJid" value={contactForm.whatsappRemoteJid} onChange={(event) => setContactForm({ ...contactForm, whatsappRemoteJid: event.target.value })} className={fieldClassName()} placeholder="5511999999999@s.whatsapp.net" /><p className="mt-1 font-mono text-[9px] text-[#acabaa]/40">Opcional · conecta o histórico automático.</p></div>
+                <div><Label htmlFor="contactPhone">Telefone / WhatsApp</Label><Input id="contactPhone" type="tel" inputMode="tel" autoComplete="tel" value={contactForm.phoneNumber} onChange={(event) => setContactForm({ ...contactForm, phoneNumber: event.target.value })} className={fieldClassName()} placeholder="(00) 00000-0000" /><p className="mt-1 font-mono text-[9px] text-[#acabaa]/40">Informe somente o número. O vínculo com o WhatsApp é feito automaticamente.</p></div>
                 <div className="md:col-span-2"><Label htmlFor="contactNotes">Observação</Label><Textarea id="contactNotes" value={contactForm.notes} onChange={(event) => setContactForm({ ...contactForm, notes: event.target.value })} className={`${fieldClassName()} min-h-20 resize-none`} placeholder="Contexto inicial do contato" /></div>
                 <Button type="submit" disabled={savingContact} className="rounded-none bg-[#e7e5e5] text-[#0e0e0e] hover:bg-[#c6c6c7] md:col-span-2">{savingContact ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Salvar contato</Button>
               </form>
@@ -402,7 +446,7 @@ export default function CrmView({ user }: { user: CrmUser }) {
 
               <Card className="rounded-none border-[#484848]/20 bg-[#131313] shadow-none"><CardHeader className="border-b border-[#484848]/20 px-4 py-4"><CardTitle className="flex items-center gap-2 font-mono text-[10px] font-normal uppercase tracking-[0.2em] text-[#acabaa]/60"><CalendarClock size={14} className="text-[#97a5ff]" /> Linha do tempo</CardTitle></CardHeader><CardContent className="p-4">{events.length === 0 ? <p className="text-xs text-[#acabaa]/50">Nenhuma interação registrada.</p> : <div className="space-y-4">{events.map((event) => <div key={event.id} className="border-l border-[#97a5ff]/30 pl-4"><div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className="rounded-none border-[#484848]/30 text-[8px] uppercase tracking-widest">{channelLabel(event.channelType)}</Badge><span className="font-mono text-[9px] text-[#acabaa]/40">{formatDate(event.occurredAt)}</span></div><p className="mt-2 text-xs leading-relaxed text-[#e7e5e5]">{event.summary}</p>{Boolean(event.nextContactAt) && <p className="mt-1 font-mono text-[9px] text-[#acabaa]/45">Próximo: {formatDate(event.nextContactAt)} {event.source === "whatsapp" ? "· WhatsApp" : ""}</p>}</div>)}</div>}</CardContent></Card>
 
-              <Card className="rounded-none border-[#484848]/20 bg-[#131313] shadow-none"><CardHeader className="border-b border-[#484848]/20 px-4 py-4"><CardTitle className="flex items-center gap-2 font-mono text-[10px] font-normal uppercase tracking-[0.2em] text-[#acabaa]/60"><PackageSearch size={14} className="text-[#97a5ff]" /> Equipamentos vinculados</CardTitle></CardHeader><CardContent className="space-y-4 p-4"><form onSubmit={handleEquipmentSubmit} noValidate className="space-y-3"><div><Label htmlFor="equipmentRelation">Relação</Label><select id="equipmentRelation" value={equipmentForm.relationType} onChange={(event) => setEquipmentForm({ ...equipmentForm, relationType: event.target.value })} className={`${fieldClassName()} h-8 w-full px-2.5`}><option value="interest">Interesse comercial</option><option value="installed">Equipamento instalado</option></select></div><div><Label htmlFor="catalogItem">Item do catálogo</Label><select id="catalogItem" value={equipmentForm.catalogItemId} onChange={(event) => { const item = catalogItems.find((catalog) => catalog.id === event.target.value); setEquipmentForm({ ...equipmentForm, catalogItemId: event.target.value, equipmentType: item?.itemType || equipmentForm.equipmentType, brand: item?.brand || equipmentForm.brand, model: item?.model || equipmentForm.model }); }} className={`${fieldClassName()} h-8 w-full px-2.5`}><option value="">Não encontrado no catálogo</option>{catalogItems.map((item) => <option key={item.id} value={item.id}>{[item.itemType, item.brand, item.model].filter(Boolean).join(" · ") || item.id}</option>)}</select></div><div className="grid gap-3 sm:grid-cols-3"><div><Label htmlFor="equipmentType">Tipo</Label><Input id="equipmentType" value={equipmentForm.equipmentType} onChange={(event) => setEquipmentForm({ ...equipmentForm, equipmentType: event.target.value })} className={fieldClassName()} placeholder="Sensor" /></div><div><Label htmlFor="equipmentBrand">Marca</Label><Input id="equipmentBrand" value={equipmentForm.brand} onChange={(event) => setEquipmentForm({ ...equipmentForm, brand: event.target.value })} className={fieldClassName()} placeholder="Marca" /></div><div><Label htmlFor="equipmentModel">Modelo</Label><Input id="equipmentModel" value={equipmentForm.model} onChange={(event) => setEquipmentForm({ ...equipmentForm, model: event.target.value })} className={fieldClassName()} placeholder="Modelo" /></div></div><Button type="submit" disabled={savingEquipment} variant="outline" className="w-full rounded-none">{savingEquipment ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Vincular equipamento</Button></form>{equipmentLinks.length > 0 && <div className="space-y-2 border-t border-[#484848]/15 pt-4">{equipmentLinks.map((link) => <div key={link.id} className="flex items-center justify-between gap-3 border border-[#484848]/20 bg-[#0e0e0e] px-3 py-3"><div className="min-w-0"><p className="truncate text-xs text-[#e7e5e5]">{[link.equipmentType, link.brand, link.model].filter(Boolean).join(" · ") || "Equipamento sem descrição"}</p><p className="font-mono text-[9px] uppercase tracking-widest text-[#acabaa]/40">{link.relationType === "installed" ? "Instalado" : "Interesse"}{link.status === "pending_catalog" ? " · Pendente de catálogo" : ""}</p></div><PackageSearch size={14} className="shrink-0 text-[#acabaa]/40" /></div>)}</div>}</CardContent></Card>
+              <Card className="rounded-none border-[#484848]/20 bg-[#131313] shadow-none"><CardHeader className="border-b border-[#484848]/20 px-4 py-4"><CardTitle className="flex items-center gap-2 font-mono text-[10px] font-normal uppercase tracking-[0.2em] text-[#acabaa]/60"><PackageSearch size={14} className="text-[#97a5ff]" /> Equipamentos vinculados</CardTitle></CardHeader><CardContent className="space-y-4 p-4"><form onSubmit={handleEquipmentSubmit} noValidate className="space-y-3"><div><Label htmlFor="equipmentRelation">Relação</Label><select id="equipmentRelation" value={equipmentForm.relationType} onChange={(event) => setEquipmentForm({ ...equipmentForm, relationType: event.target.value })} className={`${fieldClassName()} h-8 w-full px-2.5`}><option value="interest">Interesse comercial</option><option value="installed">Equipamento instalado</option></select></div><div><Label htmlFor="catalogItem">Item do catálogo</Label><select id="catalogItem" value={equipmentForm.catalogItemId} onChange={(event) => { const item = catalogItems.find((catalog) => catalog.id === event.target.value); setEquipmentForm({ ...equipmentForm, catalogItemId: event.target.value, equipmentType: item?.itemType || equipmentForm.equipmentType, brand: item?.brand || equipmentForm.brand, model: item?.model || equipmentForm.model }); }} className={`${fieldClassName()} h-8 w-full px-2.5`}><option value="">Não encontrado no catálogo</option>{catalogItems.map((item) => <option key={item.id} value={item.id}>{[item.itemType, item.brand, item.model].filter(Boolean).join(" · ") || item.id}</option>)}</select></div><div className="grid gap-3 sm:grid-cols-3"><div><Label htmlFor="equipmentType">Tipo</Label><AutocompleteInput id="equipmentType" value={equipmentForm.equipmentType} options={equipmentTypeOptions} onValueChange={(value) => setEquipmentForm((current) => ({ ...current, equipmentType: value }))} className={fieldClassName()} placeholder="Sensor" /></div><div><Label htmlFor="equipmentBrand">Marca</Label><AutocompleteInput id="equipmentBrand" value={equipmentForm.brand} options={equipmentBrandOptions} onValueChange={(value) => setEquipmentForm((current) => ({ ...current, brand: value }))} className={fieldClassName()} placeholder="Marca" /></div><div><Label htmlFor="equipmentModel">Modelo</Label><AutocompleteInput id="equipmentModel" value={equipmentForm.model} options={equipmentModelOptions} onValueChange={(value) => setEquipmentForm((current) => ({ ...current, model: value }))} className={fieldClassName()} placeholder="Modelo" /></div></div><Button type="submit" disabled={savingEquipment} variant="outline" className="w-full rounded-none">{savingEquipment ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Vincular equipamento</Button></form>{equipmentLinks.length > 0 && <div className="space-y-2 border-t border-[#484848]/15 pt-4">{equipmentLinks.map((link) => <div key={link.id} className="flex items-center justify-between gap-3 border border-[#484848]/20 bg-[#0e0e0e] px-3 py-3"><div className="min-w-0"><p className="truncate text-xs text-[#e7e5e5]">{[link.equipmentType, link.brand, link.model].filter(Boolean).join(" · ") || "Equipamento sem descrição"}</p><p className="font-mono text-[9px] uppercase tracking-widest text-[#acabaa]/40">{link.relationType === "installed" ? "Instalado" : "Interesse"}{link.status === "pending_catalog" ? " · Pendente de catálogo" : ""}</p></div><PackageSearch size={14} className="shrink-0 text-[#acabaa]/40" /></div>)}</div>}</CardContent></Card>
             </>
           )}
         </div>

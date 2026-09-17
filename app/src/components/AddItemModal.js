@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { X, Loader2, Camera, Check, Sparkles, Mic, Square } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { db, storage } from "@/lib/firebase";
@@ -34,6 +34,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { INVENTORY_STATUS_LABELS } from "@/lib/uiText";
+import AutocompleteInput from "@/components/AutocompleteInput";
 
 const STATUS_OPTIONS = ["IN STOCK", "SOLD", "REPAIR", "RESERVED"];
 
@@ -42,8 +43,28 @@ const EMPTY_FORM = {
   specifications: "", status: "IN STOCK", audioUrl: "", productImageUrl: "",
 };
 
-export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null }) {
+function buildItemFieldOptions(items, field) {
+  const seen = new Set();
+  return items
+    .map((item) => String(item?.[field] || "").trim())
+    .filter((value) => {
+      const key = value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      if (!value || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((left, right) => left.localeCompare(right, "pt-BR", { sensitivity: "base" }))
+    .map((value) => ({ value, label: value }));
+}
+
+export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null, existingItems = [] }) {
   const { user } = useAuth();
+  const itemFieldOptions = useMemo(() => ({
+    type: buildItemFieldOptions(existingItems, "type"),
+    brand: buildItemFieldOptions(existingItems, "brand"),
+    model: buildItemFieldOptions(existingItems, "model"),
+    partNumber: buildItemFieldOptions(existingItems, "partNumber"),
+  }), [existingItems]);
   const [taskLedger, setTaskLedger] = useState(() =>
     createTaskLedger({
       taskId: createAuditTaskId(),
@@ -667,13 +688,24 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                             </div>
                           )}
                         </div>
-                        <Input
-                          id={field.id}
-                          className={`h-12 rounded-none border-foreground/10 bg-[#131313]/60 focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary transition-none border-[1px] ${field.mono ? "font-mono text-sm tracking-tight" : "font-display font-normal text-xs uppercase tracking-wider"} ${isAI(field.id) ? "border-primary/40 bg-primary/[0.02]" : ""}`}
-                          placeholder={field.placeholder}
-                          value={formData[field.id]}
-                          onChange={e => set(field.id, (e.target.value || "").toUpperCase())}
-                        />
+                        {field.id === "type" || field.id === "brand" || field.id === "model" || field.id === "partNumber" ? (
+                          <AutocompleteInput
+                            id={field.id}
+                            options={itemFieldOptions[field.id]}
+                            className={`h-12 rounded-none border-foreground/10 bg-[#131313]/60 focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary transition-none border-[1px] ${field.mono ? "font-mono text-sm tracking-tight" : "font-display font-normal text-xs uppercase tracking-wider"} ${isAI(field.id) ? "border-primary/40 bg-primary/[0.02]" : ""}`}
+                            placeholder={field.placeholder}
+                            value={formData[field.id]}
+                            onValueChange={value => set(field.id, (value || "").toUpperCase())}
+                          />
+                        ) : (
+                          <Input
+                            id={field.id}
+                            className={`h-12 rounded-none border-foreground/10 bg-[#131313]/60 focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary transition-none border-[1px] ${field.mono ? "font-mono text-sm tracking-tight" : "font-display font-normal text-xs uppercase tracking-wider"} ${isAI(field.id) ? "border-primary/40 bg-primary/[0.02]" : ""}`}
+                            placeholder={field.placeholder}
+                            value={formData[field.id]}
+                            onChange={e => set(field.id, (e.target.value || "").toUpperCase())}
+                          />
+                        )}
                       </div>
                     ))}
                   </div>
