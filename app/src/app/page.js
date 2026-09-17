@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence, useMotionValue, useTransform, useAnimation } from "framer-motion";
 import AddItemModal from "@/components/AddItemModal";
+import AutocompleteInput from "@/components/AutocompleteInput";
 import ItemDetailModal from "@/components/ItemDetailModal";
 import VoiceSearch from "@/components/VoiceSearch";
 import AdminDashboard from "@/components/AdminDashboard";
@@ -19,7 +20,7 @@ import AccessGate from "@/components/AccessGate";
 import NotificationsBell from "@/components/NotificationsBell";
 import PWAInstallPrompt from "@/components/PWAInstallPrompt"; // Added PWAInstallPrompt import
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -32,6 +33,7 @@ import { escalateErrorReport, recordAppError, toUserFacingError } from "@/lib/er
 import { db } from "@/lib/firebase";
 import { getBrandMeta } from "@/lib/utils";
 import { INVENTORY_STATUS_LABELS } from "@/lib/uiText";
+import { buildInventoryGroups, buildInventorySearchOptions } from "@/lib/inventoryView";
 
 const STATUS_CONFIG = {
   "IN STOCK":  { 
@@ -103,6 +105,7 @@ export default function Dashboard() {
     inStock: items.filter(i => i.status === "IN STOCK").length,
     sold: items.filter(i => i.status === "SOLD").length,
   };
+  const searchSuggestions = useMemo(() => buildInventorySearchOptions(items), [items]);
 
   if (authLoading) {
     return (
@@ -367,11 +370,13 @@ export default function Dashboard() {
             {/* Search Input */}
             <div className="flex-1 max-w-md relative group">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#acabaa]/30 group-focus-within:text-[#97a5ff] transition-none" />
-              <Input
+              <AutocompleteInput
                 type="text"
                 placeholder="BUSCAR_NO_INVENTÁRIO..."
                 value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
+                options={searchSuggestions}
+                onValueChange={setSearchQuery}
+                onOptionSelect={(option) => setSearchQuery(option.value)}
                 className="pl-10 h-9 bg-[#131313] border-none shadow-none focus-visible:ring-1 focus-visible:ring-[#97a5ff]/20 placeholder:text-[#acabaa]/20 text-[11px] font-normal uppercase tracking-[0.1em] transition-none rounded-none font-display"
               />
               {searchQuery && (
@@ -575,6 +580,7 @@ export default function Dashboard() {
         onClose={() => { setIsModalOpen(false); setItemToEdit(null); }}
         onAdded={() => {}}
         editItem={itemToEdit}
+        existingItems={items}
       />
       
       <VoiceSearch
@@ -588,6 +594,7 @@ export default function Dashboard() {
 
 function InventoryContent({ items, filteredItems, stats, loading, searchQuery, activeMenuId, setActiveMenuId, onEdit, onDelete, onView = () => {}, onShare = () => {} }) {
   const [selectedBrandKey, setSelectedBrandKey] = useState(null);
+  const [groupBy, setGroupBy] = useState("none");
 
   const availableBrands = useMemo(() => {
     const brands = new Map();
@@ -609,6 +616,24 @@ function InventoryContent({ items, filteredItems, stats, loading, searchQuery, a
     }
     return filtered;
   }, [filteredItems, selectedBrandKey]);
+
+  const groupedItems = useMemo(() => buildInventoryGroups(displayItems, groupBy), [displayItems, groupBy]);
+
+  const groupingLabel = groupBy === "brand" ? "MARCA" : groupBy === "type" ? "TIPO" : "NENHUM";
+
+  const renderItemRows = (list) => list.map((item, idx) => (
+    <ItemRow
+      key={item.id}
+      item={item}
+      idx={idx}
+      isMenuOpen={activeMenuId === item.id}
+      onMenuToggle={() => setActiveMenuId(activeMenuId === item.id ? null : item.id)}
+      onEdit={onEdit}
+      onDelete={onDelete}
+      onView={onView}
+      onShare={onShare}
+    />
+  ));
 
   if (loading && items.length === 0) {
     return (
@@ -647,18 +672,31 @@ function InventoryContent({ items, filteredItems, stats, loading, searchQuery, a
         ))}
       </div>
 
-      {/* Brand Filter Pills */}
-      <div className="sticky top-0 z-20 bg-[#0e0e0e]/95 backdrop-blur-md border-b border-[#484848]/20 py-4 px-4 md:px-6 flex items-center gap-2 overflow-x-auto no-scrollbar">
+      {/* Filters and grouping */}
+      <div className="sticky top-0 z-20 flex items-center gap-2 overflow-x-auto border-b border-[#484848]/20 bg-[#0e0e0e]/95 px-4 py-4 backdrop-blur-md no-scrollbar md:px-6">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" aria-label="Escolher agrupamento do inventário" className="h-8 shrink-0 rounded-none border-[#97a5ff]/20 bg-[#191a1a] text-[10px] font-normal uppercase tracking-[0.15em] text-[#97a5ff] transition-none font-display">
+              AGRUPAR: {groupingLabel}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-44 rounded-none border-[#484848] bg-[#1f2020] shadow-none">
+            <DropdownMenuItem onClick={() => setGroupBy("none")} className="cursor-pointer text-[10px] font-normal uppercase tracking-widest transition-none font-display">SEM_AGRUPAMENTO</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setGroupBy("brand")} className="cursor-pointer text-[10px] font-normal uppercase tracking-widest transition-none font-display">POR_MARCA</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setGroupBy("type")} className="cursor-pointer text-[10px] font-normal uppercase tracking-widest transition-none font-display">POR_TIPO</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         {availableBrands.map(brand => (
           <Button
             key={brand.key}
             variant={selectedBrandKey === brand.key ? "default" : "outline"}
             size="sm"
             onClick={() => setSelectedBrandKey(selectedBrandKey === brand.key ? null : brand.key)}
-            className={`h-8 rounded-none text-[11px] font-normal uppercase tracking-[0.15em] transition-none font-display shrink-0 ${
-              selectedBrandKey === brand.key 
-                ? "bg-[#e7e5e5] text-[#0e0e0e] shadow-none" 
-                : "bg-[#191a1a] border-[#484848]/10 text-[#acabaa] hover:bg-[#1f2020] hover:text-[#e7e5e5]"
+            className={`h-8 shrink-0 rounded-none text-[11px] font-normal uppercase tracking-[0.15em] transition-none font-display ${
+              selectedBrandKey === brand.key
+                ? "bg-[#e7e5e5] text-[#0e0e0e] shadow-none"
+                : "border-[#484848]/10 bg-[#191a1a] text-[#acabaa] hover:bg-[#1f2020] hover:text-[#e7e5e5]"
             }`}
           >
             {brand.label}
@@ -686,19 +724,23 @@ function InventoryContent({ items, filteredItems, stats, loading, searchQuery, a
               <span className="w-10 text-right">AÇÕES</span>
             </div>
 
-            {displayItems.map((item, idx) => (
-              <ItemRow
-                key={item.id}
-                item={item}
-                idx={idx}
-                isMenuOpen={activeMenuId === item.id}
-                onMenuToggle={() => setActiveMenuId(activeMenuId === item.id ? null : item.id)}
-                onEdit={onEdit}
-                onDelete={onDelete}
-                onView={onView}
-                onShare={onShare}
-              />
-            ))}
+            {groupBy === "none" ? renderItemRows(displayItems) : (
+              <Accordion type="multiple" defaultValue={groupedItems.map((group) => group.id)} key={`${groupBy}:${groupedItems.map((group) => group.id).join("|")}`} className="divide-y divide-[#484848]/10">
+                {groupedItems.map((group) => (
+                  <AccordionItem key={group.id} value={group.id}>
+                    <AccordionTrigger>
+                      <span className="flex min-w-0 items-center gap-3">
+                        <span className="truncate">{group.label}</span>
+                        <Badge variant="outline" className="rounded-none border-[#484848]/30 text-[9px] text-[#acabaa]/70">{group.items.length}</Badge>
+                      </span>
+                    </AccordionTrigger>
+                    <AccordionContent className="pb-0">
+                      <div className="divide-y divide-foreground/[0.01]">{renderItemRows(group.items)}</div>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            )}
           </div>
         )}
       </div>
