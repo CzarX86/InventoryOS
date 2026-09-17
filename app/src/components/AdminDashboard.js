@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import AccessManagement from "@/components/AccessManagement";
+import { ERROR_ACTION_LABELS, TASK_TYPE_LABELS, uiLabel } from "@/lib/uiText";
 
 function extractTimestampValue(value) {
   if (!value) return 0;
@@ -62,7 +63,7 @@ export default function AdminDashboard({ items = [], user = null }) {
   const [updatingErrorId, setUpdatingErrorId] = useState(null);
   const [loading, setLoading] = useState(true);
   const { flags, enabledCount } = useFeatureFlags(user);
-  const displayActorId = (actorId, fallback = "system") => {
+  const displayActorId = (actorId, fallback = "sistema") => {
     if (!actorId || (user?.isHiddenOwner && actorId === user.uid)) return fallback;
     return actorId.slice(0, 8);
   };
@@ -176,7 +177,7 @@ export default function AdminDashboard({ items = [], user = null }) {
       {/* Title */}
       <div className="px-4 md:px-6 pt-8 pb-6 border-b border-foreground/5 bg-background/80 backdrop-blur-md sticky top-0 z-10 font-display">
         <h1 className="text-4xl md:text-5xl font-normal uppercase tracking-tighter text-foreground leading-none">
-          Admin_Terminal<span className="text-primary italic">.exe</span>
+          Terminal_Administrativo<span className="text-primary italic">.exe</span>
         </h1>
       </div>
 
@@ -193,23 +194,23 @@ export default function AdminDashboard({ items = [], user = null }) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {/* Using tonal layering instead of shadows and borders */}
           <div className="bg-[#131313] p-6 rounded-none border-l-2 border-primary/20">
-            <span className="text-[10px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground block mb-4">Stock_Status</span>
+            <span className="text-[10px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground block mb-4">Status_do_Estoque</span>
             <p className="text-4xl font-display font-normal text-foreground">{inventoryStats.inStock}</p>
-            <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-500/60 mt-2 block">Available_Units</span>
+            <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-500/60 mt-2 block">Unidades_Disponíveis</span>
           </div>
           <div className="bg-[#131313] p-6 rounded-none border-l-2 border-foreground/5">
-            <span className="text-[10px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground block mb-4">Outflow_Metrics</span>
+            <span className="text-[10px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground block mb-4">Métricas_de_Saída</span>
             <p className="text-4xl font-display font-normal text-foreground">{inventoryStats.sold}</p>
-            <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/40 mt-2 block">Total_Sales_Confirmed</span>
+            <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/40 mt-2 block">Total_de_Vendas_Confirmadas</span>
           </div>
         </div>
 
         {/* System Health Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
           {[
-            { label: "AI_QUERIES", value: systemHealth?.totalAIRequests ?? 0, mono: true },
-            { label: "SERVER_STATUS", value: "Online", highlight: true },
-            { label: "DB_LATENCY", value: "14ms", mono: true },
+            { label: "CONSULTAS_IA", value: systemHealth?.totalAIRequests ?? 0, mono: true },
+            { label: "STATUS_DO_SERVIDOR", value: "Ativo", highlight: true },
+            { label: "LATÊNCIA_DO_BANCO", value: "14ms", mono: true },
           ].map(({ label, value, mono, highlight }) => (
             <div key={label} className="bg-[#131313] p-4 rounded-none">
               <span className="text-[10px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground mb-3 block">{label}</span>
@@ -221,9 +222,9 @@ export default function AdminDashboard({ items = [], user = null }) {
         {/* Expansion flags */}
         <section className="space-y-4">
           <div className="flex items-end justify-between border-b border-foreground/5 pb-2">
-            <h2 className="text-lg font-display font-normal uppercase tracking-[0.15em] text-foreground">Deployment_Control</h2>
+            <h2 className="text-lg font-display font-normal uppercase tracking-[0.15em] text-foreground">Controle_de_Recursos</h2>
             <p className="text-[10px] font-mono text-muted-foreground uppercase opacity-50">
-              {enabledCount} / {EXPANSION_FEATURE_FLAGS.length} ACTIVE_FLAGS
+              {enabledCount} / {EXPANSION_FEATURE_FLAGS.length} RECURSOS_ATIVOS
             </p>
           </div>
           <div className="bg-[#131313] rounded-none overflow-hidden">
@@ -238,7 +239,7 @@ export default function AdminDashboard({ items = [], user = null }) {
                       </TableCell>
                       <TableCell className="text-right py-4">
                         <Badge variant="outline" className={`rounded-none border-none text-[9px] font-display font-normal uppercase tracking-widest px-3 ${enabled ? "bg-emerald-500/10 text-emerald-500" : "bg-muted/30 text-muted-foreground/40"}`}>
-                          {enabled ? "Enabled" : "Disabled"}
+                          {enabled ? "Ativado" : "Desativado"}
                         </Badge>
                       </TableCell>
                     </TableRow>
@@ -252,7 +253,7 @@ export default function AdminDashboard({ items = [], user = null }) {
         {/* WhatsApp Management */}
         {isFeatureEnabled(flags, "whatsappIngestion") && (
           <section className="space-y-4">
-            <h2 className="text-lg font-display font-normal uppercase tracking-[0.15em] text-foreground">WA_Bridge_Protocol</h2>
+            <h2 className="text-lg font-display font-normal uppercase tracking-[0.15em] text-foreground">Protocolo_Ponte_WhatsApp</h2>
             <div className="bg-[#131313] p-1 rounded-none border border-foreground/5">
               <WhatsappInstanceManager />
             </div>
@@ -261,20 +262,20 @@ export default function AdminDashboard({ items = [], user = null }) {
 
         {/* Token usage */}
         <section className="space-y-4">
-          <h2 className="text-lg font-display font-normal uppercase tracking-[0.15em] text-foreground">AI_Resource_Consumption</h2>
+          <h2 className="text-lg font-display font-normal uppercase tracking-[0.15em] text-foreground">Consumo_de_Recursos_da_IA</h2>
           <div className="bg-[#131313] rounded-none border border-foreground/5">
             {tokenUsage.length === 0 ? (
               <div className="py-12 text-center text-muted-foreground font-display font-normal uppercase tracking-[0.2em] text-[10px]">
-                No_Resource_Logs_Detected
+                Nenhum_Registro_de_Recursos
               </div>
             ) : (
               <Table>
                 <TableHeader className="bg-[#1f2020]">
                   <TableRow className="hover:bg-transparent border-foreground/5">
-                    <TableHead className="uppercase tracking-[0.2em] text-[9px] font-display font-normal text-muted-foreground">Log_Entry</TableHead>
-                    <TableHead className="uppercase tracking-[0.2em] text-[9px] font-display font-normal text-muted-foreground hidden md:table-cell">Operation_Hash</TableHead>
+                    <TableHead className="uppercase tracking-[0.2em] text-[9px] font-display font-normal text-muted-foreground">Registro</TableHead>
+                    <TableHead className="uppercase tracking-[0.2em] text-[9px] font-display font-normal text-muted-foreground hidden md:table-cell">Hash_da_Operação</TableHead>
                     <TableHead className="uppercase tracking-[0.2em] text-[9px] font-display font-normal text-muted-foreground">Tokens</TableHead>
-                    <TableHead className="uppercase tracking-[0.2em] text-[9px] font-display font-normal text-muted-foreground text-right">Cost_USD</TableHead>
+                    <TableHead className="uppercase tracking-[0.2em] text-[9px] font-display font-normal text-muted-foreground text-right">Custo_USD</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -282,8 +283,8 @@ export default function AdminDashboard({ items = [], user = null }) {
                     <TableRow key={task.id} className="hover:bg-[#1f2020] border-foreground/5 transition-none">
                       <TableCell>
                         <div className="flex flex-col">
-                          <span className="font-display font-normal uppercase tracking-wider text-[11px]">{task.taskType}</span>
-                          <span className="text-[10px] font-mono text-muted-foreground/60 uppercase">Actor: {displayActorId(task.actorId)}</span>
+                          <span className="font-display font-normal uppercase tracking-wider text-[11px]">{uiLabel(task.taskType, TASK_TYPE_LABELS)}</span>
+                          <span className="text-[10px] font-mono text-muted-foreground/60 uppercase">Responsável: {displayActorId(task.actorId)}</span>
                         </div>
                       </TableCell>
                       <TableCell className="font-mono text-[9px] text-muted-foreground/40 hidden md:table-cell uppercase">
@@ -305,11 +306,11 @@ export default function AdminDashboard({ items = [], user = null }) {
 
         {/* Support inbox */}
         <section className="space-y-4">
-          <h2 className="text-lg font-display font-normal uppercase tracking-[0.15em] text-foreground">System_Exceptions</h2>
+          <h2 className="text-lg font-display font-normal uppercase tracking-[0.15em] text-foreground">Exceções_do_Sistema</h2>
           <div className="grid grid-cols-1 gap-4">
             {errorReports.length === 0 ? (
               <div className="py-12 flex items-center justify-center bg-[#131313] border border-foreground/5 border-dashed">
-                <p className="text-[10px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground/30">No_Exceptions_Recorded</p>
+                <p className="text-[10px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground/30">Nenhuma_Exceção_Registrada</p>
               </div>
             ) : (
               errorReports.map(report => (
@@ -318,14 +319,14 @@ export default function AdminDashboard({ items = [], user = null }) {
                     <div className="flex items-center gap-3 min-w-0">
                       <Bug size={14} className="text-red-500 shrink-0" />
                       <span className="text-[10px] font-display font-normal uppercase tracking-[0.1em]">
-                        {report.action}
+                        {uiLabel(report.action, ERROR_ACTION_LABELS)}
                       </span>
                       <span className="font-mono text-[10px] px-2 py-0.5 bg-red-500/10 text-red-400">
                         {report.errorId?.slice(0, 8)}
                       </span>
                     </div>
                     <Badge variant="outline" className={`uppercase text-[9px] rounded-none border-none font-display font-normal ${report.severity === 'high' ? 'bg-red-500 text-white' : 'bg-[#1f2020] text-muted-foreground'}`}>
-                      {report.severity}
+                      {report.severity === "high" ? "Alta" : report.severity === "medium" ? "Média" : report.severity === "low" ? "Baixa" : report.severity}
                     </Badge>
                   </div>
                   <div className="p-6 space-y-6">
@@ -338,12 +339,12 @@ export default function AdminDashboard({ items = [], user = null }) {
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-foreground/5 border border-foreground/5">
                       <div className="bg-[#191a1a] p-4">
-                        <p className="text-[9px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground mb-2 opacity-50">Origin_User</p>
-                        <p className="font-mono text-[11px] truncate">{user?.isHiddenOwner && (report.userId === user.uid || report.userEmail === user.email) ? "SYSTEM" : (report.userEmail || report.userId || "UNDEFINED")}</p>
+                        <p className="text-[9px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground mb-2 opacity-50">Usuário_de_Origem</p>
+                        <p className="font-mono text-[11px] truncate">{user?.isHiddenOwner && (report.userId === user.uid || report.userEmail === user.email) ? "SISTEMA" : (report.userEmail || report.userId || "NÃO_DEFINIDO")}</p>
                       </div>
                       <div className="bg-[#191a1a] p-4">
-                        <p className="text-[9px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground mb-2 opacity-50">Stack_Trace</p>
-                        <p className="font-mono text-[10px] leading-relaxed break-all text-muted-foreground/60">{report.technicalMessage || "NO_DATA"}</p>
+                        <p className="text-[9px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground mb-2 opacity-50">Rastro_Técnico</p>
+                        <p className="font-mono text-[10px] leading-relaxed break-all text-muted-foreground/60">{report.technicalMessage || "SEM_DADOS"}</p>
                       </div>
                     </div>
 
@@ -354,7 +355,7 @@ export default function AdminDashboard({ items = [], user = null }) {
                         className="bg-[#1f2020] text-[10px] uppercase font-display font-normal tracking-[0.15em] rounded-none py-5 border-none hover:bg-foreground hover:text-background transition-none"
                         onClick={() => handleCopyError(report)}
                       >
-                        <Copy size={12} className="mr-2" /> Log_Copy
+                        <Copy size={12} className="mr-2" /> Copiar_Registro
                       </Button>
                       <Button 
                         variant="ghost" 
@@ -363,7 +364,7 @@ export default function AdminDashboard({ items = [], user = null }) {
                         disabled={updatingErrorId === report.id}
                         onClick={() => handleErrorStatus(report, "acknowledged")}
                       >
-                        Acknowledge
+                        Reconhecer
                       </Button>
                       <Button 
                         size="sm" 
@@ -371,7 +372,7 @@ export default function AdminDashboard({ items = [], user = null }) {
                         disabled={updatingErrorId === report.id}
                         onClick={() => handleErrorStatus(report, "resolved")}
                       >
-                        Resolve_Exception
+                        Resolver_Exceção
                       </Button>
                     </div>
                   </div>
@@ -383,11 +384,11 @@ export default function AdminDashboard({ items = [], user = null }) {
 
         {/* Activity history */}
         <section className="space-y-4">
-          <h2 className="text-lg font-display font-normal uppercase tracking-[0.15em] text-foreground">Global_Operations_Log</h2>
+          <h2 className="text-lg font-display font-normal uppercase tracking-[0.15em] text-foreground">Registro_Geral_de_Operações</h2>
           <div className="bg-[#131313] rounded-none border border-foreground/5">
             {activityLog.length === 0 ? (
               <div className="py-12 text-center text-muted-foreground font-display font-normal uppercase tracking-[0.2em] text-[10px]">
-                No_Activity_Streaming
+                Nenhuma_Atividade_Registrada
               </div>
             ) : (
               <Table>
@@ -403,18 +404,18 @@ export default function AdminDashboard({ items = [], user = null }) {
                         </TableCell>
                         <TableCell>
                           <span className="font-display font-normal uppercase tracking-wider text-[11px] text-foreground">
-                            {activity.actionType}
+                          {uiLabel(activity.actionType, { CREATE_ITEM: "CRIAR_ITEM", DELETE_ITEM: "EXCLUIR_ITEM", UNDO_ACTION: "DESFAZER_AÇÃO" })}
                           </span>
                         </TableCell>
                         <TableCell className="text-[10px] font-mono text-muted-foreground/60 uppercase">
                           {activity.targetType}/{activity.targetId?.slice(0, 8)}…
                         </TableCell>
                         <TableCell className="hidden md:table-cell text-[10px] font-mono text-muted-foreground/30 uppercase">
-                          User: {displayActorId(activity.actorId)}
+                          Usuário: {displayActorId(activity.actorId)}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-3">
-                            {undone && <span className="text-muted-foreground/40 text-[9px] uppercase font-display font-normal italic tracking-widest">Cancelled</span>}
+                            {undone && <span className="text-muted-foreground/40 text-[9px] uppercase font-display font-normal italic tracking-widest">Cancelada</span>}
                             {canUndo && (
                               <Button
                                 variant="ghost"
@@ -423,7 +424,7 @@ export default function AdminDashboard({ items = [], user = null }) {
                                 onClick={() => handleUndo(activity)}
                                 disabled={undoingId === activity.id}
                               >
-                                {undoingId === activity.id ? <Loader2 className="animate-spin" size={12} /> : "ROLLBACK"}
+                                {undoingId === activity.id ? <Loader2 className="animate-spin" size={12} /> : "DESFAZER"}
                               </Button>
                             )}
                           </div>
@@ -440,19 +441,19 @@ export default function AdminDashboard({ items = [], user = null }) {
         {/* Telemetry */}
         <section className="space-y-4">
           <div className="flex items-center justify-between border-b border-foreground/5 pb-2">
-            <h2 className="text-lg font-display font-normal uppercase tracking-[0.15em] text-foreground">Live_Telemetry_Feed</h2>
+            <h2 className="text-lg font-display font-normal uppercase tracking-[0.15em] text-foreground">Fluxo_de_Telemetria_Ativa</h2>
             <div className="flex items-center gap-2 bg-emerald-500/10 px-3 py-1">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
               </span>
-              <span className="text-[9px] font-display font-normal tracking-widest text-emerald-500 uppercase">Streaming</span>
+              <span className="text-[9px] font-display font-normal tracking-widest text-emerald-500 uppercase">Transmitindo</span>
             </div>
           </div>
           <div className="bg-[#131313] rounded-none border border-foreground/5">
             {telemetry.length === 0 ? (
               <div className="py-12 text-center text-muted-foreground font-display font-normal uppercase tracking-[0.2em] text-[10px]">
-                No_Data_Packets
+                Nenhum_Pacote_de_Dados
               </div>
             ) : (
               <Table>
@@ -468,7 +469,7 @@ export default function AdminDashboard({ items = [], user = null }) {
                         </span>
                       </TableCell>
                       <TableCell className="font-mono text-[10px] text-muted-foreground/30 hidden md:table-cell uppercase">
-                        Origin: {displayActorId(log.userId, "Global")}
+                        Origem: {displayActorId(log.userId, "Global")}
                       </TableCell>
                       <TableCell className="font-mono text-[10px] max-w-[300px] truncate text-muted-foreground/60 uppercase">
                         {JSON.stringify(log.metadata)}

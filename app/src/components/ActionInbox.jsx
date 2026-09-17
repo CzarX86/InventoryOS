@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
+import { ACTION_STAGE_LABELS, ACTION_STATUS_LABELS, uiLabel } from "@/lib/uiText";
 
 /**
  * Action Inbox: Centralized management for AI-extracted Opportunities and Tasks.
@@ -83,7 +84,7 @@ export default function ActionInbox() {
             <div className="w-1.5 h-12 bg-[#97a5ff]" />
             <div className="space-y-1">
               <h2 className="text-2xl md:text-3xl font-normal uppercase tracking-tighter text-foreground leading-none font-display">
-                ACTION_INBOX.LOG
+                CENTRAL_DE_AÇÕES.LOG
               </h2>
               <p className="text-[11px] font-mono font-black uppercase tracking-[0.25em] text-muted-foreground/40">
                 SISTEMA_DE_CAPTAÇÃO_E_RESOLUÇÃO_DE_DEMANDAS
@@ -91,7 +92,7 @@ export default function ActionInbox() {
             </div>
           </div>
           <Badge className="bg-[#1f2020] text-primary border-none text-[11px] font-black uppercase px-3 py-1 rounded-none tracking-widest font-mono">
-            {filteredItems.length} ACTIVE_RECORDS
+            {filteredItems.length} REGISTROS_ATIVOS
           </Badge>
         </div>
 
@@ -99,7 +100,7 @@ export default function ActionInbox() {
           <div className="relative flex-1">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/30" />
             <Input 
-              placeholder="PESQUISAR_NO_INBOX..." 
+              placeholder="PESQUISAR_NAS_AÇÕES..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10 h-11 bg-[#1a1b1c] border-white/5 rounded-none text-[11px] uppercase font-mono tracking-widest focus-visible:ring-primary/20"
@@ -121,7 +122,7 @@ export default function ActionInbox() {
           {filteredItems.length === 0 ? (
             <div className="py-32 flex flex-col items-center justify-center gap-4 opacity-20">
               <Clock size={48} strokeWidth={1} />
-              <span className="text-[11px] font-mono font-black uppercase tracking-[0.5em]">BUFFER_EMPTY</span>
+              <span className="text-[11px] font-mono font-black uppercase tracking-[0.5em]">FILA_VAZIA</span>
             </div>
           ) : (
             filteredItems.map((item) => (
@@ -162,7 +163,7 @@ function ActionItem({ item, onUpdateOpp, onUpdateTask, onDelete }) {
         </div>
         <div className="flex flex-col">
           <span className={`text-[10px] font-mono font-black uppercase tracking-widest ${statusColor} opacity-60`}>
-            {isOpp ? 'OPPORTUNITY' : 'TASK_ACTION'}
+            {isOpp ? 'OPORTUNIDADE' : 'AÇÃO_DE_TAREFA'}
           </span>
           <span className="text-[10px] font-mono text-muted-foreground/30">{item.id.slice(0, 8)}</span>
         </div>
@@ -175,7 +176,7 @@ function ActionItem({ item, onUpdateOpp, onUpdateTask, onDelete }) {
         </h3>
         <div className="flex flex-wrap items-center gap-3 font-mono text-[11px] text-muted-foreground/60 uppercase">
           <span className="flex items-center gap-1.5">
-            <MessageSquare size={10} /> {item.remoteJid?.split('@')[0] || 'SYSTEM'}
+            <MessageSquare size={10} /> {item.remoteJid?.split('@')[0] || 'SISTEMA'}
           </span>
           <span className="text-white/10">•</span>
           <span className="flex items-center gap-1.5">
@@ -184,7 +185,7 @@ function ActionItem({ item, onUpdateOpp, onUpdateTask, onDelete }) {
           {item.estimatedValue && (
              <>
                <span className="text-white/10">•</span>
-               <span className="text-primary font-black">VAL_EST: R$ {item.estimatedValue}</span>
+               <span className="text-primary font-black">VALOR_ESTIMADO: R$ {item.estimatedValue}</span>
              </>
           )}
         </div>
@@ -193,9 +194,9 @@ function ActionItem({ item, onUpdateOpp, onUpdateTask, onDelete }) {
       {/* Status & Actions */}
       <div className="flex items-center gap-6 w-full md:w-auto mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-none border-white/5">
         <div className="flex flex-col gap-1 items-end shrink-0 hidden sm:flex">
-          <span className="text-[10px] font-mono font-black text-muted-foreground/30 uppercase tracking-widest">CURRENT_STATUS</span>
+          <span className="text-[10px] font-mono font-black text-muted-foreground/30 uppercase tracking-widest">STATUS_ATUAL</span>
           <Badge className={`bg-transparent border-white/10 ${statusColor} rounded-none text-[11px] font-black uppercase tracking-tighter`}>
-            {isOpp ? (item.stage || 'NEW') : (item.status || 'PENDING')}
+            {isOpp ? uiLabel(item.stage || 'new', ACTION_STAGE_LABELS) : uiLabel(item.status || 'pending', ACTION_STATUS_LABELS)}
           </Badge>
         </div>
 

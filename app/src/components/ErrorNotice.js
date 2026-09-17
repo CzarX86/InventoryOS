@@ -23,19 +23,19 @@ export default function ErrorNotice({ error, onReport = null, reporting = false,
           <div className="flex items-center gap-1.5 grayscale opacity-40">
             <Terminal size={10} className="text-red-500" />
             <span className="text-[9px] font-mono font-bold text-red-500">
-              {error.errorId?.slice(0, 12) || "NULL_ID"}
+              {error.errorId?.slice(0, 12) || "ID_NÃO_INFORMADO"}
             </span>
           </div>
         </div>
 
         <div className="p-5 font-mono">
           <p className="text-xs font-black uppercase tracking-widest text-[#e7e5e5] mb-2 leading-tight">
-            MESSAGE: {error.humanMessage}
+            MENSAGEM: {error.humanMessage}
           </p>
           
           {error.knownReason && (
             <div className="text-[9px] text-muted-foreground/60 uppercase tracking-widest bg-white/5 p-2 border-l-2 border-red-500/40 mb-4">
-              REASON_LOG: {error.knownReason}
+              REGISTRO_DA_CAUSA: {error.knownReason}
             </div>
           )}
 
@@ -58,7 +58,7 @@ export default function ErrorNotice({ error, onReport = null, reporting = false,
               <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5">
                 <CheckCircle2 size={12} className="text-emerald-500" />
                 <span className="text-[9px] font-black uppercase tracking-[0.1em] text-emerald-500">
-                  TICKET_SUPORTE_GERADO: {error.ticketId || error.errorId}
+                  CHAMADO_DE_SUPORTE_GERADO: {error.ticketId || error.errorId}
                 </span>
               </div>
             ) : (

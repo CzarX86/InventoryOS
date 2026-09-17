@@ -15,6 +15,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ACTION_STAGE_LABELS, uiLabel } from "@/lib/uiText";
 
 /**
  * Sub-component to show message history for a contact
@@ -49,26 +50,26 @@ function MessagePreview({ jid }) {
         transition={{ duration: 1.5, repeat: Infinity }}
         className="w-1 h-3 bg-primary/40" 
       />
-      <span className="text-[11px] font-display uppercase tracking-[0.2em] text-muted-foreground">BUFFER_STREAM_SYNCING...</span>
+      <span className="text-[11px] font-display uppercase tracking-[0.2em] text-muted-foreground">SINCRONIZANDO_FLUXO_DE_MENSAGENS...</span>
     </div>
   );
   
   if (messages.length === 0) return (
     <div className="p-8 flex items-center justify-center gap-3 bg-[#0e0e0e]">
-      <span className="text-[10px] font-display uppercase tracking-[0.2em] text-muted-foreground/30">NO_DATA_BUFFER_FOUND</span>
+      <span className="text-[10px] font-display uppercase tracking-[0.2em] text-muted-foreground/30">NENHUM_DADO_ENCONTRADO</span>
     </div>
   );
 
   return (
     <div className="p-6 bg-[#0b0b0b] border-y border-white/5 relative overflow-hidden">
       <div className="absolute top-0 right-0 p-2 text-[10px] font-mono text-muted-foreground/10 uppercase tracking-widest font-black pointer-events-none">
-        CONTEXT_WINDOW_v2.5
+        JANELA_DE_CONTEXTO_v2.5
       </div>
       
       <div className="flex items-center gap-3 mb-6">
         <div className="w-1 h-4 bg-primary/60" />
         <h4 className="text-[11px] uppercase tracking-[0.25em] font-display text-muted-foreground flex items-center gap-2">
-          PROTOCOL_HISTORY_STREAM
+          FLUXO_DO_HISTÓRICO_DO_PROTOCOLO
         </h4>
       </div>
 
@@ -89,7 +90,7 @@ function MessagePreview({ jid }) {
               } rounded-none relative group`}>
                 <div className="flex items-center justify-between gap-6 mb-2 border-b border-white/5 pb-1">
                   <span className="text-[11px] font-display uppercase tracking-widest text-primary/60 truncate max-w-[150px]">
-                    {msg.pushName || (msg.fromMe ? 'SYSTEM_ROOT' : 'EXT_USER')}
+                    {msg.pushName || (msg.fromMe ? 'SISTEMA' : 'USUÁRIO_EXTERNO')}
                   </span>
                   <span className="text-[10px] font-mono text-muted-foreground/40 font-black">
                     {msg.timestamp?.toDate()?.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
@@ -102,14 +103,14 @@ function MessagePreview({ jid }) {
                 {msg.extracted === "waiting_context" && (
                   <div className="mt-3 pt-2 border-t border-amber-500/20 flex items-center gap-2 text-[11px] text-amber-500/80 font-mono font-black uppercase tracking-widest">
                     <AlertCircle size={10} />
-                    <span>FRAGMENT_DETECTED: {msg.completenessReason || "WAIT_CONTEXT"}</span>
+                    <span>FRAGMENTO_DETECTADO: {msg.completenessReason || "AGUARDANDO_CONTEXTO"}</span>
                   </div>
                 )}
 
                 {msg.extracted === "skipped" && (
                   <div className="mt-3 pt-2 border-t border-red-500/20 flex items-center gap-2 text-[11px] text-red-500/60 font-mono font-black uppercase tracking-widest">
                     <Info size={10} />
-                    <span>FILTER_SKIPPED: {msg.relevanceCategory || "IRRELEVANT"}</span>
+                    <span>FILTRO_IGNORADO: {msg.relevanceCategory || "IRRELEVANTE"}</span>
                   </div>
                 )}
 
@@ -227,10 +228,10 @@ function ContactCrmDetailView({ jid }) {
               <div key={opp.id} className="p-3 bg-[#151515] border border-primary/10 flex flex-col gap-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-black uppercase tracking-tight text-foreground truncate">{opp.title}</span>
-                  <Badge className="bg-primary/10 text-primary border-none text-[10px]">{opp.stage || 'NEW'}</Badge>
+                  <Badge className="bg-primary/10 text-primary border-none text-[10px]">{uiLabel(opp.stage || 'new', ACTION_STAGE_LABELS)}</Badge>
                 </div>
                 {opp.estimatedValue && (
-                  <span className="text-[10px] font-mono text-primary/60">VALOR_EST: R$ {opp.estimatedValue}</span>
+                  <span className="text-[10px] font-mono text-primary/60">VALOR_ESTIMADO: R$ {opp.estimatedValue}</span>
                 )}
               </div>
             ))}
@@ -242,7 +243,7 @@ function ContactCrmDetailView({ jid }) {
         <div>
           <div className="flex items-center gap-2 mb-3 text-[11px] font-display uppercase tracking-[0.2em] text-amber-500/80">
             <CheckSquare size={12} />
-            AÇÕES_E_FOLLOW_UPS
+            AÇÕES_E_RETORNOS
           </div>
           <div className="space-y-2">
             {tasks.map(task => (
@@ -344,7 +345,7 @@ export default function ContactReviewQueue() {
             <TooltipTrigger>
               <div className="flex items-center gap-2 text-muted-foreground/20 italic font-mono text-[11px] uppercase tracking-widest">
                 <Brain size={10} className="grayscale opacity-30" />
-                <span>NO_INSIGHT</span>
+                <span>SEM_ANÁLISE</span>
               </div>
             </TooltipTrigger>
             <TooltipContent className="bg-black border-white/10 rounded-none text-[11px] font-mono tracking-widest uppercase">
@@ -399,7 +400,7 @@ export default function ContactReviewQueue() {
               <div className="h-px w-8 bg-white/5" />
               <div className="flex items-center gap-2 text-[9px] font-mono text-primary/60 font-black">
                 <Shield size={10} />
-                <span>ACTIVE_GUARD_LOADED</span>
+                <span>PROTEÇÃO_ATIVA_CARREGADA</span>
               </div>
             </div>
           </div>
@@ -416,7 +417,7 @@ export default function ContactReviewQueue() {
             {isProcessing ? (
               <>
                 <Terminal className="w-3.5 h-3.5 mr-2 animate-pulse" />
-                SYNCING_LOTE...
+                SINCRONIZANDO_LOTE...
               </>
             ) : (
               <>
@@ -449,7 +450,7 @@ export default function ContactReviewQueue() {
                           className="absolute inset-0 bg-primary/60" 
                         />
                       </div>
-                      <span className="text-[10px] font-mono font-black uppercase tracking-[0.5em] text-muted-foreground/30">BUFFERING_ENVIRONMENT_DATA...</span>
+                      <span className="text-[10px] font-mono font-black uppercase tracking-[0.5em] text-muted-foreground/30">CARREGANDO_DADOS_DO_AMBIENTE...</span>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -457,7 +458,7 @@ export default function ContactReviewQueue() {
               {!loading && allItems.length === 0 && (
                 <TableRow className="hover:bg-transparent border-white/5">
                   <TableCell colSpan={5} className="text-center py-24">
-                    <span className="text-[10px] font-mono font-black uppercase tracking-[0.4em] text-muted-foreground/20 italic">NULL_STREAM_DETECTION</span>
+                    <span className="text-[10px] font-mono font-black uppercase tracking-[0.4em] text-muted-foreground/20 italic">NENHUM_FLUXO_DETECTADO</span>
                   </TableCell>
                 </TableRow>
               )}
@@ -481,7 +482,7 @@ export default function ContactReviewQueue() {
                           ) : (
                             <MessageSquare size={14} className="text-primary/60" />
                           )}
-                          <span className="truncate max-w-[250px]">{item.name || item.pushName || "UNIDENTIFIED_USER"}</span>
+                          <span className="truncate max-w-[250px]">{item.name || item.pushName || "USUÁRIO_NÃO_IDENTIFICADO"}</span>
                         </span>
                         <ContactCrmQuickSignals jid={item.id} />
 
@@ -489,7 +490,7 @@ export default function ContactReviewQueue() {
                           <span className="text-muted-foreground/30">{item.id}</span>
                           <span className="text-muted-foreground/10">•</span>
                           <span className="text-muted-foreground/40 font-black">
-                            ACT: {item.lastMessageAt?.toDate()?.toLocaleDateString("pt-BR", { hour12: false, hour: '2-digit', minute: '2-digit' })}
+                            ATUAL: {item.lastMessageAt?.toDate()?.toLocaleDateString("pt-BR", { hour12: false, hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
                       </div>
@@ -566,4 +567,3 @@ export default function ContactReviewQueue() {
     </div>
   );
 }
-

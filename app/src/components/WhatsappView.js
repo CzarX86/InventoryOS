@@ -12,11 +12,11 @@ export default function WhatsappView() {
       <div className="px-4 md:px-6 pt-10 pb-8 bg-[#0e0e0e] border-b border-[#484848]/20">
         <div className="flex items-center gap-3 mb-4">
             <Badge variant="outline" className="h-5 px-2 bg-[#1f2020] text-[#acc3ce] border-[#484848]/20 text-[11px] font-normal uppercase tracking-[0.2em] shadow-none rounded-none font-display">
-            REALTIME_MONITOR.LOG
+            MONITORAMENTO_EM_TEMPO_REAL.LOG
           </Badge>
         </div>
         <h1 className="text-3xl md:text-4xl font-normal uppercase tracking-tighter text-[#e7e5e5] leading-none font-display">
-          COMMS_HUBS<br /><span className="text-[#acabaa]/30">IA_AUTOMATION_NODE</span>
+          CENTRAL_DE_COMUNICAÇÕES<br /><span className="text-[#acabaa]/30">NÚCLEO_DE_AUTOMAÇÃO_IA</span>
         </h1>
       </div>
 
@@ -26,30 +26,30 @@ export default function WhatsappView() {
           <div className="bg-[#131313] p-6 space-y-4">
             <div className="flex items-center gap-2 text-[#acabaa]">
               <Zap size={14} className="text-[#97a5ff]" />
-              <span className="text-[11px] font-normal uppercase tracking-[0.2em] font-display">PASSIVE_INGESTION</span>
+              <span className="text-[11px] font-normal uppercase tracking-[0.2em] font-display">INGESTÃO_PASSIVA</span>
             </div>
             <p className="text-[11px] text-[#acabaa]/60 leading-relaxed font-mono uppercase">
-              RECV_STREAM: MONITORING ALL INCOMING TRAFFIC. EACH PACKET IS LOGGED FOR CONTINUOUS NEURAL TRAINING.
+              FLUXO_DE_RECEBIMENTO: MONITORANDO TODO O TRÁFEGO_RECEBIDO. CADA PACOTE É REGISTRADO PARA TREINAMENTO_NEURAL_CONTÍNUO.
             </p>
           </div>
 
           <div className="bg-[#131313] p-6 space-y-4">
             <div className="flex items-center gap-2 text-[#acabaa]">
               <ShieldCheck size={14} className="text-[#97a5ff]" />
-              <span className="text-[11px] font-normal uppercase tracking-[0.2em] font-display">INSTANCE_ID_POLICY</span>
+              <span className="text-[11px] font-normal uppercase tracking-[0.2em] font-display">POLÍTICA_DE_ID_DA_INSTÂNCIA</span>
             </div>
             <p className="text-[11px] text-[#acabaa]/60 leading-relaxed font-mono uppercase">
-              IDENT_PREFIX: [IOS_] FOR CORE INVENTORY SYSTEMS. AUTO-HW DETECTION ENABLED VIA API SNIFFER.
+              PREFIXO_DO_ID: [IOS_] PARA OS SISTEMAS CENTRAIS DE INVENTÁRIO. DETECÇÃO_AUTOMÁTICA_DE_HARDWARE ATIVADA PELO ANALISADOR_DA_API.
             </p>
           </div>
 
           <div className="bg-[#191a1a] p-6 space-y-4 border-l border-[#484848]/10">
             <div className="flex items-center gap-2 text-[#97a5ff]">
               <Info size={14} />
-              <span className="text-[11px] font-normal uppercase tracking-[0.2em] font-display">BOOT_CONFIGURATION</span>
+              <span className="text-[11px] font-normal uppercase tracking-[0.2em] font-display">CONFIGURAÇÃO_DE_INICIALIZAÇÃO</span>
             </div>
             <p className="text-[11px] text-[#97a5ff]/60 leading-relaxed font-mono uppercase italic">
-              IF_NULL: EXEC [WEBHOOK_SYNC] ON INSTANCE AFTER AUTHENTICATION TO ENGAGE PIPELINE.
+              SE_NULO: EXECUTAR [WEBHOOK_SYNC] NA INSTÂNCIA APÓS A AUTENTICAÇÃO PARA ATIVAR O FLUXO.
             </p>
           </div>
         </div>

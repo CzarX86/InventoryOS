@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { INVENTORY_STATUS_LABELS } from "@/lib/uiText";
 
 function DetailField({ icon: Icon, label, value, mono = false }) {
   return (
@@ -20,7 +21,7 @@ function DetailField({ icon: Icon, label, value, mono = false }) {
         <span className="text-[11px] font-display font-normal uppercase tracking-[0.2em]">{label}</span>
       </div>
       <p className={`text-sm text-foreground/90 ${mono ? "font-mono" : "font-display font-normal uppercase"} tracking-tight`}>
-        {value || <span className="text-muted-foreground/20 italic">NULL_DATA</span>}
+        {value || <span className="text-muted-foreground/20 italic">DADO_NÃO_INFORMADO</span>}
       </p>
     </div>
   );
@@ -51,7 +52,7 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
   };
 
   const formatDate = (date) => {
-    if (!date) return "N/A";
+    if (!date) return "N/D";
     const d = date.toDate ? date.toDate() : new Date(date);
     return new Intl.DateTimeFormat('pt-BR', {
       day: '2-digit',
@@ -80,6 +81,7 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
             <Button 
               size="icon"
               variant="outline"
+              aria-label="Compartilhar no WhatsApp"
               className="w-10 h-10 rounded-none bg-[#1f2020] border-foreground/10 hover:bg-foreground hover:text-background transition-none"
               onClick={() => handleShare("whatsapp")}
             >
@@ -88,6 +90,7 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
             <Button 
                size="icon"
                variant="outline"
+               aria-label="Editar item"
                className="w-10 h-10 rounded-none bg-[#1f2020] border-foreground/10 hover:bg-primary hover:text-primary-foreground transition-none"
                onClick={() => onEdit(item)}
             >
@@ -114,7 +117,7 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
                     ${item.status === "IN STOCK" ? "bg-emerald-500/10 text-emerald-500" :
                     item.status === "SOLD" ? "bg-foreground/5 text-muted-foreground/60" :
                     "bg-red-500/10 text-red-500"}`}>
-                  {item.status}
+                  {INVENTORY_STATUS_LABELS[item.status] || item.status}
                 </div>
               </div>
               <h2 className="text-4xl font-display font-normal uppercase tracking-tighter text-foreground leading-none mb-1 truncate">
@@ -128,10 +131,10 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
         {/* Content */}
         <div className="flex-1 overflow-y-auto custom-scrollbar bg-[#0e0e0e]">
           <div className="grid grid-cols-1 md:grid-cols-2 p-10 gap-x-12 border-b border-foreground/5">
-            <DetailField icon={Server} label="CATEGORIA_IDX" value={item.type} />
-            <DetailField icon={Hash} label="PART_NUMBER_REF" value={item.partNumber} mono />
-            <DetailField icon={Calendar} label="ENTRY_TIMESTAMP" value={formatDate(item.createdAt)} />
-            <DetailField icon={Activity} label="LAST_SYNCHRONIZATION" value={formatDate(item.updatedAt)} />
+            <DetailField icon={Server} label="CATEGORIA" value={item.type} />
+            <DetailField icon={Hash} label="REFERÊNCIA_DO_CÓDIGO" value={item.partNumber} mono />
+            <DetailField icon={Calendar} label="DATA_DE_ENTRADA" value={formatDate(item.createdAt)} />
+            <DetailField icon={Activity} label="ÚLTIMA_SINCRONIZAÇÃO" value={formatDate(item.updatedAt)} />
           </div>
 
           <div className="p-10">
@@ -139,13 +142,13 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
             <div className="mb-12">
               <div className="flex items-center gap-2 mb-6 opacity-40">
                 <CornerRightDown size={14} className="text-primary/60" />
-                <h4 className="text-[11px] font-display font-normal uppercase tracking-[0.2em]">TECHNICAL_SPECIFICATIONS.TXT</h4>
+                <h4 className="text-[11px] font-display font-normal uppercase tracking-[0.2em]">ESPECIFICAÇÕES_TÉCNICAS.TXT</h4>
               </div>
               <div className="bg-[#131313] border border-foreground/10 p-8 rounded-none relative group transition-all">
                 <div className="absolute top-0 right-0 p-3 text-[10px] font-mono text-muted-foreground/20 uppercase font-bold">UTF-8</div>
                 <div className="absolute top-0 left-0 w-[2px] h-0 bg-primary group-hover:h-full transition-all duration-300" />
                 <p className="text-sm text-foreground/70 leading-relaxed font-mono whitespace-pre-wrap">
-                  {item.specifications || "NO_TECHNICAL_DATA_AVAILABLE_IN_SYSTEM_INDEX"}
+                  {item.specifications || "NENHUM_DADO_TÉCNICO_DISPONÍVEL"}
                 </p>
               </div>
             </div>
@@ -158,8 +161,8 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-3">
-                    <p className="text-[11px] font-display font-normal uppercase tracking-[0.2em] opacity-30">VOICE_TRANSMISSION_LOG</p>
-                    <span className="text-[10px] font-mono text-primary/40 uppercase">AI_SOURCE_ENCODED</span>
+                    <p className="text-[11px] font-display font-normal uppercase tracking-[0.2em] opacity-30">REGISTRO_DA_TRANSMISSÃO_DE_VOZ</p>
+                    <span className="text-[10px] font-mono text-primary/40 uppercase">FONTE_IA_CODIFICADA</span>
                   </div>
                   <audio src={item.audioUrl} controls className="w-full h-8 brightness-[0.4] contrast-200" />
                 </div>
@@ -175,11 +178,10 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
             onClick={onClose}
             className="w-full py-8 text-[12px] font-display font-normal uppercase tracking-[0.4em] hover:bg-foreground hover:text-background rounded-none transition-all duration-300 text-muted-foreground/60"
           >
-            DISMISS_VIEWPORT_TERMINAL
+            FECHAR_DETALHES
           </Button>
         </div>
       </DialogContent>
     </Dialog>
   );
 }
-

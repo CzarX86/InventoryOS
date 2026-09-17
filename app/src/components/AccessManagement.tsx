@@ -100,10 +100,10 @@ export default function AccessManagement({ currentUser }: AccessManagementProps)
           <div>
             <div className="mb-3 flex items-center gap-2">
               <ShieldCheck size={15} className="text-[#97a5ff]" />
-              <span className="font-mono text-[9px] uppercase tracking-[0.25em] text-[#acabaa]/50">ACCESS_CONTROL</span>
+              <span className="font-mono text-[9px] uppercase tracking-[0.25em] text-[#acabaa]/50">CONTROLE_DE_ACESSO</span>
             </div>
             <h2 className="font-display text-2xl font-normal uppercase tracking-tight text-[#e7e5e5]">Usuários da plataforma</h2>
-            <p className="mt-2 max-w-xl text-xs leading-relaxed text-[#acabaa]/60">Aprovação obrigatória antes de liberar qualquer dado. O owner da plataforma é protegido e não aparece nesta lista.</p>
+            <p className="mt-2 max-w-xl text-xs leading-relaxed text-[#acabaa]/60">Aprovação obrigatória antes de liberar qualquer dado. O proprietário da plataforma é protegido e não aparece nesta lista.</p>
           </div>
           <Button variant="outline" onClick={() => void loadUsers()} disabled={loading} className="w-fit rounded-none border-[#484848]/30 text-xs uppercase tracking-widest">
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} /> Atualizar
