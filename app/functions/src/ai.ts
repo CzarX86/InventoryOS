@@ -16,8 +16,12 @@ export async function generateStructuredOutput(prompt: string, modelName = "gemi
   const geminiApiKey = process.env.GEMINI_API_KEY;
   const deepseekApiKey = process.env.DEEPSEEK_API_KEY;
 
-  if (modelName.startsWith("deepseek-")) {
+  if (modelName.startsWith("deepseek-") && deepseekApiKey) {
     return generateDeepSeekStructuredOutput(prompt, modelName, parts, { ...options, deepseekApiKey });
+  }
+
+  if (modelName.startsWith("deepseek-") && geminiApiKey) {
+    return generateGeminiStructuredOutput(prompt, "gemini-2.0-flash", parts, { ...options, geminiApiKey });
   }
   return generateGeminiStructuredOutput(prompt, modelName, parts, { ...options, geminiApiKey });
 }

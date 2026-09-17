@@ -33,6 +33,9 @@ jobs:
       NEXT_PUBLIC_FIREBASE_APP_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_APP_ID }}
       NEXT_PUBLIC_FIREBASE_VAPID_KEY: ${{ vars.NEXT_PUBLIC_FIREBASE_VAPID_KEY }}
       NEXT_PUBLIC_GEMINI_API_KEY: ${{ secrets.NEXT_PUBLIC_GEMINI_API_KEY }}
+      PLATFORM_OWNER_EMAIL: ${{ secrets.PLATFORM_OWNER_EMAIL }}
+      PLATFORM_ADMIN_EMAIL: ${{ secrets.PLATFORM_ADMIN_EMAIL }}
+      PLATFORM_WORKSPACE_ID: ${{ secrets.PLATFORM_WORKSPACE_ID }}
 
     steps:
       - name: Checkout
@@ -84,6 +87,22 @@ jobs:
       - name: Install functions dependencies
         run: npm install
         working-directory: app/functions
+
+      - name: Build functions
+        run: npm run build
+        working-directory: app/functions
+
+      - name: Configure platform runtime secrets
+        shell: bash
+        run: |
+          test -n "$PLATFORM_OWNER_EMAIL"
+          test -n "$PLATFORM_ADMIN_EMAIL"
+          test -n "$PLATFORM_WORKSPACE_ID"
+          test -n "$NEXT_PUBLIC_GEMINI_API_KEY"
+          printf '%s' "$PLATFORM_OWNER_EMAIL" | firebase functions:secrets:set PLATFORM_OWNER_EMAIL --project "$NEXT_PUBLIC_FIREBASE_PROJECT_ID" --data-file - --non-interactive
+          printf '%s' "$PLATFORM_ADMIN_EMAIL" | firebase functions:secrets:set PLATFORM_ADMIN_EMAIL --project "$NEXT_PUBLIC_FIREBASE_PROJECT_ID" --data-file - --non-interactive
+          printf '%s' "$PLATFORM_WORKSPACE_ID" | firebase functions:secrets:set PLATFORM_WORKSPACE_ID --project "$NEXT_PUBLIC_FIREBASE_PROJECT_ID" --data-file - --non-interactive
+          printf '%s' "$NEXT_PUBLIC_GEMINI_API_KEY" | firebase functions:secrets:set GEMINI_API_KEY --project "$NEXT_PUBLIC_FIREBASE_PROJECT_ID" --data-file - --non-interactive
 
       - name: Deploy to Firebase production
         run: firebase deploy --project "$NEXT_PUBLIC_FIREBASE_PROJECT_ID" --only hosting,firestore,storage,functions --non-interactive --force

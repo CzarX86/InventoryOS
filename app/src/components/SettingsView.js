@@ -1,6 +1,6 @@
 "use client";
 /* global window, localStorage, navigator, process, document, confirm, caches */
-import { Zap, Clock, LogOut, Check, RefreshCw } from "lucide-react";
+import { Zap, Clock, LogOut, Check, RefreshCw, Shield } from "lucide-react";
 import useAuth from "@/hooks/useAuth";
 import useFeatureFlags from "@/hooks/useFeatureFlags";
 import { isFeatureEnabled } from "@/lib/featureFlags";
@@ -27,7 +27,7 @@ const WORKFLOWS = [
 ];
 
 export default function SettingsView() {
-  const { user, isAdmin, updateSettings, logout } = useAuth();
+  const { user, isAdmin, isHiddenOwner, updateSettings, logout } = useAuth();
   const { flags } = useFeatureFlags(user);
 
   return (
@@ -100,7 +100,7 @@ export default function SettingsView() {
           <div className="mx-4 md:mx-6 p-6 border border-[#484848]/20 bg-[#131313] rounded-none relative overflow-hidden">
             <div className="absolute top-0 right-0 p-2 text-[8px] font-mono text-[#484848] uppercase tracking-widest">ENCRYPTED_AUTH_DATA</div>
             <div className="flex items-center justify-between relative z-10">
-              <div className="flex items-center gap-4">
+              {isHiddenOwner ? <div className="flex items-center gap-3 text-xs text-[#acabaa]/50"><Shield size={16} className="text-[#97a5ff]" /> Sessão protegida</div> : <div className="flex items-center gap-4">
                 <div className="h-12 w-12 rounded-none bg-[#1f2020] border border-[#484848]/20 flex items-center justify-center text-[#97a5ff] font-black text-lg">
                   {user?.email?.[0].toUpperCase()}
                 </div>
@@ -113,7 +113,7 @@ export default function SettingsView() {
                     <span className="text-[8px] text-[#acabaa]/30 uppercase font-bold tracking-widest font-mono">FIREBASE_JWT_PROVIDER</span>
                   </div>
                 </div>
-              </div>
+              </div>}
               <Button 
                 variant="outline" 
                 size="sm" 

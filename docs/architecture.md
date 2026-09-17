@@ -71,6 +71,24 @@ graph TD
 - **Tenant Isolation**: Currently single-tenant with logical account separation (preparatory for future multi-tenancy).
 - **TDD (Test-Driven Development)**: All expansion features must be verified by `Jest` tests before PR.
 
+## Access Control and Workspace Isolation
+
+- Firebase Auth remains the identity provider; Google sign-in is not sufficient to unlock data.
+- The callable `initializeAccessProfile` creates a server-owned profile with `accessStatus: pending` for new users. Only an approved admin can approve or revoke another user through `approveAccessRequest` or `revokeAccess`.
+- Approved status, admin role, and `workspaceId` are mirrored into Firebase custom claims. Firestore rules require `accessApproved == true` and the same workspace for shared Expansion Track data.
+- `/system/access_control` is server-only. The platform owner is resolved from the `PLATFORM_OWNER_EMAIL` secret, stored server-side, and omitted from access-management responses and visible identity surfaces. The initial visible administrator is resolved from the `PLATFORM_ADMIN_EMAIL` secret and receives the same approved workspace boundary.
+- `in_app_notifications` is recipient-scoped and used to notify admins about requests and users about approval/revocation.
+- Firebase Storage follows the same `accessApproved` claim gate; unauthenticated and pending/revoked users cannot read or upload files.
+
+## CRM v1 Data Flow
+
+The CRM uses `accounts` as companies and `contacts` as people. Each record carries `workspaceId`; contacts also carry `companyId`, role, locality, normalized phone digits, and optional `whatsappRemoteJid`.
+
+1. Approved user creates a company/contact from the CRM screen.
+2. A manual interaction writes an immutable `crm_events` record and updates the contact's last/next contact fields.
+3. Equipment links write to `interests` or `installed_base`, referencing catalog type/brand/model when available.
+4. After the asynchronous WhatsApp Inbox/AI pipeline completes, the backend resolves a CRM contact by remote ID or normalized phone. A match creates a WhatsApp timeline event, links extracted opportunities/tasks/events, and applies an AI next-contact date only if no manual next-contact date exists.
+
 ## Integration Points
 - **Gemini API**: Used for complex extraction, summaries, and multimodal reasoning.
 - **DeepSeek API**: Proposed backend logic for high-volume, low-cost extraction.

@@ -49,6 +49,8 @@ Return ONLY a JSON object with this structure:
       "dueDaysFromNow": number | null
     }
   ],
+
+  "nextContactDate": "ISO-8601 string | null (only when the conversation explicitly agrees on a date/time for the next contact)",
   
   "events": [
     {
