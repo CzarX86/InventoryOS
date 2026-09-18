@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { X, Edit2, Mic, Package, Hash, Tag, Activity, Calendar, Server, Share2, CornerRightDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getBrandLogo } from "@/lib/utils";
@@ -27,6 +28,8 @@ function DetailField({ icon: Icon, label, value, mono = false }) {
 }
 
 export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
+  const [isImagePreviewOpen, setIsImagePreviewOpen] = useState(false);
+
   if (!item) return null;
 
   const handleShare = async (platform = "native") => {
@@ -63,7 +66,7 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { setIsImagePreviewOpen(false); onClose(); } }}>
       <DialogContent className="sm:max-w-2xl bg-[#0e0e0e] border-foreground/10 p-0 overflow-hidden shadow-none flex flex-col max-h-[95vh] rounded-none focus:outline-none">
         <DialogHeader className="hidden">
           <DialogTitle>{item.model}</DialogTitle>
@@ -97,9 +100,17 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
           
           <div className="relative z-10 flex items-end gap-8">
             {item.productImageUrl ? (
-              <div className="w-32 h-32 rounded-none overflow-hidden border border-foreground/10 bg-[#0e0e0e] grayscale group hover:grayscale-0 transition-all duration-500">
+              <button
+                type="button"
+                className="group relative w-32 h-32 rounded-none overflow-hidden border border-foreground/10 bg-[#0e0e0e] grayscale hover:grayscale-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-[#131313] transition-all duration-500 cursor-zoom-in"
+                onClick={() => setIsImagePreviewOpen(true)}
+                aria-label={`Ampliar imagem de ${item.model}`}
+              >
                 <img src={item.productImageUrl} alt={item.model} className="w-full h-full object-cover scale-110 group-hover:scale-100 transition-transform duration-700" />
-              </div>
+                <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-white opacity-0 transition-opacity duration-300 group-hover:bg-black/35 group-hover:opacity-100 group-focus-visible:bg-black/35 group-focus-visible:opacity-100">
+                  <span className="text-[10px] font-display uppercase tracking-[0.18em]">Ampliar</span>
+                </span>
+              </button>
             ) : (
               <div className="w-32 h-32 rounded-none bg-[#1f2020] border border-foreground/10 flex items-center justify-center text-muted-foreground/20">
                 <Package size={40} strokeWidth={1} />
@@ -130,6 +141,7 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
           <div className="grid grid-cols-1 md:grid-cols-2 p-10 gap-x-12 border-b border-foreground/5">
             <DetailField icon={Server} label="CATEGORIA_IDX" value={item.type} />
             <DetailField icon={Hash} label="PART_NUMBER_REF" value={item.partNumber} mono />
+            <DetailField icon={Hash} label="GTIN_EAN_REF" value={item.gtin} mono />
             <DetailField icon={Calendar} label="ENTRY_TIMESTAMP" value={formatDate(item.createdAt)} />
             <DetailField icon={Activity} label="LAST_SYNCHRONIZATION" value={formatDate(item.updatedAt)} />
           </div>
@@ -149,6 +161,47 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
                 </p>
               </div>
             </div>
+
+            {item.metadata?.catalogEnrichment?.status && (
+              <div className="mb-12 flex flex-wrap items-center gap-3 border border-foreground/10 bg-[#131313] p-5">
+                <span className="text-[10px] font-display uppercase tracking-[0.2em] text-muted-foreground/60">CATALOG_ENRICHMENT</span>
+                <Badge variant="outline" className="rounded-none border-primary/20 bg-primary/5 text-[10px] font-mono uppercase tracking-widest text-primary">
+                  {item.metadata.catalogEnrichment.status}
+                </Badge>
+                {item.metadata.catalogEnrichment.matchedBy && (
+                  <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/50">
+                    MATCH: {item.metadata.catalogEnrichment.matchedBy}
+                  </span>
+                )}
+                {item.metadata.catalogEnrichment.sourceUrl && (
+                  <a
+                    href={item.metadata.catalogEnrichment.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[10px] font-mono uppercase tracking-widest text-primary underline underline-offset-4"
+                  >
+                    OPEN_ICECAT_SOURCE
+                  </a>
+                )}
+              </div>
+            )}
+
+            {item.technicalSpecifications && Object.keys(item.technicalSpecifications).length > 0 && (
+              <div className="mb-12">
+                <div className="flex items-center gap-2 mb-6 opacity-40">
+                  <Tag size={14} className="text-primary/60" />
+                  <h4 className="text-[11px] font-display font-normal uppercase tracking-[0.2em]">CATALOG_SPECIFICATIONS.JSON</h4>
+                </div>
+                <div className="grid grid-cols-1 gap-px border border-foreground/10 bg-foreground/10 md:grid-cols-2">
+                  {Object.entries(item.technicalSpecifications).map(([name, value]) => (
+                    <div key={name} className="bg-[#131313] p-4">
+                      <p className="mb-2 text-[10px] font-display uppercase tracking-[0.16em] text-muted-foreground/50">{name}</p>
+                      <p className="text-sm font-mono text-foreground/80">{String(value)}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Audio Log Section */}
             {item.audioUrl && (
@@ -179,7 +232,22 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
           </Button>
         </div>
       </DialogContent>
+
+      <Dialog open={isImagePreviewOpen} onOpenChange={setIsImagePreviewOpen}>
+        <DialogContent className="w-fit max-w-[calc(100%-2rem)] border-foreground/10 bg-[#09090b] p-0 rounded-none shadow-2xl">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Imagem ampliada: {item.model}</DialogTitle>
+            <DialogDescription>Visualização ampliada da imagem do equipamento {item.model}.</DialogDescription>
+          </DialogHeader>
+          <div className="flex max-h-[90vh] max-w-[92vw] items-center justify-center p-4 sm:p-6">
+            <img
+              src={item.productImageUrl}
+              alt={item.model}
+              className="max-h-[82vh] max-w-full object-contain"
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
-

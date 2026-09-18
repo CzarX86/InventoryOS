@@ -22,7 +22,7 @@ describe("useFeatureFlags", () => {
     const { result } = renderHook(() => useFeatureFlags(null));
 
     expect(result.current.loading).toBe(false);
-    expect(result.current.enabledCount).toBe(1);
+    expect(result.current.enabledCount).toBe(2);
     expect(mockOnSnapshot).not.toHaveBeenCalled();
   });
 
@@ -48,7 +48,6 @@ describe("useFeatureFlags", () => {
     expect(result.current.flags.whatsappIngestion).toBe(true);
     expect(result.current.flags.supplierRfq).toBe(true);
     expect(result.current.flags.actionInbox).toBe(false);
-    expect(result.current.enabledCount).toBe(3);
+    expect(result.current.enabledCount).toBe(4);
   });
 });
-

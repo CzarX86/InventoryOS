@@ -128,7 +128,7 @@ describe("AdminDashboard", () => {
 
     expect(await screen.findByText("AI_Resource_Consumption")).toBeInTheDocument();
     expect(screen.getByText("Deployment_Control")).toBeInTheDocument();
-    expect(screen.getByText(/1 \/ 7 ACTIVE_FLAGS/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 \/ 8 ACTIVE_FLAGS/i)).toBeInTheDocument();
     expect(screen.getByText("contactReviewQueue")).toBeInTheDocument();
     expect(screen.getAllByText("Disabled").length).toBeGreaterThan(0);
     expect(screen.getByText("Stock_Status")).toBeInTheDocument();

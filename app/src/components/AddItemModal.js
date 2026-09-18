@@ -37,7 +37,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 const STATUS_OPTIONS = ["IN STOCK", "SOLD", "REPAIR", "RESERVED"];
 
 const EMPTY_FORM = {
-  type: "", brand: "", model: "", partNumber: "",
+  type: "", brand: "", model: "", partNumber: "", gtin: "",
   specifications: "", status: "IN STOCK", audioUrl: "", productImageUrl: "",
 };
 
@@ -651,6 +651,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                       { id: "brand",                label: "MANUFACTURER",    placeholder: "SIEMENS / WEG / ABB" },
                       { id: "model",                label: "MODEL_REF",                placeholder: "SYS_REFERENCE" },
                       { id: "partNumber",           label: "SERIAL_PN",           placeholder: "S/N ID", mono: true },
+                      { id: "gtin",                 label: "GTIN_EAN",            placeholder: "EAN / UPC / GTIN", mono: true },
                     ].map(field => (
                       <div key={field.id} className="space-y-4">
                         <div className="flex items-center justify-between px-1">

@@ -1,7 +1,7 @@
 import * as admin from "firebase-admin";
 admin.initializeApp(); // Initialize early for child modules
 
-import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { onDocumentCreated, onDocumentWritten } from "firebase-functions/v2/firestore";
 import { onRequest, onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
 import { onSchedule, ScheduledEvent } from "firebase-functions/v2/scheduler";
 import * as logger from "firebase-functions/logger";
@@ -23,6 +23,11 @@ import {
   createInterestRecord 
 } from "./crmDomain";
 import { processHardwareInterests } from "./hardwareResolution";
+import {
+  buildEnrichmentPatch,
+  buildProductLookupSignature,
+  lookupOpenIcecatProduct,
+} from "./productEnrichment";
 import { processPendingContactClassifications } from "./whatsappClassification";
 import {
   ensureAccessAdmin,
@@ -64,7 +69,24 @@ async function findLinkedCrmContact(db: FirebaseFirestore.Firestore, workspaceId
     .where("phoneDigits", "==", phoneDigits)
     .limit(1)
     .get();
-  return phoneSnapshot.empty ? null : phoneSnapshot.docs[0];
+  if (!phoneSnapshot.empty) return phoneSnapshot.docs[0];
+
+  // Additional numbers are stored in arrays so the CRM can keep multiple
+  // phones without exposing a WhatsApp remote ID in the UI. Scan the scoped
+  // workspace as a compatibility fallback until all contacts are migrated.
+  const contactsSnapshot = await db.collection("contacts")
+    .where("workspaceId", "==", workspaceId)
+    .limit(500)
+    .get();
+  return contactsSnapshot.docs.find((contact) => {
+    const data = contact.data() as Record<string, any>;
+    const phoneDigitsList = Array.isArray(data.phoneDigitsList) ? data.phoneDigitsList : [];
+    const whatsappPhoneDigits = Array.isArray(data.whatsappPhoneDigits) ? data.whatsappPhoneDigits : [];
+    const phoneNumbers = Array.isArray(data.phoneNumbers) ? data.phoneNumbers : [];
+    return phoneDigitsList.includes(phoneDigits)
+      || whatsappPhoneDigits.includes(phoneDigits)
+      || phoneNumbers.some((phone: any) => normalizePhoneDigits(phone?.value || phone?.number || phone?.digits) === phoneDigits);
+  }) || null;
 }
 
 function parseOptionalDate(value: any) {
@@ -562,6 +584,60 @@ export const processWhatsappEvent = onDocumentCreated("whatsapp_webhook_events/{
       errorMessage: error.message,
     });
   }
+}));
+
+/**
+ * Enriches inventory products automatically using the free Open Icecat catalog.
+ * The trigger runs on creation and whenever an identifying field changes. Its
+ * own metadata update is ignored through the lookup signature guard.
+ */
+export const enrichInventoryProduct = onDocumentWritten("inventory/{itemId}", withEventErrorHandling(async (event: any, logger: any) => {
+  const afterSnapshot = event.data?.after;
+  if (!afterSnapshot?.exists) return;
+
+  const item = afterSnapshot.data() || {};
+  const lookupSignature = buildProductLookupSignature(item);
+  const storedSignature = item.metadata?.catalogEnrichment?.lookupSignature || null;
+
+  if (!lookupSignature || storedSignature === lookupSignature) {
+    return;
+  }
+
+  const lookupResult = await lookupOpenIcecatProduct(item);
+  const enrichment = buildEnrichmentPatch(item, lookupResult);
+  const finalLookupSignature = buildProductLookupSignature({
+    ...item,
+    ...enrichment.fields,
+  });
+  const db = getFirestore();
+  const itemRef = db.collection("inventory").doc(event.params.itemId);
+
+  await itemRef.set({
+    ...enrichment.fields,
+    metadata: {
+      ...(item.metadata && typeof item.metadata === "object" ? item.metadata : {}),
+      catalogEnrichment: {
+        provider: "open_icecat",
+        status: lookupResult.status,
+        reason: lookupResult.reason || null,
+        matchedBy: lookupResult.matchedBy,
+        confidence: enrichment.confidence,
+        productId: lookupResult.product?.productId || null,
+        sourceUrl: lookupResult.product?.sourceUrl || lookupResult.sourceUrl || null,
+        lookupSignature: finalLookupSignature || lookupSignature,
+        attemptedAt: FieldValue.serverTimestamp(),
+        completedAt: FieldValue.serverTimestamp(),
+      },
+    },
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+
+  logger.info("Inventory product enrichment completed", {
+    itemId: event.params.itemId,
+    status: lookupResult.status,
+    matchedBy: lookupResult.matchedBy,
+    provider: "open_icecat",
+  });
 }));
 
 async function resolvePrimaryAdminUid(db: FirebaseFirestore.Firestore) {

@@ -28,6 +28,7 @@ describe("featureFlags helpers", () => {
       txtImport: false,
       supplierRfq: false,
       semiAutonomousAi: false,
+      crmPerformanceDashboard: true,
     });
   });
 
@@ -45,15 +46,15 @@ describe("featureFlags helpers", () => {
   });
 
   it("counts enabled flags and guards unknown names", () => {
-    expect(countEnabledFeatureFlags(DEFAULT_FEATURE_FLAGS)).toBe(1);
+    expect(countEnabledFeatureFlags(DEFAULT_FEATURE_FLAGS)).toBe(2);
     expect(countEnabledFeatureFlags({
       ...DEFAULT_FEATURE_FLAGS,
       contactReviewQueue: true,
       whatsappIngestion: true,
       supplierRfq: true,
-    })).toBe(3);
+    })).toBe(4);
     expect(isFeatureEnabled({ actionInbox: true }, "actionInbox")).toBe(true);
+    expect(isFeatureEnabled({ crmPerformanceDashboard: false }, "crmPerformanceDashboard")).toBe(false);
     expect(isFeatureEnabled({ actionInbox: true }, "unknownFlag")).toBe(false);
   });
 });
-

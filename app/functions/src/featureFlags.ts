@@ -6,6 +6,7 @@ export const EXPANSION_FEATURE_FLAGS = [
   "txtImport",
   "supplierRfq",
   "semiAutonomousAi",
+  "crmPerformanceDashboard",
 ];
 
 export const DEFAULT_FEATURE_FLAGS = Object.freeze({
@@ -16,6 +17,7 @@ export const DEFAULT_FEATURE_FLAGS = Object.freeze({
   txtImport: false,
   supplierRfq: false,
   semiAutonomousAi: false,
+  crmPerformanceDashboard: true,
 });
 
 function normalizeFlagValue(value: any) {
@@ -31,7 +33,9 @@ function normalizeFlagValue(value: any) {
 
 export function normalizeFeatureFlags(rawFlags: any = {}) {
   return EXPANSION_FEATURE_FLAGS.reduce((acc: any, flag) => {
-    acc[flag] = normalizeFlagValue(rawFlags?.[flag]);
+    if (Object.prototype.hasOwnProperty.call(rawFlags || {}, flag)) {
+      acc[flag] = normalizeFlagValue(rawFlags[flag]);
+    }
     return acc;
   }, { ...DEFAULT_FEATURE_FLAGS });
 }

@@ -68,9 +68,27 @@ active_decisions:
 - **Status**: Active.
 
 ## Decision: Company/contact CRM with immutable interaction history
-- **Decision**: Model `accounts` as companies, `contacts` as people, and `crm_events` as the interaction timeline. Equipment relationships use `interests` and `installed_base`; WhatsApp matching uses explicit remote ID first and normalized phone as fallback.
-- **Reason**: Preserve the customer's spreadsheet shape while supporting multiple contacts per company, roles, follow-up dates, equipment context, and asynchronous WhatsApp enrichment.
-- **Implications**: Manual next-contact dates cannot be overwritten by AI. WhatsApp enrichment is applied only when a CRM contact is linked, and all records carry the shared `workspaceId` boundary.
+- **Decision**: Model `accounts` as companies, `contacts` as people, and `crm_events` as the interaction timeline. Equipment relationships use `interests` and `installed_base`; WhatsApp matching uses explicit remote ID first, then primary or additional normalized phone digits.
+- **Reason**: Preserve the customer's spreadsheet shape while supporting multiple contacts per company, roles, follow-up dates, full company addresses, multiple communication channels, equipment context, and asynchronous WhatsApp enrichment.
+- **Implications**: The UI uses a contact list/detail flow with modal creation and progressive company autocomplete. WhatsApp status is captured per phone and the backend derives matching fields; the UI does not expose a remote ID field. Manual next-contact dates cannot be overwritten by AI. WhatsApp enrichment is applied only when a CRM contact is linked, and all records carry the shared `workspaceId` boundary.
+- **Status**: Active.
+
+## Decision: Build-time Firebase configuration per environment
+- **Decision**: Inject the public Firebase web configuration during each static frontend build, using the staging project for staging hosting and the production project for production hosting.
+- **Reason**: The exported Next.js bundle cannot resolve runtime Firebase environment variables in the browser. Missing values leave Firebase Auth uninitialized and make the Google login action appear unresponsive.
+- **Implications**: `NEXT_PUBLIC_FIREBASE_*` values are deployment inputs, not committed secrets. Production and staging must be built separately or with explicit environment injection; the login flow also falls back to redirect when browser pop-ups are blocked.
+- **Status**: Active.
+
+## Decision: Local-only development auth bypass
+- **Decision**: Development can use a fake approved administrator when `NEXT_PUBLIC_LOCAL_AUTH_BYPASS=true` is loaded from the ignored `.env.development.local` file. The bypass is additionally restricted to `NODE_ENV=development`.
+- **Reason**: Allow fast local UI/flow validation without requiring Google OAuth or an approved Firebase account.
+- **Implications**: Firebase initialization is disabled while the bypass is active, preventing the fake user from reading or writing staging/production data. Production builds cannot activate this path.
+- **Status**: Active.
+
+## Decision: CRM performance attribution and KPI contract
+- **Decision**: Attribute employee performance from `crm_events.actorUserId`, fall back to a non-system `ownerId` only when necessary, and keep system/unknown activity under an explicit unassigned bucket. The first dashboard KPI set is registered calls, explicit `contact_interaction` events, distinct contacts reached, scheduled follow-ups, overdue follow-ups, channel mix, and attribution coverage.
+- **Reason**: CRM v1 records do not yet contain call duration, connection state, call outcome, conversion, or revenue attribution. The dashboard must remain source-backed and avoid presenting inferred business performance as fact.
+- **Implications**: Automated WhatsApp activity is visible but does not inflate an employee's ranking. Adding conversion or quality KPIs requires new captured fields and tests before the dashboard contract is expanded.
 - **Status**: Active.
 
 ## FinOps Architecture Overview
@@ -200,6 +218,12 @@ Location: `system_usage/ai_usage_summary_{YYYYMM}`
   - O orçamento é configurado no documento Firestore `system/config` (campo: `aiMonthlyBudgetLimitUsd`).
   - Se o documento não existir, o limite padrão é **$10.00 USD**.
   - Violações de limite geram um log de categoria `finops` na coleção `system_audit_logs`.
+- **Status**: Active.
+
+## Decision: Automatic free product catalog enrichment
+- **Decision**: Enrich products in the legacy `inventory` collection automatically through the free Open Icecat catalog, using GTIN/EAN/UPC first and manufacturer part number or brand/model as fallbacks.
+- **Reason**: Improve technical completeness without introducing a paid product-data API or allowing an AI model to invent specifications.
+- **Implications**: New products and products whose identifying fields change are queried by a Firestore write trigger. The result stores provider, source URL, match method, confidence, structured specifications and lookup signature. Existing manually entered fields are preserved; products not found remain marked `not_found` for later manual enrichment.
 - **Status**: Active.
 
 ## Technical Reference
