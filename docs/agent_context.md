@@ -46,7 +46,7 @@ InventoryOS is an operational platform currently focused on inventory and item m
 ## Technologies in Use
 - **Frontend**: Next.js 15 (App Router), React, PWA, Tailwind CSS.
 - **UI Library**: `shadcn/ui` (default for new modules).
-- **Backend/Functions**: Firebase Cloud Functions Gen 2 (Node.js 20).
+- **Backend/Functions**: Firebase Cloud Functions Gen 2 (Node.js 22 LTS).
 - **Database/Storage**: Cloud Firestore, Firebase Storage.
 - **Authentication**: Firebase Auth.
 - **AI/LLM**: Google Generative AI (Gemini) SDK client-side, DeepSeek (proposed backend default).

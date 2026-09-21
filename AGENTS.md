@@ -154,7 +154,7 @@ Como usar:
 
 - **Frontend:** Next.js 15 (App Router), React, PWA
 - **Database/Auth:** Firebase (Firestore, Auth, Storage, Hosting)
-- **Functions:** Firebase Cloud Functions v2 (Node.js 20), trigger em `onDocumentCreated`
+- **Functions:** Firebase Cloud Functions v2 (Node.js 22 LTS), trigger em `onDocumentCreated`
 - **Push Notifications:** Firebase Cloud Messaging (FCM) + VAPID
 - **AI:** Google Generative AI SDK (Gemini) — chamado do lado do cliente via `NEXT_PUBLIC_GEMINI_API_KEY`
 - **Package manager:** pnpm
