@@ -12,7 +12,7 @@
 - **Auth**: Firebase Authentication (Email/Password, Google).
 - **Database**: `Cloud Firestore` (NoSQL).
 - **Functions**: `Firebase Cloud Functions v2` (Node.js 22 LTS), `onDocumentCreated` triggers.
-- **Storage**: `Firebase Storage` (for image uploads and WhatsApp text exports).
+- **Storage**: `Firebase Storage` with Rules v2 (for image uploads, CRM imports, and WhatsApp text exports).
 - **Hosting**: Firebase Hosting (Staging/Production).
 - **Push**: `Firebase Cloud Messaging (FCM)` for notifications.
 
