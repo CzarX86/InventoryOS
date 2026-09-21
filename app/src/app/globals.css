@@ -90,6 +90,16 @@ body {
 ::-webkit-scrollbar-thumb { background: #b7c4d8; border: 3px solid transparent; border-radius: 999px; background-clip: padding-box; }
 ::-webkit-scrollbar-thumb:hover { background: #8798b2; border-width: 2px; }
 
+/* Keep the shell and mobile navigation inside Safari's dynamic viewport. */
+.app-shell-height {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.mobile-bottom-nav-safe-area {
+  bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+}
+
 .magnetic-tooltip {
   @apply bg-slate-900 border border-slate-700 text-white text-[11px] font-medium px-2.5 py-1.5 shadow-lg pointer-events-none z-[9999];
   border-radius: 0.375rem;

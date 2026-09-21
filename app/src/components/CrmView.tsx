@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   ArrowLeft,
   AtSign,
+  AudioLines,
   Building2,
   CalendarClock,
   Check,
@@ -31,9 +32,12 @@ import {
   serverTimestamp,
   updateDoc,
   where,
+  writeBatch,
 } from "firebase/firestore";
 import type { Firestore } from "firebase/firestore";
-import { db as firebaseDb } from "@/lib/firebase";
+import { deleteObject, getDownloadURL, ref as storageRef, uploadBytes } from "firebase/storage";
+import type { FirebaseStorage } from "firebase/storage";
+import { db as firebaseDb, storage as firebaseStorage } from "@/lib/firebase";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,9 +53,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { filterCompanySuggestions, normalizePhoneDigits } from "@/lib/crmContacts";
+import CrmAudioCapture from "@/components/CrmAudioCapture";
+import { extractCrmInteractionFromAudio } from "@/lib/ai";
+import { getCrmAudioExtension, mergeCrmNotes, readBlobAsBase64, type CrmAudioAttachment } from "@/lib/crmAudio";
 import { cn } from "@/lib/utils";
 
 const db = firebaseDb as unknown as Firestore | undefined;
+const storage = firebaseStorage as unknown as FirebaseStorage | undefined;
 
 type CrmUser = { uid?: string | null; workspaceId?: string | null; defaultAccountId?: string | null } | null;
 
@@ -117,6 +125,29 @@ type CrmEvent = {
   source?: string | null;
   occurredAt?: unknown;
   nextContactAt?: unknown;
+  transcript?: string | null;
+  audioUrl?: string | null;
+  audioName?: string | null;
+  aiAnalysis?: CrmAiAnalysis | null;
+};
+
+type CrmAiAnalysis = {
+  transcript?: string | null;
+  summary?: string | null;
+  nextContactAt?: string | null;
+  contactUpdates?: {
+    role?: string | null;
+    sector?: string | null;
+    locality?: string | null;
+    email?: string | null;
+    phoneNumber?: string | null;
+    notesAppend?: string | null;
+  } | null;
+  opportunities?: Array<{ title?: string | null; summary?: string | null; stage?: string | null }>;
+  tasks?: Array<{ title?: string | null; summary?: string | null; dueAt?: string | null }>;
+  equipmentLinks?: Array<{ relationType?: string | null; equipmentType?: string | null; brand?: string | null; model?: string | null; summary?: string | null }>;
+  confidence?: number | null;
+  aiModel?: string | null;
 };
 
 type EquipmentLink = {
@@ -217,6 +248,53 @@ function contactEmails(contact: Contact): EmailEntry[] {
   return contact.email ? [{ label: "Principal", value: contact.email }] : [];
 }
 
+function safeStorageSegment(value: string) {
+  return value.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 120) || "registro";
+}
+
+function parseOptionalDate(value: unknown) {
+  if (!value) return null;
+  const parsed = new Date(String(value));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function valueOrNull(value: unknown) {
+  const normalized = String(value || "").trim();
+  return normalized || null;
+}
+
+function cleanAudioAnalysis(value: unknown): CrmAiAnalysis {
+  const input = (value || {}) as Record<string, unknown>;
+  const updates = (input.contactUpdates || {}) as Record<string, unknown>;
+  const cleanList = (items: unknown, fields: string[]) => Array.isArray(items)
+    ? items.map((item) => {
+      const source = (item || {}) as Record<string, unknown>;
+      return fields.reduce<Record<string, string | null>>((result, field) => {
+        result[field] = valueOrNull(source[field]);
+        return result;
+      }, {});
+    }).filter((item) => Object.values(item).some(Boolean))
+    : [];
+  return {
+    transcript: valueOrNull(input.transcript),
+    summary: valueOrNull(input.summary),
+    nextContactAt: valueOrNull(input.nextContactAt),
+    contactUpdates: {
+      role: valueOrNull(updates.role),
+      sector: valueOrNull(updates.sector),
+      locality: valueOrNull(updates.locality),
+      email: valueOrNull(updates.email),
+      phoneNumber: valueOrNull(updates.phoneNumber),
+      notesAppend: valueOrNull(updates.notesAppend),
+    },
+    opportunities: cleanList(input.opportunities, ["title", "summary", "stage"]),
+    tasks: cleanList(input.tasks, ["title", "summary", "dueAt"]),
+    equipmentLinks: cleanList(input.equipmentLinks, ["relationType", "equipmentType", "brand", "model", "summary"]),
+    confidence: typeof input.confidence === "number" && Number.isFinite(input.confidence) ? input.confidence : null,
+    aiModel: valueOrNull(input.aiModel),
+  };
+}
+
 export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenImport?: () => void }) {
   const workspaceId = user?.workspaceId || user?.defaultAccountId || null;
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -234,6 +312,8 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
   const [savingEquipment, setSavingEquipment] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [interactionOpen, setInteractionOpen] = useState(false);
+  const [audioAttachment, setAudioAttachment] = useState<CrmAudioAttachment | null>(null);
+  const [audioResetKey, setAudioResetKey] = useState(0);
   const [detailTab, setDetailTab] = useState<"overview" | "interactions" | "equipment">("overview");
   const [mobilePane, setMobilePane] = useState<"list" | "detail">("list");
   const [formError, setFormError] = useState<string | null>(null);
@@ -303,7 +383,16 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
     return () => { unsubscribeEvents(); unsubscribeInterests(); unsubscribeInstalled(); };
   }, [selectedContactId, workspaceId]);
 
-  const selectContact = (contactId: string) => { setSelectedContactId(contactId); setDetailTab("overview"); setMobilePane("detail"); };
+  const selectContact = (contactId: string) => {
+    if (contactId !== selectedContactId) {
+      setAudioAttachment(null);
+      setAudioResetKey((current) => current + 1);
+      setInteractionForm(createEmptyInteraction());
+    }
+    setSelectedContactId(contactId);
+    setDetailTab("overview");
+    setMobilePane("detail");
+  };
   const closeCreateDialog = () => { setCreateOpen(false); setFormError(null); setContactForm(createEmptyContactForm()); };
 
   const selectCompany = (company: Company) => {
@@ -402,20 +491,100 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
 
   const handleInteractionSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!db || !user?.uid || !workspaceId || !selectedContact || !interactionForm.summary.trim()) { setStatus({ tone: "error", text: "Selecione um contato e descreva a interação." }); return; }
+    if (!db || !user?.uid || !workspaceId || !selectedContact || (!interactionForm.summary.trim() && !audioAttachment)) { setStatus({ tone: "error", text: "Selecione um contato e descreva a interação ou anexe um áudio." }); return; }
+    const occurredAt = new Date(interactionForm.occurredAt);
+    if (Number.isNaN(occurredAt.getTime())) { setStatus({ tone: "error", text: "Informe uma data válida para a interação." }); return; }
     setSavingInteraction(true);
     setStatus(null);
+    let uploadedAudioRef: ReturnType<typeof storageRef> | null = null;
     try {
-      const occurredAt = new Date(interactionForm.occurredAt);
-      const nextContactAt = interactionForm.nextContactAt ? new Date(interactionForm.nextContactAt) : new Date(occurredAt.getTime() + (10 * 24 * 60 * 60 * 1000));
-      await addDoc(collection(db, "crm_events"), { type: "crm_event", eventType: "contact_interaction", source: "manual", channelType: interactionForm.channelType, summary: interactionForm.summary.trim(), occurredAt, nextContactAt, contactId: selectedContact.id, companyId: selectedContact.companyId || null, workspaceId, ownerId: user.uid, actorUserId: user.uid, createdAt: serverTimestamp() });
-      await updateDoc(doc(db, "contacts", selectedContact.id), { lastContactAt: occurredAt, nextContactAt, nextContactSource: "manual", followUpStatus: "green", updatedAt: serverTimestamp() });
+      let audioAnalysis: CrmAiAnalysis | null = null;
+      let audioUrl: string | null = null;
+      let audioStoragePath: string | null = null;
+
+      if (audioAttachment) {
+        if (!storage) throw new Error("O armazenamento de áudio ainda não está disponível.");
+        const base64Audio = await readBlobAsBase64(audioAttachment.blob);
+        const result = await extractCrmInteractionFromAudio(base64Audio, audioAttachment.mimeType, {
+          contactName: selectedContact.displayName || selectedContact.name,
+          companyName: selectedCompany?.name,
+          role: selectedContact.role,
+          sector: selectedContact.sector,
+        });
+        audioAnalysis = cleanAudioAnalysis(result);
+        const fileId = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        audioStoragePath = `crm_audio/${safeStorageSegment(workspaceId)}/${safeStorageSegment(selectedContact.id)}/${fileId}.${getCrmAudioExtension(audioAttachment.mimeType, audioAttachment.name)}`;
+        uploadedAudioRef = storageRef(storage, audioStoragePath);
+        await uploadBytes(uploadedAudioRef, audioAttachment.blob, { contentType: audioAttachment.mimeType, customMetadata: { workspaceId, contactId: selectedContact.id, source: "crm_interaction" } });
+        audioUrl = await getDownloadURL(uploadedAudioRef);
+      }
+
+      const manualNextContactAt = interactionForm.nextContactAt ? new Date(interactionForm.nextContactAt) : null;
+      const aiNextContactAt = parseOptionalDate(audioAnalysis?.nextContactAt);
+      const nextContactAt = manualNextContactAt && !Number.isNaN(manualNextContactAt.getTime()) ? manualNextContactAt : aiNextContactAt || new Date(occurredAt.getTime() + (10 * 24 * 60 * 60 * 1000));
+      const summary = interactionForm.summary.trim() || valueOrNull(audioAnalysis?.summary) || "Mensagem de áudio registrada.";
+      const extracted = audioAnalysis?.contactUpdates || {};
+      const contactUpdate: Record<string, unknown> = { lastContactAt: occurredAt, nextContactAt, nextContactSource: manualNextContactAt ? "manual" : aiNextContactAt ? "ai" : "manual", followUpStatus: "green", updatedAt: serverTimestamp() };
+      const role = valueOrNull(extracted.role);
+      const sector = valueOrNull(extracted.sector);
+      const locality = valueOrNull(extracted.locality);
+      const email = valueOrNull(extracted.email);
+      const phoneNumber = valueOrNull(extracted.phoneNumber);
+      if (role) contactUpdate.role = role;
+      if (sector) contactUpdate.sector = sector;
+      if (locality) contactUpdate.locality = locality;
+      if (email) contactUpdate.email = email;
+      if (phoneNumber) {
+        contactUpdate.phoneNumber = phoneNumber;
+        contactUpdate.phoneDigits = normalizePhoneDigits(phoneNumber) || null;
+      }
+      const notes = valueOrNull(extracted.notesAppend);
+      if (notes) contactUpdate.notes = mergeCrmNotes(selectedContact.notes, notes);
+
+      const eventRef = doc(collection(db, "crm_events"));
+      const batch = writeBatch(db);
+      batch.set(eventRef, {
+        type: "crm_event",
+        eventType: "contact_interaction",
+        source: audioAttachment ? "manual_audio" : "manual",
+        channelType: interactionForm.channelType,
+        summary,
+        transcript: audioAnalysis?.transcript || null,
+        audioUrl,
+        audioStoragePath,
+        audioName: audioAttachment?.name || null,
+        audioMimeType: audioAttachment?.mimeType || null,
+        audioSizeBytes: audioAttachment?.blob.size || null,
+        aiStatus: audioAnalysis ? "completed" : null,
+        aiAnalysis: audioAnalysis ? {
+          confidence: audioAnalysis.confidence ?? null,
+          contactUpdates: audioAnalysis.contactUpdates || null,
+          opportunities: audioAnalysis.opportunities || [],
+          tasks: audioAnalysis.tasks || [],
+          equipmentLinks: audioAnalysis.equipmentLinks || [],
+          aiModel: audioAnalysis.aiModel || null,
+        } : null,
+        occurredAt,
+        nextContactAt,
+        contactId: selectedContact.id,
+        companyId: selectedContact.companyId || null,
+        workspaceId,
+        ownerId: user.uid,
+        actorUserId: user.uid,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      batch.update(doc(db, "contacts", selectedContact.id), contactUpdate);
+      await batch.commit();
       setInteractionForm(createEmptyInteraction());
+      setAudioAttachment(null);
+      setAudioResetKey((current) => current + 1);
       setInteractionOpen(false);
       setDetailTab("interactions");
-      setStatus({ tone: "success", text: "Interação registrada no histórico do contato." });
-    } catch {
-      setStatus({ tone: "error", text: "Não foi possível registrar a interação." });
+      setStatus({ tone: "success", text: audioAttachment ? "Áudio transcrito e interação registrada no histórico." : "Interação registrada no histórico do contato." });
+    } catch (cause) {
+      if (uploadedAudioRef) await deleteObject(uploadedAudioRef).catch(() => undefined);
+      setStatus({ tone: "error", text: cause instanceof Error && cause.message.includes("armazenamento") ? cause.message : "Não foi possível analisar ou registrar a interação. Verifique o áudio e tente novamente." });
     } finally {
       setSavingInteraction(false);
     }
@@ -501,7 +670,7 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
         </DialogContent>
       </Dialog>
 
-      <Dialog open={interactionOpen} onOpenChange={setInteractionOpen}><DialogContent className="max-w-xl"><DialogHeader><DialogTitle>Registrar interação</DialogTitle><DialogDescription>Adicione o que aconteceu e deixe a próxima ação clara para a equipe.</DialogDescription></DialogHeader><form onSubmit={handleInteractionSubmit} noValidate className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="interactionChannel">Canal</Label><select id="interactionChannel" value={interactionForm.channelType} onChange={(event) => setInteractionForm((previous) => ({ ...previous, channelType: event.target.value }))} className={`${fieldClassName()} w-full px-3`}><option value="phone">Ligação</option><option value="whatsapp">WhatsApp</option><option value="email">E-mail</option><option value="meeting">Reunião</option><option value="other">Outro</option></select></div><div><Label htmlFor="interactionDate">Quando</Label><Input id="interactionDate" type="datetime-local" value={interactionForm.occurredAt} onChange={(event) => setInteractionForm((previous) => ({ ...previous, occurredAt: event.target.value }))} className={fieldClassName()} /></div></div><div><Label htmlFor="nextContactAt">Próximo contato</Label><Input id="nextContactAt" type="datetime-local" value={interactionForm.nextContactAt} onChange={(event) => setInteractionForm((previous) => ({ ...previous, nextContactAt: event.target.value }))} className={fieldClassName()} /><p className="mt-1 text-xs text-muted-foreground">Sem data, o sistema sugere um follow-up em 10 dias.</p></div><div><Label htmlFor="interactionSummary">Resumo <span className="text-destructive">*</span></Label><Textarea id="interactionSummary" value={interactionForm.summary} onChange={(event) => setInteractionForm((previous) => ({ ...previous, summary: event.target.value }))} className="mt-2 min-h-28 resize-none" placeholder="O que foi tratado e qual é a próxima ação?" /></div><DialogFooter className="-mx-4 -mb-4"><DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose><Button type="submit" disabled={savingInteraction} className="gap-2">{savingInteraction ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} Registrar interação</Button></DialogFooter></form></DialogContent></Dialog>
+      <Dialog open={interactionOpen} onOpenChange={(open: boolean) => { setInteractionOpen(open); if (!open) { setAudioAttachment(null); setAudioResetKey((current) => current + 1); } }}><DialogContent className="max-w-xl"><DialogHeader><DialogTitle>Registrar interação</DialogTitle><DialogDescription>Adicione o que aconteceu ou anexe uma conversa para a IA organizar o próximo passo.</DialogDescription></DialogHeader><form onSubmit={handleInteractionSubmit} noValidate className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="interactionChannel">Canal</Label><select id="interactionChannel" value={interactionForm.channelType} onChange={(event) => setInteractionForm((previous) => ({ ...previous, channelType: event.target.value }))} className={`${fieldClassName()} w-full px-3`}><option value="phone">Ligação</option><option value="whatsapp">WhatsApp</option><option value="email">E-mail</option><option value="meeting">Reunião</option><option value="other">Outro</option></select></div><div><Label htmlFor="interactionDate">Quando</Label><Input id="interactionDate" type="datetime-local" value={interactionForm.occurredAt} onChange={(event) => setInteractionForm((previous) => ({ ...previous, occurredAt: event.target.value }))} className={fieldClassName()} /></div></div><div><Label htmlFor="nextContactAt">Próximo contato</Label><Input id="nextContactAt" type="datetime-local" value={interactionForm.nextContactAt} onChange={(event) => setInteractionForm((previous) => ({ ...previous, nextContactAt: event.target.value }))} className={fieldClassName()} /><p className="mt-1 text-xs text-muted-foreground">Sem data, o sistema sugere um follow-up em 10 dias.</p></div><div><Label htmlFor="interactionSummary">Resumo ou observação</Label><Textarea id="interactionSummary" value={interactionForm.summary} onChange={(event) => setInteractionForm((previous) => ({ ...previous, summary: event.target.value }))} className="mt-2 min-h-28 resize-none" placeholder={audioAttachment ? "Opcional: acrescente uma observação ao áudio..." : "O que foi tratado e qual é a próxima ação?"} /></div><CrmAudioCapture key={`${selectedContact?.id || "contact"}-${audioResetKey}`} onAudioReady={setAudioAttachment} onError={(message) => setStatus({ tone: "error", text: message })} processing={savingInteraction && Boolean(audioAttachment)} disabled={savingInteraction} /><DialogFooter className="-mx-4 -mb-4"><DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose><Button type="submit" disabled={savingInteraction} className="gap-2">{savingInteraction ? <Loader2 size={15} className="animate-spin" /> : audioAttachment ? <AudioLines size={15} /> : <Check size={15} />} {savingInteraction ? (audioAttachment ? "Analisando áudio..." : "Registrando...") : audioAttachment ? "Transcrever e registrar" : "Registrar interação"}</Button></DialogFooter></form></DialogContent></Dialog>
     </div>
   );
 }
@@ -516,7 +685,11 @@ function InfoItem({ icon: Icon, label, value }: { icon: typeof Mail; label: stri
 
 function InteractionTimeline({ events, onRegister }: { events: CrmEvent[]; onRegister: () => void }) {
   if (!events.length) return <div className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/25 p-8 text-center"><History className="text-muted-foreground/50" size={28} /><h3 className="mt-3 text-sm font-semibold">Nenhuma interação registrada</h3><p className="mt-1 max-w-xs text-xs leading-relaxed text-muted-foreground">Registre uma ligação, reunião, e-mail ou conversa para começar a construir o histórico.</p><Button type="button" onClick={onRegister} className="mt-4 gap-2"><Plus size={14} /> Registrar interação</Button></div>;
-  return <div className="space-y-5">{events.map((event) => <div key={event.id} className="relative border-l-2 border-primary/20 pl-5"><span className="absolute -left-[7px] top-1 h-3 w-3 rounded-full border-2 border-card bg-primary" /><div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className="rounded-full px-2 py-0.5 text-[11px] font-medium">{channelLabel(event.channelType)}</Badge><span className="text-xs text-muted-foreground">{formatDate(event.occurredAt)}</span></div><p className="mt-2 text-sm leading-relaxed">{event.summary}</p>{Boolean(event.nextContactAt) && <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"><CalendarClock size={13} /> Próximo contato: {formatDate(event.nextContactAt)}{event.source === "whatsapp" ? " · WhatsApp" : ""}</p>}</div>)}<Button type="button" variant="outline" onClick={onRegister} className="gap-2"><Plus size={14} /> Registrar outra interação</Button></div>;
+  return <div className="space-y-5">{events.map((event) => {
+    const suggestions = event.aiAnalysis;
+    const suggestionCount = (suggestions?.opportunities?.length || 0) + (suggestions?.tasks?.length || 0) + (suggestions?.equipmentLinks?.length || 0);
+    return <div key={event.id} className="relative border-l-2 border-primary/20 pl-5"><span className="absolute -left-[7px] top-1 h-3 w-3 rounded-full border-2 border-card bg-primary" /><div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className="rounded-full px-2 py-0.5 text-[11px] font-medium">{channelLabel(event.channelType)}</Badge>{event.source === "manual_audio" && <Badge variant="secondary" className="gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"><AudioLines size={11} /> Áudio</Badge>}<span className="text-xs text-muted-foreground">{formatDate(event.occurredAt)}</span></div><p className="mt-2 text-sm leading-relaxed">{event.summary}</p>{event.audioUrl && <audio controls src={event.audioUrl} className="mt-3 h-9 w-full max-w-md" aria-label={event.audioName ? `Áudio ${event.audioName}` : "Áudio da interação"} />}{event.transcript && <details className="mt-3 rounded-lg border border-border/70 bg-muted/20 px-3 py-2"><summary className="cursor-pointer text-xs font-medium text-primary">Ver transcrição</summary><p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">{event.transcript}</p></details>}{suggestionCount > 0 && <details className="mt-3 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2"><summary className="cursor-pointer text-xs font-medium text-primary">Sugestões da IA ({suggestionCount})</summary><div className="mt-2 space-y-1 text-xs text-muted-foreground">{suggestions?.opportunities?.map((item, index) => <p key={`opportunity-${index}`}><strong className="font-medium text-foreground">Oportunidade:</strong> {item.title || item.summary || "Sem título"}</p>)}{suggestions?.tasks?.map((item, index) => <p key={`task-${index}`}><strong className="font-medium text-foreground">Tarefa:</strong> {item.title || item.summary || "Sem título"}</p>)}{suggestions?.equipmentLinks?.map((item, index) => <p key={`equipment-${index}`}><strong className="font-medium text-foreground">Equipamento:</strong> {[item.equipmentType, item.brand, item.model].filter(Boolean).join(" · ") || item.summary || "Sem descrição"}</p>)}</div></details>}{Boolean(event.nextContactAt) && <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"><CalendarClock size={13} /> Próximo contato: {formatDate(event.nextContactAt)}{event.source === "whatsapp" ? " · WhatsApp" : ""}</p>}</div>;
+  })}<Button type="button" variant="outline" onClick={onRegister} className="gap-2"><Plus size={14} /> Registrar outra interação</Button></div>;
 }
 
 function EquipmentPanel({ catalogItems, equipmentForm, setEquipmentForm, equipmentLinks, savingEquipment, onSubmit }: { catalogItems: CatalogItem[]; equipmentForm: EquipmentFormState; setEquipmentForm: React.Dispatch<React.SetStateAction<EquipmentFormState>>; equipmentLinks: EquipmentLink[]; savingEquipment: boolean; onSubmit: (event: FormEvent) => void }) {

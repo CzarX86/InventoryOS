@@ -231,3 +231,37 @@ export async function extractRegistrationFromAudio(base64Audio, mimeType = "audi
   const audioData = { inlineData: { data: base64Audio, mimeType } };
   return callWithFallback(prompt, audioData);
 }
+
+export async function extractCrmInteractionFromAudio(base64Audio, mimeType = "audio/webm", context = {}) {
+  const prompt = `
+Você é um assistente de CRM industrial. Transcreva o áudio em português do Brasil e extraia apenas informações explicitamente mencionadas na conversa. Não invente dados e não preencha campos por inferência. Retorne somente JSON válido neste formato:
+{
+  "transcript": "transcrição integral ou vazia",
+  "summary": "resumo objetivo da interação",
+  "nextContactAt": "data ISO 8601 se uma data ou prazo for mencionado, senão null",
+  "contactUpdates": {
+    "role": "função mencionada ou null",
+    "sector": "setor mencionado ou null",
+    "locality": "cidade/UF mencionada ou null",
+    "email": "e-mail mencionado ou null",
+    "phoneNumber": "telefone mencionado ou null",
+    "notesAppend": "observação relevante que deve ser acrescentada ou null"
+  },
+  "opportunities": [{ "title": "título", "summary": "contexto", "stage": "etapa ou null" }],
+  "tasks": [{ "title": "tarefa", "summary": "contexto", "dueAt": "data ISO 8601 ou null" }],
+  "equipmentLinks": [{ "relationType": "interest ou installed", "equipmentType": "tipo ou null", "brand": "marca ou null", "model": "modelo ou null", "summary": "contexto ou null" }],
+  "confidence": 0
+}
+
+Contexto do contato para desambiguar nomes, sem repetir nem alterar os dados sem confirmação:
+${JSON.stringify({
+  referenceDateTime: new Date().toISOString(),
+  contactName: context.contactName || null,
+  companyName: context.companyName || null,
+  role: context.role || null,
+  sector: context.sector || null,
+})}
+`.trim();
+  const audioData = { inlineData: { data: base64Audio, mimeType } };
+  return callWithFallback(prompt, audioData);
+}

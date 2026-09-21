@@ -67,4 +67,15 @@ describe("AI extraction helpers", () => {
       message: "RESOURCE_EXHAUSTED: quota exceeded",
     });
   });
+
+  it("extracts CRM interaction fields from audio through the shared media path", async () => {
+    const { extractCrmInteractionFromAudio } = await buildModule({
+      "gemini-2.0-flash": {
+        text: () => JSON.stringify({ transcript: "Falamos sobre uma nova cotação.", summary: "Cliente pediu uma cotação.", tasks: [{ title: "Enviar cotação" }] }),
+        usageMetadata: { promptTokenCount: 8, candidatesTokenCount: 12, totalTokenCount: 20 },
+      },
+    });
+    const result = await extractCrmInteractionFromAudio("base64-audio", "audio/webm", { contactName: "Rafael" });
+    expect(result).toMatchObject({ transcript: "Falamos sobre uma nova cotação.", summary: "Cliente pediu uma cotação.", tasks: [{ title: "Enviar cotação" }] });
+  });
 });
