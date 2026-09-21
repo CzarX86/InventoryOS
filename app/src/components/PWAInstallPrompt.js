@@ -163,7 +163,6 @@ export default function PWAInstallPrompt() {
             <Button 
               variant="ghost" 
               size="icon"
-              aria-label="Fechar aviso de instalação"
               onClick={() => setDismissed(true)} 
               className="absolute top-2 right-2 h-8 w-8 rounded-none text-muted-foreground hover:text-white hover:bg-white/5"
             >
@@ -180,7 +179,7 @@ export default function PWAInstallPrompt() {
                     MODO_APLICATIVO
                   </h3>
                   <div className="px-1.5 py-0.5 border border-emerald-500/30 text-[8px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-500/5 font-mono">
-                    MODO_PWA
+                    PWA_MODE
                   </div>
                 </div>
                 <p className="text-[10px] font-bold text-muted-foreground/80 leading-relaxed uppercase tracking-wide font-mono">
@@ -200,7 +199,7 @@ export default function PWAInstallPrompt() {
                 {isInstalling ? (
                   <>
                     <Loader2 size={14} className="animate-spin mr-2" />
-                    EXECUTANDO_INSTALAÇÃO...
+                    EXECUTANDO_SETUP...
                   </>
                 ) : (
                   <>

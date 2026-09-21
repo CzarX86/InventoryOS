@@ -26,8 +26,9 @@ export const aggregateAiUsage = onDocumentWritten("ai_runs/{runId}", async (even
     return;
   }
 
-  const cost = after.actualCostUsd || after.estimatedCostUsd || 0;
-  const tokens = after.actualTotalTokenCount || after.estimatedTotalTokens || 0;
+  const cost = after.actualCostUsd ?? after.estimatedCostUsd ?? 0;
+  const tokens = after.actualTotalTokenCount ?? after.estimatedTotalTokens ?? 0;
+  const hasMeasuredUsage = after.actualCostUsd != null;
   
   // Use YYYYMM format for the summary document
   const date = new Date();
@@ -42,6 +43,8 @@ export const aggregateAiUsage = onDocumentWritten("ai_runs/{runId}", async (even
       totalCostUsd: FieldValue.increment(cost),
       totalTokens: FieldValue.increment(tokens),
       totalRequests: FieldValue.increment(1),
+      measuredRequests: FieldValue.increment(hasMeasuredUsage ? 1 : 0),
+      estimatedRequests: FieldValue.increment(hasMeasuredUsage ? 0 : 1),
       updatedAt: FieldValue.serverTimestamp(),
       lastRunId: event.params.runId,
       // Track top task type costs

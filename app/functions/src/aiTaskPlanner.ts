@@ -1,4 +1,4 @@
-import { createAiRunRecord, saveAiRun, updateAiRun } from "./aiRuns";
+import { createAiRunRecord, estimateAiRunCost, saveAiRun, updateAiRun } from "./aiRuns";
 import { generateStructuredOutput } from "./ai";
 import { routeTask, getModelPricing } from "./modelRouter";
 import { checkAiBudget } from "./finops";
@@ -16,6 +16,9 @@ export interface AiTaskResult {
   actualPromptTokenCount?: number;
   actualCandidatesTokenCount?: number;
   actualTotalTokenCount?: number;
+  actualCostUsd?: number;
+  usageCalls?: any[];
+  actualUsage?: any;
 }
 
 /**
@@ -94,11 +97,20 @@ export async function executeAiTask(plan: any, prompt: string, parts: any[] = []
 
     const isShadow = options.shadow === true;
 
+    const actualCost = estimateAiRunCost({
+      estimatedInputTokens: usage?.promptTokenCount || 0,
+      estimatedOutputTokens: usage?.candidatesTokenCount || 0,
+      estimatedCachedTokens: (usage as any)?.cachedContentTokenCount || 0,
+      pricing: getModelPricing(model || plan.model),
+    });
     const result = {
       status: "completed" as const,
       actualPromptTokenCount: usage?.promptTokenCount || 0,
       actualCandidatesTokenCount: usage?.candidatesTokenCount || 0,
       actualTotalTokenCount: usage?.totalTokenCount || 0,
+      actualUsage: usage || null,
+      actualCostUsd: actualCost.estimatedCostUsd,
+      usageCalls: [{ model: model || plan.model, provider: String(model || plan.model).startsWith("deepseek") ? "deepseek" : "google", usage, costUsd: actualCost.estimatedCostUsd }],
       model,
       completedAt: new Date().toISOString(),
       metadata: { ...plan.metadata, shadow: isShadow }

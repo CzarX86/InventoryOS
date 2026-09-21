@@ -37,7 +37,7 @@ function DropdownMenuContent({
         sideOffset={sideOffset}
         align={align}
         className={cn(
-          "z-50 min-w-[180px] max-h-[var(--radix-dropdown-menu-content-available-height)] origin-[var(--radix-dropdown-menu-content-transform-origin)] overflow-x-hidden overflow-y-auto rounded-xl border border-white/[0.08] bg-[#1a1a1a] p-1 text-white shadow-2xl ring-1 ring-black/40 transition-transform transition-opacity duration-150 data-[state=closed]:scale-95 data-[state=closed]:opacity-0 data-[state=open]:scale-100 data-[state=open]:opacity-100",
+          "z-50 min-w-[180px] max-h-[var(--radix-dropdown-menu-content-available-height)] origin-[var(--radix-dropdown-menu-content-transform-origin)] overflow-x-hidden overflow-y-auto rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl ring-1 ring-foreground/5 transition-transform transition-opacity duration-150 data-[state=closed]:scale-95 data-[state=closed]:opacity-0 data-[state=open]:scale-100 data-[state=open]:opacity-100",
           className
         )}
         {...props} />
@@ -63,7 +63,7 @@ function DropdownMenuItem({
       data-inset={inset}
       data-variant={variant}
       className={cn(
-        "group/dropdown-menu-item relative flex cursor-default items-center gap-2 rounded-lg px-3 py-2 text-xs font-black uppercase tracking-[0.14em] text-zinc-300 outline-hidden select-none transition-colors focus:bg-white/[0.08] focus:text-white data-inset:pl-7 data-[variant=destructive]:text-red-400 data-[variant=destructive]:focus:bg-red-500/10 data-[variant=destructive]:focus:text-red-300 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "group/dropdown-menu-item relative flex cursor-default items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-foreground outline-hidden select-none transition-colors focus:bg-accent focus:text-accent-foreground data-inset:pl-7 data-[variant=destructive]:text-red-700 data-[variant=destructive]:focus:bg-red-50 data-[variant=destructive]:focus:text-red-700 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className
       )}
       {...props} />
@@ -156,7 +156,7 @@ function DropdownMenuSeparator({
   return (
     <DropdownMenuPrimitive.Separator
       data-slot="dropdown-menu-separator"
-      className={cn("my-1 h-px bg-white/[0.07]", className)}
+      className={cn("my-1 h-px bg-border", className)}
       {...props} />
   );
 }

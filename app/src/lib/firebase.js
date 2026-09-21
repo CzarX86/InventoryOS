@@ -16,23 +16,27 @@ const firebaseConfig = {
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
-const hasFirebaseConfig = Object.values(firebaseConfig).every(Boolean);
+const hasFirebaseConfig = Boolean(
+  firebaseConfig.apiKey &&
+    firebaseConfig.authDomain &&
+    firebaseConfig.projectId &&
+    firebaseConfig.appId,
+);
 
-// Only initialize if we're in the browser or have a valid project ID
-/** @type {import('firebase/app').FirebaseApp | undefined} */
+/** @type {import("firebase/app").FirebaseApp | undefined} */
 let app;
-/** @type {import('firebase/auth').Auth | undefined} */
+/** @type {import("firebase/auth").Auth | undefined} */
 let auth;
-/** @type {import('firebase/firestore').Firestore | undefined} */
+/** @type {import("firebase/firestore").Firestore | undefined} */
 let db;
-/** @type {import('firebase/storage').FirebaseStorage | undefined} */
+/** @type {import("firebase/storage").FirebaseStorage | undefined} */
 let storage;
-/** @type {import('firebase/functions').Functions | undefined} */
+/** @type {import("firebase/functions").Functions | undefined} */
 let functions;
 
-const googleProvider = new GoogleAuthProvider(); // Define googleProvider here
+const googleProvider = new GoogleAuthProvider();
 const shouldUseEmulators = process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true";
 const firestoreEmulatorHost = process.env.NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST || "127.0.0.1";
 const firestoreEmulatorPort = Number(process.env.NEXT_PUBLIC_FIRESTORE_EMULATOR_PORT || 8080);
@@ -41,26 +45,28 @@ const storageEmulatorPort = Number(process.env.NEXT_PUBLIC_STORAGE_EMULATOR_PORT
 const authEmulatorHost = process.env.NEXT_PUBLIC_AUTH_EMULATOR_HOST || "127.0.0.1:9099";
 const functionsEmulatorHost = process.env.NEXT_PUBLIC_FUNCTIONS_EMULATOR_HOST || "127.0.0.1";
 const functionsEmulatorPort = Number(process.env.NEXT_PUBLIC_FUNCTIONS_EMULATOR_PORT || 5001);
+const localAuthBypass = process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_LOCAL_AUTH_BYPASS === "true";
 
-if (typeof window !== "undefined" && hasFirebaseConfig) {
+// The local auth bypass deliberately disables Firebase as well, so a fake
+// development user can never read or write a real project by accident.
+if (typeof window !== "undefined" && hasFirebaseConfig && !localAuthBypass) {
   app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
   auth = getAuth(app);
-  
-  // Enable offline persistence for Firestore
+
   try {
     db = initializeFirestore(app, {
-      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
     });
-  } catch (error) {
+  } catch {
     db = getFirestore(app);
   }
-  
+
   storage = getStorage(app);
   functions = getFunctions(app);
 
   if (shouldUseEmulators) {
     connectAuthEmulator(auth, `http://${authEmulatorHost}`);
-    
+
     if (!window.__inventoryOsFirestoreEmulatorConnected) {
       connectFirestoreEmulator(db, firestoreEmulatorHost, firestoreEmulatorPort);
       window.__inventoryOsFirestoreEmulatorConnected = true;

@@ -18,7 +18,6 @@ describe("ownership helpers", () => {
     })).toEqual({
       ownerId: "user-123",
       defaultAccountId: "acct_user-123",
-      workspaceId: "acct_user-123",
     });
   });
 
@@ -26,24 +25,22 @@ describe("ownership helpers", () => {
     const context = {
       ownerId: "user-123",
       defaultAccountId: "acct_user-123",
-      workspaceId: "workspace-1",
     };
 
     expect(applyOwnershipContext({ type: "crm_event" }, context)).toEqual({
       type: "crm_event",
       ownerId: "user-123",
       accountId: "acct_user-123",
-      workspaceId: "workspace-1",
     });
 
     expect(applyOwnershipContext({ type: "crm_event", accountId: "acct_custom" }, context)).toEqual({
       type: "crm_event",
       ownerId: "user-123",
       accountId: "acct_custom",
-      workspaceId: "workspace-1",
     });
 
     expect(hasOwnershipBoundary({ ownerId: "user-123", accountId: "acct_user-123" })).toBe(true);
     expect(hasOwnershipBoundary({ ownerId: "user-123" })).toBe(false);
   });
 });
+

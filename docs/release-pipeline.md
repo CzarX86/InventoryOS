@@ -85,19 +85,24 @@ As Functions de controle de acesso e processamento WhatsApp usam Secret Manager 
 | `PLATFORM_WORKSPACE_ID` | Identificador estável do workspace compartilhado por todos os usuários aprovados |
 | `GEMINI_API_KEY` | Chave usada pelas Functions para tarefas de IA; o workflow a sincroniza a partir do secret `NEXT_PUBLIC_GEMINI_API_KEY` do GitHub |
 
-Os três secrets `PLATFORM_*` devem existir nos environments `staging` e `production` do GitHub. O valor de `GEMINI_API_KEY` é derivado do secret existente `NEXT_PUBLIC_GEMINI_API_KEY`. Os workflows sincronizam todos eles com o Secret Manager do respectivo projeto Firebase antes do deploy.
+Esses secrets também devem existir nos environments `staging` e `production` do GitHub. Os workflows os sincronizam com o Secret Manager do respectivo projeto Firebase antes do deploy.
 
-Exemplo interativo, executado uma vez por projeto:
+### Billing Export opcional
 
-```bash
-firebase functions:secrets:set PLATFORM_OWNER_EMAIL
-firebase functions:secrets:set PLATFORM_ADMIN_EMAIL
-firebase functions:secrets:set PLATFORM_WORKSPACE_ID
-```
+O reconciliador `reconcileAiBillingExport` roda diariamente e permanece inativo quando a configuração abaixo não existe. Para ativá-lo, habilite o Billing Export detalhado para BigQuery no projeto GCP e conceda à service account de runtime acesso de leitura ao dataset exportado. As variáveis devem apontar para a tabela no formato `project.dataset.table`:
 
-Não salve esses valores em `.env`, no repositório ou no bundle público do frontend.
+| Variável | Descrição |
+|---|---|
+| `BILLING_EXPORT_PROJECT_ID` | Projeto GCP que contém a tabela de exportação |
+| `BILLING_EXPORT_DATASET` | Dataset do Billing Export |
+| `BILLING_EXPORT_TABLE` | Tabela padrão ou detalhada exportada |
+| `BILLING_EXPORT_LOCATION` | Localização do dataset; padrão `US` |
+
+O painel mantém o custo de tokens medido/estimado separado do custo oficial retornado pelo Billing Export. A reconciliação filtra serviços de IA, agrupa por mês e registra a origem, créditos e linhas consultadas em `system_billing_reconciliation`.
 
 As credenciais `EVOLUTION_API_URL`, `EVOLUTION_API_KEY`, `EVOLUTION_WEBHOOK_SECRET` e `DEEPSEEK_API_KEY` são opcionais. Sem elas, a integração Evolution fica desabilitada e as tarefas roteadas para DeepSeek usam Gemini como fallback; o deploy não cria valores fictícios nem publica credenciais vazias.
+
+Não salve esses valores em `.env`, no repositório ou no bundle público do frontend.
 
 ## Configuração inicial do GCP (uma vez por projeto Firebase)
 

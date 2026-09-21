@@ -44,6 +44,9 @@ export interface Pricing {
   inputUsdPer1M?: number;
   outputUsdPer1M?: number;
   cachedInputUsdPer1M?: number;
+  currency?: string;
+  source?: string;
+  priceVersion?: string;
 }
 
 export function estimateAiRunCost({
@@ -117,6 +120,10 @@ export function createAiRunRecord(payload: any = {}, ownershipContext: any = {})
     status: payload.status || "pending_approval",
     provider: payload.provider || null,
     model: payload.model || null,
+    pricingCurrency: payload.pricing?.currency || "USD",
+    pricingSource: payload.pricing?.source || "provider_catalog_estimate",
+    pricingVersion: payload.pricing?.priceVersion || null,
+    costBasis: payload.costBasis || "estimated_token_usage",
     source: payload.source || "expansion-track",
     targetType: payload.targetType || null,
     targetId: payload.targetId || null,

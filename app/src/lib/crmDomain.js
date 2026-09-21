@@ -71,6 +71,7 @@ export function createAccountRecord(payload = {}, ownershipContext = {}) {
     segment: payload.segment || null,
     tags: payload.tags || [],
     notes: payload.notes || null,
+    address: payload.address || null,
     accountId: payload.accountId || ownershipContext?.defaultAccountId || null,
   }, ownershipContext);
 }
@@ -85,8 +86,12 @@ export function createContactRecord(payload = {}, ownershipContext = {}) {
     status: payload.status || "active",
     phoneNumber: payload.phoneNumber || null,
     phoneDigits: payload.phoneDigits || null,
+    phoneDigitsList: Array.isArray(payload.phoneDigitsList) ? payload.phoneDigitsList : [],
+    phoneNumbers: Array.isArray(payload.phoneNumbers) ? payload.phoneNumbers : [],
+    whatsappPhoneDigits: Array.isArray(payload.whatsappPhoneDigits) ? payload.whatsappPhoneDigits : [],
     whatsappRemoteJid: payload.whatsappRemoteJid || null,
     email: payload.email || null,
+    emails: Array.isArray(payload.emails) ? payload.emails : [],
     source: payload.source || "manual",
     notes: payload.notes || null,
   }, ownershipContext);

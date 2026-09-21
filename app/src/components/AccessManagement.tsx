@@ -3,6 +3,7 @@ import { Check, Loader2, RefreshCw, ShieldCheck, ShieldOff, UserRound } from "lu
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import UserAvatar from "@/components/UserAvatar";
 import {
   Dialog,
   DialogContent,
@@ -14,7 +15,7 @@ import {
 import { ACCESS_STATUS, AccessStatus, AccessUserSummary, approveAccessRequest, listAccessUsers, revokeAccess } from "@/lib/accessControl";
 
 type AccessManagementProps = {
-  currentUser?: { uid?: string | null } | null;
+  currentUser?: { uid?: string | null; isLocalDev?: boolean } | null;
 };
 
 type ActionState = {
@@ -49,10 +50,16 @@ export default function AccessManagement({ currentUser }: AccessManagementProps)
   const [busyUid, setBusyUid] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [action, setAction] = useState<ActionState>(null);
+  const isLocalDev = Boolean(currentUser?.isLocalDev);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
     setError(null);
+    if (isLocalDev) {
+      setUsers([]);
+      setLoading(false);
+      return;
+    }
     try {
       const result = await listAccessUsers();
       setUsers(result.users.filter((user) => user.uid !== currentUser?.uid));
@@ -61,7 +68,7 @@ export default function AccessManagement({ currentUser }: AccessManagementProps)
     } finally {
       setLoading(false);
     }
-  }, [currentUser?.uid]);
+  }, [currentUser?.uid, isLocalDev]);
 
   useEffect(() => {
     void loadUsers();
@@ -100,10 +107,10 @@ export default function AccessManagement({ currentUser }: AccessManagementProps)
           <div>
             <div className="mb-3 flex items-center gap-2">
               <ShieldCheck size={15} className="text-[#97a5ff]" />
-              <span className="font-mono text-[9px] uppercase tracking-[0.25em] text-[#acabaa]/50">CONTROLE_DE_ACESSO</span>
+              <span className="font-mono text-[9px] uppercase tracking-[0.25em] text-[#acabaa]/50">ACESSO DA EQUIPE</span>
             </div>
-            <h2 className="font-display text-2xl font-normal uppercase tracking-tight text-[#e7e5e5]">Usuários da plataforma</h2>
-            <p className="mt-2 max-w-xl text-xs leading-relaxed text-[#acabaa]/60">Aprovação obrigatória antes de liberar qualquer dado. O proprietário da plataforma é protegido e não aparece nesta lista.</p>
+            <h2 className="font-display text-2xl font-normal uppercase tracking-tight text-[#e7e5e5]">Acessos ao workspace</h2>
+            <p className="mt-2 max-w-xl text-xs leading-relaxed text-[#acabaa]/60">Gerencie quem pode entrar no workspace e acompanhe o estado de cada solicitação de acesso.</p>
           </div>
           <Button variant="outline" onClick={() => void loadUsers()} disabled={loading} className="w-fit rounded-none border-[#484848]/30 text-xs uppercase tracking-widest">
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} /> Atualizar
@@ -124,6 +131,7 @@ export default function AccessManagement({ currentUser }: AccessManagementProps)
         </div>
 
         {error && <p role="alert" className="mb-4 border border-[#ee7d77]/30 bg-[#7f2927]/10 px-4 py-3 text-xs text-[#ee7d77]">{error}</p>}
+        {isLocalDev && <p role="status" className="mb-4 border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-900">A lista de acessos fica disponível quando o app local está conectado ao Firebase.</p>}
 
         <Card className="rounded-none border border-[#484848]/20 bg-[#131313] shadow-none">
           <CardHeader className="border-b border-[#484848]/20 px-4 py-4">
@@ -138,10 +146,13 @@ export default function AccessManagement({ currentUser }: AccessManagementProps)
               <div className="divide-y divide-[#484848]/15">
                 {visibleUsers.map((user) => (
                   <div key={user.uid} className="flex flex-col gap-4 px-4 py-4 md:flex-row md:items-center md:justify-between">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm text-[#e7e5e5]">{user.displayName || "Usuário sem nome"}</p>
-                      <p className="truncate font-mono text-[11px] text-[#acabaa]/60">{user.email || "E-mail indisponível"}</p>
-                      <p className="mt-1 font-mono text-[9px] uppercase tracking-widest text-[#acabaa]/35">Solicitado em {formatDate(user.requestedAt)}</p>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <UserAvatar user={user} size="default" className="border-[#acc3ce]/30" />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm text-[#e7e5e5]">{user.displayName || "Usuário sem nome"}</p>
+                        <p className="truncate font-mono text-[11px] text-[#acabaa]/60">{user.email || "E-mail indisponível"}</p>
+                        <p className="mt-1 font-mono text-[9px] uppercase tracking-widest text-[#acabaa]/35">Solicitado em {formatDate(user.requestedAt)}</p>
+                      </div>
                     </div>
                     <div className="flex items-center gap-3">
                       <Badge variant="outline" className={`rounded-none text-[9px] uppercase tracking-widest ${statusClass(user.status)}`}>{statusLabel(user.status)}</Badge>

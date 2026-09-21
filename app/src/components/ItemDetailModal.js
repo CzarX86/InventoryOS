@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { X, Edit2, Mic, Package, Hash, Tag, Activity, Calendar, Server, Share2, CornerRightDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getBrandLogo } from "@/lib/utils";
@@ -11,7 +12,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { INVENTORY_STATUS_LABELS } from "@/lib/uiText";
 
 function DetailField({ icon: Icon, label, value, mono = false }) {
   return (
@@ -21,13 +21,15 @@ function DetailField({ icon: Icon, label, value, mono = false }) {
         <span className="text-[11px] font-display font-normal uppercase tracking-[0.2em]">{label}</span>
       </div>
       <p className={`text-sm text-foreground/90 ${mono ? "font-mono" : "font-display font-normal uppercase"} tracking-tight`}>
-        {value || <span className="text-muted-foreground/20 italic">DADO_NÃO_INFORMADO</span>}
+        {value || <span className="text-muted-foreground/20 italic">NULL_DATA</span>}
       </p>
     </div>
   );
 }
 
 export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
+  const [isImagePreviewOpen, setIsImagePreviewOpen] = useState(false);
+
   if (!item) return null;
 
   const handleShare = async (platform = "native") => {
@@ -52,7 +54,7 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
   };
 
   const formatDate = (date) => {
-    if (!date) return "N/D";
+    if (!date) return "N/A";
     const d = date.toDate ? date.toDate() : new Date(date);
     return new Intl.DateTimeFormat('pt-BR', {
       day: '2-digit',
@@ -64,7 +66,7 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { setIsImagePreviewOpen(false); onClose(); } }}>
       <DialogContent className="sm:max-w-2xl bg-[#0e0e0e] border-foreground/10 p-0 overflow-hidden shadow-none flex flex-col max-h-[95vh] rounded-none focus:outline-none">
         <DialogHeader className="hidden">
           <DialogTitle>{item.model}</DialogTitle>
@@ -81,7 +83,6 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
             <Button 
               size="icon"
               variant="outline"
-              aria-label="Compartilhar no WhatsApp"
               className="w-10 h-10 rounded-none bg-[#1f2020] border-foreground/10 hover:bg-foreground hover:text-background transition-none"
               onClick={() => handleShare("whatsapp")}
             >
@@ -90,7 +91,6 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
             <Button 
                size="icon"
                variant="outline"
-               aria-label="Editar item"
                className="w-10 h-10 rounded-none bg-[#1f2020] border-foreground/10 hover:bg-primary hover:text-primary-foreground transition-none"
                onClick={() => onEdit(item)}
             >
@@ -100,9 +100,17 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
           
           <div className="relative z-10 flex items-end gap-8">
             {item.productImageUrl ? (
-              <div className="w-32 h-32 rounded-none overflow-hidden border border-foreground/10 bg-[#0e0e0e] grayscale group hover:grayscale-0 transition-all duration-500">
+              <button
+                type="button"
+                className="group relative w-32 h-32 rounded-none overflow-hidden border border-foreground/10 bg-[#0e0e0e] grayscale hover:grayscale-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-[#131313] transition-all duration-500 cursor-zoom-in"
+                onClick={() => setIsImagePreviewOpen(true)}
+                aria-label={`Ampliar imagem de ${item.model}`}
+              >
                 <img src={item.productImageUrl} alt={item.model} className="w-full h-full object-cover scale-110 group-hover:scale-100 transition-transform duration-700" />
-              </div>
+                <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-white opacity-0 transition-opacity duration-300 group-hover:bg-black/35 group-hover:opacity-100 group-focus-visible:bg-black/35 group-focus-visible:opacity-100">
+                  <span className="text-[10px] font-display uppercase tracking-[0.18em]">Ampliar</span>
+                </span>
+              </button>
             ) : (
               <div className="w-32 h-32 rounded-none bg-[#1f2020] border border-foreground/10 flex items-center justify-center text-muted-foreground/20">
                 <Package size={40} strokeWidth={1} />
@@ -117,7 +125,7 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
                     ${item.status === "IN STOCK" ? "bg-emerald-500/10 text-emerald-500" :
                     item.status === "SOLD" ? "bg-foreground/5 text-muted-foreground/60" :
                     "bg-red-500/10 text-red-500"}`}>
-                  {INVENTORY_STATUS_LABELS[item.status] || item.status}
+                  {item.status}
                 </div>
               </div>
               <h2 className="text-4xl font-display font-normal uppercase tracking-tighter text-foreground leading-none mb-1 truncate">
@@ -131,10 +139,11 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
         {/* Content */}
         <div className="flex-1 overflow-y-auto custom-scrollbar bg-[#0e0e0e]">
           <div className="grid grid-cols-1 md:grid-cols-2 p-10 gap-x-12 border-b border-foreground/5">
-            <DetailField icon={Server} label="CATEGORIA" value={item.type} />
-            <DetailField icon={Hash} label="REFERÊNCIA_DO_CÓDIGO" value={item.partNumber} mono />
-            <DetailField icon={Calendar} label="DATA_DE_ENTRADA" value={formatDate(item.createdAt)} />
-            <DetailField icon={Activity} label="ÚLTIMA_SINCRONIZAÇÃO" value={formatDate(item.updatedAt)} />
+            <DetailField icon={Server} label="CATEGORIA_IDX" value={item.type} />
+            <DetailField icon={Hash} label="PART_NUMBER_REF" value={item.partNumber} mono />
+            <DetailField icon={Hash} label="GTIN_EAN_REF" value={item.gtin} mono />
+            <DetailField icon={Calendar} label="ENTRY_TIMESTAMP" value={formatDate(item.createdAt)} />
+            <DetailField icon={Activity} label="LAST_SYNCHRONIZATION" value={formatDate(item.updatedAt)} />
           </div>
 
           <div className="p-10">
@@ -142,16 +151,57 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
             <div className="mb-12">
               <div className="flex items-center gap-2 mb-6 opacity-40">
                 <CornerRightDown size={14} className="text-primary/60" />
-                <h4 className="text-[11px] font-display font-normal uppercase tracking-[0.2em]">ESPECIFICAÇÕES_TÉCNICAS.TXT</h4>
+                <h4 className="text-[11px] font-display font-normal uppercase tracking-[0.2em]">TECHNICAL_SPECIFICATIONS.TXT</h4>
               </div>
               <div className="bg-[#131313] border border-foreground/10 p-8 rounded-none relative group transition-all">
                 <div className="absolute top-0 right-0 p-3 text-[10px] font-mono text-muted-foreground/20 uppercase font-bold">UTF-8</div>
                 <div className="absolute top-0 left-0 w-[2px] h-0 bg-primary group-hover:h-full transition-all duration-300" />
                 <p className="text-sm text-foreground/70 leading-relaxed font-mono whitespace-pre-wrap">
-                  {item.specifications || "NENHUM_DADO_TÉCNICO_DISPONÍVEL"}
+                  {item.specifications || "NO_TECHNICAL_DATA_AVAILABLE_IN_SYSTEM_INDEX"}
                 </p>
               </div>
             </div>
+
+            {item.metadata?.catalogEnrichment?.status && (
+              <div className="mb-12 flex flex-wrap items-center gap-3 border border-foreground/10 bg-[#131313] p-5">
+                <span className="text-[10px] font-display uppercase tracking-[0.2em] text-muted-foreground/60">CATALOG_ENRICHMENT</span>
+                <Badge variant="outline" className="rounded-none border-primary/20 bg-primary/5 text-[10px] font-mono uppercase tracking-widest text-primary">
+                  {item.metadata.catalogEnrichment.status}
+                </Badge>
+                {item.metadata.catalogEnrichment.matchedBy && (
+                  <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/50">
+                    MATCH: {item.metadata.catalogEnrichment.matchedBy}
+                  </span>
+                )}
+                {item.metadata.catalogEnrichment.sourceUrl && (
+                  <a
+                    href={item.metadata.catalogEnrichment.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[10px] font-mono uppercase tracking-widest text-primary underline underline-offset-4"
+                  >
+                    OPEN_ICECAT_SOURCE
+                  </a>
+                )}
+              </div>
+            )}
+
+            {item.technicalSpecifications && Object.keys(item.technicalSpecifications).length > 0 && (
+              <div className="mb-12">
+                <div className="flex items-center gap-2 mb-6 opacity-40">
+                  <Tag size={14} className="text-primary/60" />
+                  <h4 className="text-[11px] font-display font-normal uppercase tracking-[0.2em]">CATALOG_SPECIFICATIONS.JSON</h4>
+                </div>
+                <div className="grid grid-cols-1 gap-px border border-foreground/10 bg-foreground/10 md:grid-cols-2">
+                  {Object.entries(item.technicalSpecifications).map(([name, value]) => (
+                    <div key={name} className="bg-[#131313] p-4">
+                      <p className="mb-2 text-[10px] font-display uppercase tracking-[0.16em] text-muted-foreground/50">{name}</p>
+                      <p className="text-sm font-mono text-foreground/80">{String(value)}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Audio Log Section */}
             {item.audioUrl && (
@@ -161,8 +211,8 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-3">
-                    <p className="text-[11px] font-display font-normal uppercase tracking-[0.2em] opacity-30">REGISTRO_DA_TRANSMISSÃO_DE_VOZ</p>
-                    <span className="text-[10px] font-mono text-primary/40 uppercase">FONTE_IA_CODIFICADA</span>
+                    <p className="text-[11px] font-display font-normal uppercase tracking-[0.2em] opacity-30">VOICE_TRANSMISSION_LOG</p>
+                    <span className="text-[10px] font-mono text-primary/40 uppercase">AI_SOURCE_ENCODED</span>
                   </div>
                   <audio src={item.audioUrl} controls className="w-full h-8 brightness-[0.4] contrast-200" />
                 </div>
@@ -178,10 +228,26 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
             onClick={onClose}
             className="w-full py-8 text-[12px] font-display font-normal uppercase tracking-[0.4em] hover:bg-foreground hover:text-background rounded-none transition-all duration-300 text-muted-foreground/60"
           >
-            FECHAR_DETALHES
+            DISMISS_VIEWPORT_TERMINAL
           </Button>
         </div>
       </DialogContent>
+
+      <Dialog open={isImagePreviewOpen} onOpenChange={setIsImagePreviewOpen}>
+        <DialogContent className="w-fit max-w-[calc(100%-2rem)] border-foreground/10 bg-[#09090b] p-0 rounded-none shadow-2xl">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Imagem ampliada: {item.model}</DialogTitle>
+            <DialogDescription>Visualização ampliada da imagem do equipamento {item.model}.</DialogDescription>
+          </DialogHeader>
+          <div className="flex max-h-[90vh] max-w-[92vw] items-center justify-center p-4 sm:p-6">
+            <img
+              src={item.productImageUrl}
+              alt={item.model}
+              className="max-h-[82vh] max-w-full object-contain"
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

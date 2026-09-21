@@ -33,11 +33,18 @@ describe("crmDomain helpers", () => {
   });
 
   it("creates a coherent account/contact/channel/conversation/message chain", () => {
-    const account = createAccountRecord({ name: "Metalurgica XPTO" }, ownershipContext);
+    const account = createAccountRecord({
+      name: "Metalurgica XPTO",
+      address: { street: "Rua Central", number: "10", city: "Campinas", state: "SP" },
+    }, ownershipContext);
     const contact = createContactRecord({
       accountId: account.accountId,
       name: "Carlos",
       phoneNumber: "+5511999999999",
+      phoneDigitsList: ["5511999999999", "5511988887777"],
+      whatsappPhoneDigits: ["5511988887777"],
+      phoneNumbers: [{ label: "Celular", value: "+5511999999999", hasWhatsapp: false }],
+      emails: [{ label: "Principal", value: "carlos@metalurgica.com" }],
     }, ownershipContext);
     const channel = createContactChannelRecord({
       accountId: account.accountId,
@@ -62,12 +69,16 @@ describe("crmDomain helpers", () => {
       ownerId: "user-123",
       accountId: "acct_user-123",
       kind: "customer",
+      address: expect.objectContaining({ city: "Campinas" }),
     }));
     expect(contact).toEqual(expect.objectContaining({
       type: "contact",
       ownerId: "user-123",
       accountId: "acct_user-123",
       phoneNumber: "+5511999999999",
+      phoneDigitsList: ["5511999999999", "5511988887777"],
+      whatsappPhoneDigits: ["5511988887777"],
+      emails: [{ label: "Principal", value: "carlos@metalurgica.com" }],
     }));
     expect(channel).toEqual(expect.objectContaining({
       type: "contact_channel",
@@ -135,4 +146,3 @@ describe("crmDomain helpers", () => {
     }));
   });
 });
-

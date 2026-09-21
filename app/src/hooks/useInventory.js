@@ -73,6 +73,7 @@ export default function useInventory(user = null, enabled = true) {
       const match = (val) => val && val.toString().toLowerCase().includes(query);
       return (
         match(item.partNumber) ||
+        match(item.gtin) ||
         match(item.model) ||
         match(item.brand) ||
         match(item.type)

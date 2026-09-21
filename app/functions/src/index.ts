@@ -1,7 +1,7 @@
 import * as admin from "firebase-admin";
 admin.initializeApp(); // Initialize early for child modules
 
-import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { onDocumentCreated, onDocumentWritten } from "firebase-functions/v2/firestore";
 import { onRequest, onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
 import { onSchedule, ScheduledEvent } from "firebase-functions/v2/scheduler";
 import * as logger from "firebase-functions/logger";
@@ -23,7 +23,14 @@ import {
   createInterestRecord 
 } from "./crmDomain";
 import { processHardwareInterests } from "./hardwareResolution";
+import {
+  buildEnrichmentPatch,
+  buildProductLookupSignature,
+  lookupOpenIcecatProduct,
+} from "./productEnrichment";
 import { processPendingContactClassifications } from "./whatsappClassification";
+import { loadFeatureFlags, isFeatureEnabled } from "./featureFlags";
+import { createCrmReviewItemRecord } from "./crmReview";
 import {
   ensureAccessAdmin,
   getAccessConfig,
@@ -31,7 +38,6 @@ import {
   listAccessUsers as listAccessUsersData,
   updateAccessStatus,
 } from "./accessControl";
-import { normalizePhoneDigits, withoutBrazilCountryCode } from "./phone";
 
 
 
@@ -42,6 +48,10 @@ import { normalizePhoneDigits, withoutBrazilCountryCode } from "./phone";
  */
 async function ensureAdmin(auth: any) {
   await ensureAccessAdmin(auth, getFirestore());
+}
+
+function normalizePhoneDigits(value: any) {
+  return String(value || "").replace(/\D/g, "");
 }
 
 async function findLinkedCrmContact(db: FirebaseFirestore.Firestore, workspaceId: string, remoteJid: string) {
@@ -56,18 +66,29 @@ async function findLinkedCrmContact(db: FirebaseFirestore.Firestore, workspaceId
 
   const phoneDigits = normalizePhoneDigits(remoteJid.split("@")[0]);
   if (!phoneDigits) return null;
-  const phoneCandidates = [phoneDigits, withoutBrazilCountryCode(phoneDigits)].filter((candidate, index, values) => candidate && values.indexOf(candidate) === index);
+  const phoneSnapshot = await db.collection("contacts")
+    .where("workspaceId", "==", workspaceId)
+    .where("phoneDigits", "==", phoneDigits)
+    .limit(1)
+    .get();
+  if (!phoneSnapshot.empty) return phoneSnapshot.docs[0];
 
-  for (const candidate of phoneCandidates) {
-    const phoneSnapshot = await db.collection("contacts")
-      .where("workspaceId", "==", workspaceId)
-      .where("phoneDigits", "==", candidate)
-      .limit(1)
-      .get();
-    if (!phoneSnapshot.empty) return phoneSnapshot.docs[0];
-  }
-
-  return null;
+  // Additional numbers are stored in arrays so the CRM can keep multiple
+  // phones without exposing a WhatsApp remote ID in the UI. Scan the scoped
+  // workspace as a compatibility fallback until all contacts are migrated.
+  const contactsSnapshot = await db.collection("contacts")
+    .where("workspaceId", "==", workspaceId)
+    .limit(500)
+    .get();
+  return contactsSnapshot.docs.find((contact) => {
+    const data = contact.data() as Record<string, any>;
+    const phoneDigitsList = Array.isArray(data.phoneDigitsList) ? data.phoneDigitsList : [];
+    const whatsappPhoneDigits = Array.isArray(data.whatsappPhoneDigits) ? data.whatsappPhoneDigits : [];
+    const phoneNumbers = Array.isArray(data.phoneNumbers) ? data.phoneNumbers : [];
+    return phoneDigitsList.includes(phoneDigits)
+      || whatsappPhoneDigits.includes(phoneDigits)
+      || phoneNumbers.some((phone: any) => normalizePhoneDigits(phone?.value || phone?.number || phone?.digits) === phoneDigits);
+  }) || null;
 }
 
 function parseOptionalDate(value: any) {
@@ -567,6 +588,60 @@ export const processWhatsappEvent = onDocumentCreated("whatsapp_webhook_events/{
   }
 }));
 
+/**
+ * Enriches inventory products automatically using the free Open Icecat catalog.
+ * The trigger runs on creation and whenever an identifying field changes. Its
+ * own metadata update is ignored through the lookup signature guard.
+ */
+export const enrichInventoryProduct = onDocumentWritten("inventory/{itemId}", withEventErrorHandling(async (event: any, logger: any) => {
+  const afterSnapshot = event.data?.after;
+  if (!afterSnapshot?.exists) return;
+
+  const item = afterSnapshot.data() || {};
+  const lookupSignature = buildProductLookupSignature(item);
+  const storedSignature = item.metadata?.catalogEnrichment?.lookupSignature || null;
+
+  if (!lookupSignature || storedSignature === lookupSignature) {
+    return;
+  }
+
+  const lookupResult = await lookupOpenIcecatProduct(item);
+  const enrichment = buildEnrichmentPatch(item, lookupResult);
+  const finalLookupSignature = buildProductLookupSignature({
+    ...item,
+    ...enrichment.fields,
+  });
+  const db = getFirestore();
+  const itemRef = db.collection("inventory").doc(event.params.itemId);
+
+  await itemRef.set({
+    ...enrichment.fields,
+    metadata: {
+      ...(item.metadata && typeof item.metadata === "object" ? item.metadata : {}),
+      catalogEnrichment: {
+        provider: "open_icecat",
+        status: lookupResult.status,
+        reason: lookupResult.reason || null,
+        matchedBy: lookupResult.matchedBy,
+        confidence: enrichment.confidence,
+        productId: lookupResult.product?.productId || null,
+        sourceUrl: lookupResult.product?.sourceUrl || lookupResult.sourceUrl || null,
+        lookupSignature: finalLookupSignature || lookupSignature,
+        attemptedAt: FieldValue.serverTimestamp(),
+        completedAt: FieldValue.serverTimestamp(),
+      },
+    },
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+
+  logger.info("Inventory product enrichment completed", {
+    itemId: event.params.itemId,
+    status: lookupResult.status,
+    matchedBy: lookupResult.matchedBy,
+    provider: "open_icecat",
+  });
+}));
+
 async function resolvePrimaryAdminUid(db: FirebaseFirestore.Firestore) {
   const supportDoc = await db.collection("system").doc("support").get();
   if (supportDoc.exists && supportDoc.data()?.primaryAdminUid) {
@@ -738,6 +813,8 @@ async function processPendingWhatsappBatches() {
     .where("extracted", "in", ["pending_batch", "waiting_context"])
     .orderBy("timestamp", "asc")
     .get();
+  const featureFlags = await loadFeatureFlags(db);
+  const useCrmReviewQueue = isFeatureEnabled(featureFlags, "crmAiWorkflow");
 
   if (pendingMessagesSnap.empty) {
     logger.info("No pending messages for batch processing");
@@ -875,26 +952,28 @@ async function processPendingWhatsappBatches() {
          });
        }
 
-       // 3.2 Save CRM Opportunities
+       // 3.2 Save CRM Opportunities. AI suggestions go through the human
+       // review queue before becoming operational records.
        if (extractedData.opportunities?.length > 0) {
          extractedData.opportunities.forEach((opp: any) => {
-           const oppRef = db.collection(CRM_COLLECTIONS.opportunities).doc();
-           const oppRecord = createOpportunityRecord({
+           const suggestion = {
              ...opp,
              contactId: opp.contactId || linkedContactId,
              companyId: opp.companyId || linkedCompanyId,
              remoteJid: remoteJid, // Link to whatsapp
-             _lineage: { aiRunId: runResult.runId }
-           }, ownershipContext);
-           crmBatch.set(oppRef, oppRecord);
+           };
+           const targetRef = db.collection(useCrmReviewQueue ? "crm_review_items" : CRM_COLLECTIONS.opportunities).doc();
+           const targetRecord = useCrmReviewQueue
+             ? createCrmReviewItemRecord({ kind: "opportunity", suggestion, sourceMessageIds, remoteJid, contactId: linkedContactId, companyId: linkedCompanyId, summary: extractedData.summary, confidence: extractedData.confidence, aiRunId: runResult.runId }, ownershipContext)
+             : createOpportunityRecord({ ...suggestion, _lineage: { aiRunId: runResult.runId } }, ownershipContext);
+           crmBatch.set(targetRef, targetRecord);
          });
        }
 
        // 3.3 Save CRM Tasks
        if (extractedData.tasks?.length > 0) {
          extractedData.tasks.forEach((task: any) => {
-           const taskRef = db.collection(CRM_COLLECTIONS.tasks).doc();
-           const taskRecord = createTaskRecord({
+           const suggestion = {
              ...task,
              contactId: task.contactId || linkedContactId,
              companyId: task.companyId || linkedCompanyId,
@@ -903,9 +982,12 @@ async function processPendingWhatsappBatches() {
                : null),
              sourceMessageIds,
              remoteJid: remoteJid, // Link to whatsapp
-             _lineage: { aiRunId: runResult.runId }
-           }, ownershipContext);
-           crmBatch.set(taskRef, taskRecord);
+           };
+           const targetRef = db.collection(useCrmReviewQueue ? "crm_review_items" : CRM_COLLECTIONS.tasks).doc();
+           const targetRecord = useCrmReviewQueue
+             ? createCrmReviewItemRecord({ kind: "task", suggestion, sourceMessageIds, remoteJid, contactId: linkedContactId, companyId: linkedCompanyId, summary: extractedData.summary, confidence: extractedData.confidence, aiRunId: runResult.runId }, ownershipContext)
+             : createTaskRecord({ ...suggestion, _lineage: { aiRunId: runResult.runId } }, ownershipContext);
+           crmBatch.set(targetRef, targetRecord);
          });
        }
 
@@ -958,8 +1040,14 @@ async function processPendingWhatsappBatches() {
          crmBatch.update(db.collection("contacts").doc(linkedContactId), contactUpdate);
        }
 
-       // 3.5 Process Hardware Interests
-       if (extractedData.interests?.length > 0) {
+       // 3.5 Hardware interests become reviewable cross-sell suggestions when
+       // the guarded AI workflow is enabled.
+       if (extractedData.interests?.length > 0 && useCrmReviewQueue) {
+         extractedData.interests.forEach((interest: any) => {
+           const reviewRef = db.collection("crm_review_items").doc();
+           crmBatch.set(reviewRef, createCrmReviewItemRecord({ kind: "cross_sell", suggestion: { ...interest, name: interest.name || interest.catalogItemId }, sourceMessageIds, remoteJid, contactId: linkedContactId, companyId: linkedCompanyId, summary: extractedData.summary, confidence: interest.confidence ?? extractedData.confidence, aiRunId: runResult.runId }, ownershipContext));
+         });
+       } else if (extractedData.interests?.length > 0) {
          await processHardwareInterests(
            extractedData.interests.map((it: any) => ({ ...it, name: it.catalogItemId })),
            {
@@ -1088,7 +1176,21 @@ export const revokeAccess = onCall({
   return updateAccessStatus(request.auth, request.data?.targetUid, "revoked");
 }));
 
+export { approveCrmReviewItem, rejectCrmReviewItem } from "./crmReview";
+export { runAiExtraction } from "./aiGateway";
 
-// FinOps - Real-time aggregated usage monitoring
+// CRM migration is server-owned: the client uploads the source file to a
+// short-lived workspace path and these callables validate and commit only the
+// normalized rows that the user explicitly confirms.
+export {
+  createCrmImportJob,
+  validateCrmImport,
+  confirmCrmImport,
+  cleanupCrmImportFiles,
+} from "./crmImport";
+
+
+// FinOps - real-time token usage plus optional official Billing Export reconciliation.
 import { aggregateAiUsage } from "./finops";
-export { aggregateAiUsage };
+import { reconcileAiBillingExport } from "./billingReconciliation";
+export { aggregateAiUsage, reconcileAiBillingExport };

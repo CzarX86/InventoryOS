@@ -1,10 +1,22 @@
 import { useEffect, useState } from "react";
 import { auth, db, googleProvider } from "@/lib/firebase";
-import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+import { onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut } from "firebase/auth";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { initializeAccessProfile } from "@/lib/accessControl";
 
 const profileBootstrapPromises = new Map();
+const localAuthBypass = process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_LOCAL_AUTH_BYPASS === "true";
+const localDevUser = {
+  uid: "local-dev-user",
+  email: "dev@localhost",
+  displayName: "Usuário local",
+  workspaceId: "local-dev-workspace",
+  defaultAccountId: "local-dev-workspace",
+  accessStatus: "approved",
+  role: "admin",
+  isHiddenOwner: false,
+  isLocalDev: true,
+};
 
 function getProfileBootstrap(firebaseUser) {
   if (!profileBootstrapPromises.has(firebaseUser.uid)) {
@@ -20,20 +32,30 @@ function mergeUserProfile(firebaseUser, profile = {}) {
     uid: firebaseUser.uid,
     email: profile.email || firebaseUser.email || null,
     displayName: profile.displayName || firebaseUser.displayName || null,
+    photoURL: profile.photoURL || firebaseUser.photoURL || null,
     accessStatus: profile.accessStatus || "pending",
     role: profile.role || "user",
   };
 }
 
 export default function useAuth() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isApproved, setIsApproved] = useState(false);
+  const [user, setUser] = useState(localAuthBypass ? localDevUser : null);
+  const [loading, setLoading] = useState(!localAuthBypass);
+  const [isAdmin, setIsAdmin] = useState(localAuthBypass);
+  const [isApproved, setIsApproved] = useState(localAuthBypass);
   const [accessStatus, setAccessStatus] = useState("pending");
   const [accessError, setAccessError] = useState(null);
 
   useEffect(() => {
+    if (localAuthBypass) {
+      setUser(localDevUser);
+      setIsAdmin(true);
+      setIsApproved(true);
+      setAccessStatus("approved");
+      setLoading(false);
+      return undefined;
+    }
+
     if (!auth) {
       setLoading(false);
       return undefined;
@@ -114,12 +136,40 @@ export default function useAuth() {
     };
   }, []);
 
-  const login = () => {
+  const login = async () => {
+    if (localAuthBypass) {
+      setUser(localDevUser);
+      setIsAdmin(true);
+      setIsApproved(true);
+      setAccessStatus("approved");
+      return localDevUser;
+    }
+
     if (!auth) throw new Error("Firebase Auth indisponível neste ambiente.");
-    return signInWithPopup(auth, googleProvider);
+
+    try {
+      return await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      if (
+        error?.code === "auth/popup-blocked" ||
+        error?.code === "auth/operation-not-supported-in-this-environment"
+      ) {
+        return signInWithRedirect(auth, googleProvider);
+      }
+
+      throw error;
+    }
   };
 
   const logout = () => {
+    if (localAuthBypass) {
+      setUser(null);
+      setIsAdmin(false);
+      setIsApproved(false);
+      setAccessStatus("pending");
+      return Promise.resolve();
+    }
+
     if (!auth) return Promise.resolve();
     return signOut(auth);
   };
@@ -146,5 +196,6 @@ export default function useAuth() {
     login,
     logout,
     updateSettings,
+    isLocalAuthBypass: localAuthBypass,
   };
 }
