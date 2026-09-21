@@ -15,16 +15,8 @@ import {
   Users,
   Video,
 } from "lucide-react";
-import {
-  collection,
-  limit,
-  onSnapshot,
-  query,
-  where,
-} from "firebase/firestore";
-import type { Firestore } from "firebase/firestore";
-import { db as firebaseDb } from "@/lib/firebase";
-import { listAccessUsers, type AccessUserSummary } from "@/lib/accessControl";
+import type { AccessUserSummary } from "@/lib/accessControl";
+import { getCrmPerformanceSnapshot } from "@/lib/crmPerformanceApi";
 import {
   aggregateCrmPerformance,
   type CrmPerformanceContact,
@@ -39,8 +31,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-const db = firebaseDb as unknown as Firestore | undefined;
-
 type CrmPerformanceUser = {
   uid?: string | null;
   email?: string | null;
@@ -53,27 +43,6 @@ type CrmPerformanceUser = {
 type Company = {
   id: string;
   name?: string | null;
-};
-
-type LoadingState = {
-  events: boolean;
-  contacts: boolean;
-  companies: boolean;
-  employees: boolean;
-};
-
-const EMPTY_LOADING: LoadingState = {
-  events: false,
-  contacts: false,
-  companies: false,
-  employees: false,
-};
-
-const READY_LOADING: LoadingState = {
-  events: true,
-  contacts: true,
-  companies: true,
-  employees: true,
 };
 
 const CHANNELS = [
@@ -183,69 +152,42 @@ export default function CrmPerformanceDashboard({ user }: { user: CrmPerformance
   const [companies, setCompanies] = useState<Company[]>([]);
   const [employees, setEmployees] = useState<CrmPerformanceEmployee[]>([]);
   const [periodDays, setPeriodDays] = useState<PeriodDays>(30);
-  const [loading, setLoading] = useState<LoadingState>(() => (db && workspaceId ? EMPTY_LOADING : READY_LOADING));
+  const [loading, setLoading] = useState(Boolean(workspaceId));
   const [error, setError] = useState<string | null>(null);
   const [employeeError, setEmployeeError] = useState(false);
   const [eventLimitReached, setEventLimitReached] = useState(false);
   const [metricsNow] = useState(() => Date.now());
 
   useEffect(() => {
-    if (!db || !workspaceId) {
+    if (!workspaceId) {
+      setLoading(false);
       return undefined;
     }
-
-    const markLoaded = (key: keyof LoadingState) => setLoading((current) => ({ ...current, [key]: true }));
-    const scopedQuery = (collectionName: string, max: number) => query(
-      collection(db, collectionName),
-      where("workspaceId", "==", workspaceId),
-      limit(max),
-    );
-    const eventsUnsubscribe = onSnapshot(
-      scopedQuery("crm_events", 2000),
-      (snapshot) => {
-        setEvents(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as CrmPerformanceEvent)));
-        setEventLimitReached(snapshot.size >= 2000);
-        markLoaded("events");
-      },
-      () => {
-        setError("Não foi possível carregar as atividades do CRM.");
-        markLoaded("events");
-      },
-    );
-    const contactsUnsubscribe = onSnapshot(
-      scopedQuery("contacts", 1000),
-      (snapshot) => {
-        setContacts(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as CrmPerformanceContact)));
-        markLoaded("contacts");
-      },
-      () => {
-        setError("Não foi possível carregar os contatos do CRM.");
-        markLoaded("contacts");
-      },
-    );
-    const companiesUnsubscribe = onSnapshot(
-      scopedQuery("accounts", 500),
-      (snapshot) => {
-        setCompanies(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as Company)));
-        markLoaded("companies");
-      },
-      () => markLoaded("companies"),
-    );
-
-    void listAccessUsers()
-      .then((result) => setEmployees(mergeEmployees(user, result.users)))
+    let active = true;
+    setLoading(true);
+    setError(null);
+    setEmployeeError(false);
+    void getCrmPerformanceSnapshot(periodDays)
+      .then((snapshot) => {
+        if (!active) return;
+        setEvents(snapshot.events);
+        setContacts(snapshot.contacts);
+        setCompanies(snapshot.companies);
+        setEmployees(mergeEmployees(user, snapshot.employees));
+        setEventLimitReached(snapshot.eventLimitReached);
+      })
       .catch(() => {
+        if (!active) return;
+        setError("Não foi possível carregar a performance do CRM.");
         setEmployeeError(true);
         setEmployees(mergeEmployees(user, []));
       })
-      .finally(() => markLoaded("employees"));
+      .finally(() => {
+        if (active) setLoading(false);
+      });
 
-    return () => {
-      eventsUnsubscribe();
-      contactsUnsubscribe();
-      companiesUnsubscribe();
-    };
-  }, [user, workspaceId]);
+    return () => { active = false; };
+  }, [periodDays, user, workspaceId]);
 
   const metrics = useMemo(() => aggregateCrmPerformance({
     now: metricsNow,
@@ -256,14 +198,13 @@ export default function CrmPerformanceDashboard({ user }: { user: CrmPerformance
     hiddenEmployeeIds: user?.isHiddenOwner && user.uid ? [user.uid] : [],
   }), [contacts, employees, events, metricsNow, periodDays, user]);
   const companyNames = useMemo(() => new Map(companies.map((company) => [company.id, company.name || "Empresa sem nome"])), [companies]);
-  const isLoading = Object.values(loading).some((value) => !value);
   const previous = metrics.previousPeriod;
   const channelRows = CHANNELS.filter((channel) => Boolean(metrics.channels[channel.key]));
   const channelMax = Math.max(...channelRows.map((channel) => metrics.channels[channel.key] || 0), 1);
   const trendMax = Math.max(...metrics.trend.map((point) => point.interactions), 1);
   const hasData = metrics.totalInteractions > 0;
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="flex min-h-[520px] items-center justify-center gap-3 bg-[#0e0e0e] text-[#acabaa]/60">
         <Loader2 size={18} className="animate-spin text-[#97a5ff]" />

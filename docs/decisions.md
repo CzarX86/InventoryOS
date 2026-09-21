@@ -97,6 +97,12 @@ active_decisions:
 - **Implications**: `deleteCrmContact` snapshots the contact for 90 days in `crm_deleted_records`, marks the contact as deleted, writes `system_audit_logs`, and leaves related interactions available for restoration. Hard deletion and long-term backup retention require a separate retention/DSAR process; this flow is not a substitute for scheduled Firestore/GCP backups.
 - **Status**: Active.
 
+## Decision: Bounded server snapshot for CRM performance
+- **Decision**: The Performance screen loads through the administrator-only `getCrmPerformanceSnapshot` callable instead of opening separate client-side realtime listeners for events, contacts, companies and users. For 7/30/90-day views, the backend requests only the selected period and its comparable previous period; all-time views retain a bounded 2,000-event safety cap.
+- **Reason**: The previous implementation delayed first render while downloading and subscribing to up to 3,500 documents across four independent streams. Performance analytics do not need realtime updates at event granularity, and a single server snapshot reduces latency, browser listeners and read amplification.
+- **Implications**: Changing the period triggers one bounded refresh. The `crm_events(workspaceId, occurredAt)` composite index is required. A future high-volume analytics phase should replace the all-time cap with materialized aggregates rather than increasing client limits.
+- **Status**: Active.
+
 ## FinOps Architecture Overview
 
 ### AI Cost Aggregation Flow

@@ -97,7 +97,7 @@ The CRM uses `accounts` as companies and `contacts` as people. Each record carri
 
 ### CRM Performance Dashboard
 
-The administrative CRM performance surface reads workspace-scoped `crm_events`, `contacts`, `accounts`, and approved access summaries. The employee comparison is attributed by `actorUserId` (falling back to `ownerId` only when it is not a system actor), while automated/system activity is retained in an explicit `Sem atribuição` row instead of being assigned to a person.
+The administrative CRM performance surface uses the `getCrmPerformanceSnapshot` callable to read workspace-scoped `crm_events`, `contacts`, `accounts`, and approved access summaries in one request. Event queries are bounded to the selected period plus the comparable previous period (or the existing 2,000-event safety cap for all-time views), avoiding several client-side realtime listeners. The employee comparison is attributed by `actorUserId` (falling back to `ownerId` only when it is not a system actor), while automated/system activity is retained in an explicit `Sem atribuição` row instead of being assigned to a person.
 
 The initial KPI contract is:
 
