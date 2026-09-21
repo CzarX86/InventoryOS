@@ -88,4 +88,18 @@ describe("aggregateCrmPerformance", () => {
     expect(result.employeeMetrics).toEqual([expect.objectContaining({ uid: "unassigned", name: "Sem atribuição" })]);
     expect(result.attributionRate).toBe(0);
   });
+
+  it("does not count soft-deleted contacts as active or overdue", () => {
+    const result = aggregateCrmPerformance({
+      now: NOW,
+      periodDays: 30,
+      events: [{ eventType: "contact_interaction", channelType: "phone", actorUserId: "u1", contactId: "deleted-1", occurredAt: daysAgo(1) }],
+      contacts: [{ id: "deleted-1", status: "deleted", nextContactAt: daysAgo(2) }],
+      employees: [{ uid: "u1", displayName: "Ana", status: "approved" }],
+    });
+
+    expect(result.activeContacts).toBe(0);
+    expect(result.contactsReachedInActiveBase).toBe(0);
+    expect(result.overdueContacts).toHaveLength(0);
+  });
 });
