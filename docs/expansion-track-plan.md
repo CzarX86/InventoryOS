@@ -147,7 +147,9 @@ Regras:
 
 ### 4.3 Backup e risco
 
-Ja existem mecanismos de backup e isso reduz o risco operacional, mas nao substitui:
+O CRM agora possui uma camada de recuperacao operacional: a exclusao de contato e logica, o cadastro e preservado em `crm_deleted_records` por 90 dias, a restauracao e exclusiva de administradores e a acao gera auditoria. Isso reduz o risco de erro humano, mas nao substitui backup de infraestrutura e nao representa uma politica de retencao LGPD definitiva.
+
+Backups e recuperacao devem continuar sendo tratados como controles separados e nao substituem:
 
 - TDD
 - staging validation
@@ -396,7 +398,14 @@ Exemplos de derivados:
 
 ### 8.2 Exclusao e reversibilidade
 
-O usuario deve poder:
+Para o CRM estruturado, a politica inicial e:
+
+- contato: soft-delete por callable administrativo, com snapshot e restauracao por 90 dias;
+- interacoes: historico append-only, sem update/delete direto pelo cliente;
+- relatórios massivos: somente administradores, com geração server-side e export controlado;
+- hard delete: somente em processo de retencao/DSAR explicitamente aprovado.
+
+No trilho de mensagens e lineage, o usuario deve poder:
 
 - apagar uma mensagem
 - apagar uma mensagem e manter derivados

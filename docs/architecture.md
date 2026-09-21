@@ -109,6 +109,12 @@ The initial KPI contract is:
 
 The dashboard intentionally does not infer call duration, connection rate, outcome, conversion, or revenue attribution because those fields are not present in the CRM v1 records. `crmPerformanceDashboard` controls the admin navigation entry and can be disabled through `system/feature_flags`.
 
+### CRM governance, deletion and reporting
+
+CRM deletion is soft-delete by default. `deleteCrmContact` is an administrator-only callable that stores a 90-day recovery snapshot in `crm_deleted_records`, marks the contact as `status: deleted`, and records the action in `system_audit_logs`. The contact and its interaction history remain recoverable; `restoreCrmContact` reverses the lifecycle marker without rewriting the timeline. Direct client deletes are denied by Firestore Rules.
+
+Approved team members can update operational contact/company fields, but cannot change workspace, ownership, lifecycle/deletion metadata or communication-channel administration. `crm_events` is append-only: corrections are represented by a new event instead of editing or erasing history. The Performance screen and future mass-report/export collections are administrator-only; report files must be generated server-side and never exposed as unrestricted client exports.
+
 ## Integration Points
 - **Gemini API**: Used for complex extraction, summaries, and multimodal reasoning.
 - **DeepSeek API**: Proposed backend logic for high-volume, low-cost extraction.

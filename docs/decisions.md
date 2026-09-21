@@ -91,6 +91,12 @@ active_decisions:
 - **Implications**: Automated WhatsApp activity is visible but does not inflate an employee's ranking. Adding conversion or quality KPIs requires new captured fields and tests before the dashboard contract is expanded.
 - **Status**: Active.
 
+## Decision: Reversible CRM deletion and administrator-only reporting
+- **Decision**: Contacts use a server-owned soft-delete/recycle-bin flow. Only approved administrators can move a contact to the lixeira or restore it; operational users retain access to normal CRM work but cannot directly delete records, rewrite `crm_events`, or change ownership/workspace/lifecycle metadata. Mass performance/report exports remain administrator-only and are generated through server-owned paths.
+- **Reason**: A test contact must be removable without making accidental or irreversible data loss easy. Customer relationship history is critical business data and should remain auditable and recoverable while teams collaborate on day-to-day fields.
+- **Implications**: `deleteCrmContact` snapshots the contact for 90 days in `crm_deleted_records`, marks the contact as deleted, writes `system_audit_logs`, and leaves related interactions available for restoration. Hard deletion and long-term backup retention require a separate retention/DSAR process; this flow is not a substitute for scheduled Firestore/GCP backups.
+- **Status**: Active.
+
 ## FinOps Architecture Overview
 
 ### AI Cost Aggregation Flow

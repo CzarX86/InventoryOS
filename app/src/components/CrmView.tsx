@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   ArrowLeft,
   AtSign,
+  Archive,
   AudioLines,
   Building2,
   CalendarClock,
@@ -16,7 +17,9 @@ import {
   PackageSearch,
   Phone,
   Plus,
+  RotateCcw,
   Search,
+  ShieldAlert,
   Trash2,
   UserRound,
   UsersRound,
@@ -56,12 +59,23 @@ import { filterCompanySuggestions, normalizePhoneDigits } from "@/lib/crmContact
 import CrmAudioCapture from "@/components/CrmAudioCapture";
 import { extractCrmInteractionFromAudio } from "@/lib/ai";
 import { getCrmAudioExtension, mergeCrmNotes, readBlobAsBase64, type CrmAudioAttachment } from "@/lib/crmAudio";
+import {
+  deleteCrmContact as deleteCrmContactServer,
+  listDeletedCrmContacts,
+  restoreCrmContact,
+  type DeletedCrmContact,
+} from "@/lib/crmGovernance";
 import { cn } from "@/lib/utils";
 
 const db = firebaseDb as unknown as Firestore | undefined;
 const storage = firebaseStorage as unknown as FirebaseStorage | undefined;
 
-type CrmUser = { uid?: string | null; workspaceId?: string | null; defaultAccountId?: string | null } | null;
+type CrmUser = {
+  uid?: string | null;
+  workspaceId?: string | null;
+  defaultAccountId?: string | null;
+  role?: "user" | "admin";
+} | null;
 
 type CompanyAddress = {
   street: string;
@@ -113,6 +127,7 @@ type Contact = {
   lastContactAt?: unknown;
   nextContactAt?: unknown;
   nextContactSource?: string | null;
+  status?: string | null;
 };
 
 type CatalogItem = { id: string; itemType?: string | null; brand?: string | null; model?: string | null };
@@ -297,6 +312,7 @@ function cleanAudioAnalysis(value: unknown): CrmAiAnalysis {
 
 export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenImport?: () => void }) {
   const workspaceId = user?.workspaceId || user?.defaultAccountId || null;
+  const isAdmin = user?.role === "admin";
   const [companies, setCompanies] = useState<Company[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
@@ -312,6 +328,11 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
   const [savingEquipment, setSavingEquipment] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [interactionOpen, setInteractionOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [recycleOpen, setRecycleOpen] = useState(false);
+  const [deletingContact, setDeletingContact] = useState(false);
+  const [loadingDeletedContacts, setLoadingDeletedContacts] = useState(false);
+  const [deletedContacts, setDeletedContacts] = useState<DeletedCrmContact[]>([]);
   const [audioAttachment, setAudioAttachment] = useState<CrmAudioAttachment | null>(null);
   const [audioResetKey, setAudioResetKey] = useState(0);
   const [detailTab, setDetailTab] = useState<"overview" | "interactions" | "equipment">("overview");
@@ -327,6 +348,7 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
     const term = contactSearch.trim().toLocaleLowerCase("pt-BR");
     return contacts
       .filter((contact) => {
+        if (contact.status === "deleted") return false;
         if (!term) return true;
         const company = companies.find((item) => item.id === contact.companyId);
         return [
@@ -352,7 +374,9 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
       setCompanies(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as Company)).sort((left, right) => String(left.name || "").localeCompare(String(right.name || ""), "pt-BR")));
     }, () => setStatus({ tone: "error", text: "Não foi possível carregar as empresas." }));
     const unsubscribeContacts = onSnapshot(contactQuery, (snapshot) => {
-      const nextContacts = snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as Contact));
+      const nextContacts = snapshot.docs
+        .map((item) => ({ id: item.id, ...item.data() } as Contact))
+        .filter((contact) => contact.status !== "deleted");
       setContacts(nextContacts);
       setSelectedContactId((current) => current && nextContacts.some((contact) => contact.id === current) ? current : nextContacts[0]?.id || null);
     }, () => setStatus({ tone: "error", text: "Não foi possível carregar os contatos." }));
@@ -394,6 +418,52 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
     setMobilePane("detail");
   };
   const closeCreateDialog = () => { setCreateOpen(false); setFormError(null); setContactForm(createEmptyContactForm()); };
+
+  const handleDeleteContact = async () => {
+    if (!isAdmin || !selectedContact) return;
+    setDeletingContact(true);
+    setStatus(null);
+    try {
+      await deleteCrmContactServer(selectedContact.id);
+      setContacts((current) => current.filter((contact) => contact.id !== selectedContact.id));
+      setSelectedContactId(null);
+      setMobilePane("list");
+      setDeleteOpen(false);
+      setStatus({ tone: "success", text: "Contato movido para a lixeira. O histórico foi preservado e pode ser restaurado por um administrador." });
+    } catch {
+      setStatus({ tone: "error", text: "Não foi possível mover o contato para a lixeira." });
+    } finally {
+      setDeletingContact(false);
+    }
+  };
+
+  const openRecycleBin = async () => {
+    if (!isAdmin) return;
+    setRecycleOpen(true);
+    setLoadingDeletedContacts(true);
+    try {
+      const result = await listDeletedCrmContacts();
+      setDeletedContacts(result.items);
+    } catch {
+      setStatus({ tone: "error", text: "Não foi possível carregar a lixeira administrativa." });
+    } finally {
+      setLoadingDeletedContacts(false);
+    }
+  };
+
+  const handleRestoreContact = async (deletion: DeletedCrmContact) => {
+    setLoadingDeletedContacts(true);
+    try {
+      await restoreCrmContact(deletion.id);
+      setDeletedContacts((current) => current.filter((item) => item.id !== deletion.id));
+      setRecycleOpen(false);
+      setStatus({ tone: "success", text: "Contato restaurado para a carteira. As interações continuam preservadas." });
+    } catch {
+      setStatus({ tone: "error", text: "Não foi possível restaurar o contato." });
+    } finally {
+      setLoadingDeletedContacts(false);
+    }
+  };
 
   const selectCompany = (company: Company) => {
     setContactForm((previous) => ({
@@ -610,7 +680,7 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
 
   return (
     <div className="min-h-full bg-background pb-20 text-foreground">
-      <div className="border-b border-border/70 bg-card px-4 py-7 md:px-8 md:py-8"><div className="mx-auto max-w-7xl"><div className="mb-3 flex items-center gap-2 text-xs font-medium text-primary"><Building2 size={15} /> CRM</div><div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"><div><h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Contatos e relacionamento</h1><p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">Organize empresas, contatos e o histórico de cada conversa em um fluxo contínuo.</p></div><div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto"><Button type="button" variant="outline" onClick={onOpenImport} disabled={!onOpenImport} className="h-10 w-full gap-2 sm:w-auto"><FileSpreadsheet size={16} /> Importar</Button><Button type="button" onClick={() => { setFormError(null); setCreateOpen(true); }} className="h-10 w-full gap-2 sm:w-auto"><Plus size={16} /> Novo contato</Button></div></div></div></div>
+      <div className="border-b border-border/70 bg-card px-4 py-7 md:px-8 md:py-8"><div className="mx-auto max-w-7xl"><div className="mb-3 flex items-center gap-2 text-xs font-medium text-primary"><Building2 size={15} /> CRM</div><div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"><div><h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Contatos e relacionamento</h1><p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">Organize empresas, contatos e o histórico de cada conversa em um fluxo contínuo.</p></div><div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto"><Button type="button" variant="outline" onClick={onOpenImport} disabled={!onOpenImport} className="h-10 w-full gap-2 sm:w-auto"><FileSpreadsheet size={16} /> Importar</Button>{isAdmin && <Button type="button" variant="outline" onClick={openRecycleBin} className="h-10 w-full gap-2 sm:w-auto"><Archive size={16} /> Lixeira</Button>}<Button type="button" onClick={() => { setFormError(null); setCreateOpen(true); }} className="h-10 w-full gap-2 sm:w-auto"><Plus size={16} /> Novo contato</Button></div></div></div></div>
 
       <div className="mx-auto grid max-w-7xl gap-5 px-4 py-5 md:px-8 xl:grid-cols-[minmax(300px,0.72fr)_minmax(0,1.6fr)]">
         <section className={cn("min-w-0", mobilePane === "detail" && "hidden xl:block")}><div className="rounded-2xl border border-border/70 bg-card shadow-sm"><div className="border-b border-border/70 p-4"><div className="flex items-center justify-between gap-3"><div><h2 className="text-base font-semibold">Sua carteira</h2><p className="mt-1 text-xs text-muted-foreground">{contacts.length} {contacts.length === 1 ? "contato" : "contatos"}</p></div><UsersRound className="text-primary" size={18} /></div><div className="relative mt-4"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} /><Input value={contactSearch} onChange={(event) => setContactSearch(event.target.value)} className="h-10 pl-9 pr-9" placeholder="Buscar contato ou empresa" aria-label="Buscar contato ou empresa" />{contactSearch && <button type="button" onClick={() => setContactSearch("")} className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Limpar busca"><X size={14} /></button>}</div></div><div className="divide-y divide-border/60">{visibleContacts.length === 0 ? <div className="px-5 py-12 text-center"><UserRound className="mx-auto text-muted-foreground/50" size={28} /><p className="mt-3 text-sm font-medium">{contactSearch ? "Nenhum contato encontrado" : "Sua carteira está vazia"}</p><p className="mt-1 text-xs leading-relaxed text-muted-foreground">{contactSearch ? "Tente buscar por outro nome, empresa ou telefone." : "Cadastre um contato para começar a acompanhar os relacionamentos."}</p>{!contactSearch && <Button type="button" variant="outline" onClick={() => setCreateOpen(true)} className="mt-4 gap-2"><Plus size={14} /> Cadastrar contato</Button>}</div> : visibleContacts.map((contact) => { const state = followUpState(contact); const company = companies.find((item) => item.id === contact.companyId); return <button key={contact.id} type="button" onClick={() => selectContact(contact.id)} className={cn("flex min-h-[76px] w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/60 focus-visible:bg-muted focus-visible:outline-none", selectedContactId === contact.id && "bg-accent/60")} aria-current={selectedContactId === contact.id ? "true" : undefined}><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-semibold text-primary">{(contact.displayName || contact.name || "?").trim().charAt(0).toUpperCase()}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{contact.displayName || contact.name || "Contato sem nome"}</span><span className="mt-0.5 block truncate text-xs text-muted-foreground">{company?.name || "Empresa não vinculada"}{contact.role ? ` · ${contact.role}` : ""}</span><span className="mt-1 block text-[11px] text-muted-foreground">{state.label}</span></span><ChevronRight className="shrink-0 text-muted-foreground" size={16} /></button>; })}</div></div></section>
@@ -618,8 +688,34 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
         <section className={cn("min-w-0", mobilePane === "list" && "hidden xl:block")}>{!selectedContact ? <div className="flex min-h-[360px] items-center justify-center rounded-2xl border border-dashed border-border bg-card p-8 text-center"><div><UserRound className="mx-auto text-muted-foreground/50" size={30} /><h2 className="mt-4 text-base font-semibold">Selecione um contato</h2><p className="mt-1 max-w-sm text-sm text-muted-foreground">Escolha uma pessoa na carteira para acessar dados, histórico e próximas ações.</p></div></div> : <div className="space-y-5 md:sticky md:top-24 md:self-start"><Button type="button" variant="ghost" onClick={() => setMobilePane("list")} className="h-10 gap-2 px-0 text-muted-foreground hover:bg-transparent hover:text-foreground xl:hidden"><ArrowLeft size={16} /> Voltar para contatos</Button><div className="rounded-2xl border border-border/70 bg-card shadow-sm"><div className="flex flex-col gap-4 border-b border-border/70 p-5 sm:flex-row sm:items-start sm:justify-between"><div className="flex min-w-0 items-start gap-3"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent text-lg font-semibold text-primary">{(selectedContact.displayName || selectedContact.name || "?").trim().charAt(0).toUpperCase()}</span><div className="min-w-0"><h2 className="truncate text-xl font-semibold">{selectedContact.displayName || selectedContact.name}</h2><p className="mt-1 truncate text-sm text-muted-foreground">{selectedCompany?.name || "Empresa não vinculada"}{selectedContact.role ? ` · ${selectedContact.role}` : ""}</p><div className="mt-3 flex flex-wrap gap-2"><Badge variant="outline" className={cn("rounded-full px-2.5 py-1 text-[11px] font-medium", followUpState(selectedContact).className)}>{followUpState(selectedContact).label}</Badge>{selectedContact.sector && <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-[11px] font-medium">{selectedContact.sector}</Badge>}</div></div></div><Button type="button" onClick={() => { setInteractionForm(createEmptyInteraction()); setInteractionOpen(true); }} className="h-10 w-full gap-2 sm:w-auto"><Plus size={15} /> Registrar interação</Button></div><div className="flex overflow-x-auto border-b border-border/70 px-3" role="tablist" aria-label="Detalhes do contato">{[{ id: "overview", label: "Resumo" }, { id: "interactions", label: "Interações", count: events.length }, { id: "equipment", label: "Equipamentos", count: equipmentLinks.length }].map((tab) => <button key={tab.id} type="button" role="tab" aria-selected={detailTab === tab.id} onClick={() => setDetailTab(tab.id as typeof detailTab)} className={cn("min-h-12 shrink-0 border-b-2 px-3 text-sm font-medium transition-colors", detailTab === tab.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>{tab.label}{typeof tab.count === "number" && <span className="ml-1.5 text-xs text-muted-foreground">{tab.count}</span>}</button>)}</div><div className="p-5">{detailTab === "overview" && <div className="space-y-6"><div className="grid gap-4 sm:grid-cols-2"><InfoItem icon={Mail} label="E-mails" value={contactEmails(selectedContact).map((email) => email.value).join(" · ") || "Ainda não informado"} /><InfoItem icon={Phone} label="Telefones" value={contactPhones(selectedContact).map((phone) => phone.value).join(" · ") || "Ainda não informado"} /><InfoItem icon={MapPin} label="Localidade" value={selectedContact.locality || selectedCompany?.locality || "Ainda não informado"} /><InfoItem icon={Clock3} label="Último contato" value={formatDate(selectedContact.lastContactAt)} /></div><div className="rounded-xl border border-border/70 bg-muted/35 p-4"><div className="flex items-center gap-2 text-sm font-semibold"><Building2 size={16} className="text-primary" /> {selectedCompany?.name || "Empresa não vinculada"}</div><p className="mt-2 text-sm leading-relaxed text-muted-foreground">{formatAddress(selectedCompany?.address)}</p></div>{selectedContact.notes && <div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Observações</p><p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground/80">{selectedContact.notes}</p></div>}<div className="grid gap-3 border-t border-border/70 pt-5 sm:grid-cols-2"><div><p className="text-xs text-muted-foreground">Próximo contato</p><p className="mt-1 text-sm font-semibold">{formatDate(selectedContact.nextContactAt)}</p></div><div><p className="text-xs text-muted-foreground">Origem da data</p><p className="mt-1 text-sm font-semibold">{selectedContact.nextContactSource === "ai" ? "Sugestão da IA" : selectedContact.nextContactAt ? "Definida pela equipe" : "Ainda não definida"}</p></div></div></div>}{detailTab === "interactions" && <InteractionTimeline events={events} onRegister={() => setInteractionOpen(true)} />}{detailTab === "equipment" && <EquipmentPanel catalogItems={catalogItems} equipmentForm={equipmentForm} setEquipmentForm={setEquipmentForm} equipmentLinks={equipmentLinks} savingEquipment={savingEquipment} onSubmit={handleEquipmentSubmit} />}</div></div></div>}</section>
       </div>
 
+      {selectedContact && isAdmin && <div className="mx-auto -mt-2 flex max-w-7xl justify-end px-4 md:px-8"><Button type="button" variant="outline" onClick={() => setDeleteOpen(true)} className="gap-2 text-destructive hover:text-destructive"><Trash2 size={15} /> Excluir contato</Button></div>}
+
       {status && <div role={status.tone === "error" ? "alert" : "status"} aria-live="polite" className={cn("fixed bottom-20 left-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-xl border px-4 py-3 text-sm shadow-lg md:bottom-6", status.tone === "error" ? "border-red-200 bg-red-50 text-red-800" : "border-emerald-200 bg-emerald-50 text-emerald-800")}>{status.text}</div>}
 
+
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><ShieldAlert className="text-destructive" size={18} /> Mover contato para a lixeira?</DialogTitle>
+            <DialogDescription>O contato será ocultado da carteira, mas não será apagado fisicamente. Interações, equipamentos e o backup do cadastro ficam preservados para restauração administrativa.</DialogDescription>
+          </DialogHeader>
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"><strong>{selectedContact?.displayName || selectedContact?.name || "Este contato"}</strong> ficará fora das buscas e da operação diária.</div>
+          <DialogFooter className="gap-2"><DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose><Button type="button" variant="destructive" onClick={handleDeleteContact} disabled={deletingContact} className="gap-2">{deletingContact ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />} {deletingContact ? "Movendo..." : "Mover para lixeira"}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={recycleOpen} onOpenChange={setRecycleOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Archive className="text-primary" size={18} /> Lixeira administrativa</DialogTitle>
+            <DialogDescription>Somente administradores podem restaurar contatos. O prazo operacional de retenção desta lixeira é de 90 dias.</DialogDescription>
+          </DialogHeader>
+          {loadingDeletedContacts && <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground"><Loader2 size={16} className="animate-spin" /> Carregando registros...</div>}
+          {!loadingDeletedContacts && deletedContacts.length === 0 && <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">A lixeira está vazia.</div>}
+          {!loadingDeletedContacts && deletedContacts.length > 0 && <div className="max-h-80 space-y-2 overflow-y-auto">{deletedContacts.map((deletion) => <div key={deletion.id} className="flex items-center justify-between gap-3 rounded-xl border border-border/70 px-4 py-3"><div className="min-w-0"><p className="truncate text-sm font-medium">{deletion.displayName || "Contato sem nome"}</p><p className="mt-1 text-xs text-muted-foreground">Movido em {formatDate(deletion.deletedAt)} · dados preservados</p></div><Button type="button" size="sm" variant="outline" onClick={() => handleRestoreContact(deletion)} disabled={loadingDeletedContacts} className="shrink-0 gap-2"><RotateCcw size={14} /> Restaurar</Button></div>)}</div>}
+          <DialogFooter className="gap-2"><DialogClose asChild><Button type="button" variant="outline">Fechar</Button></DialogClose></DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={createOpen} onOpenChange={(open: boolean) => { if (open) setCreateOpen(true); else closeCreateDialog(); }}>
         <DialogContent showCloseButton={false} className="max-h-[calc(100dvh-1rem)] max-w-3xl overflow-hidden p-0 sm:max-w-3xl">

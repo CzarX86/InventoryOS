@@ -294,9 +294,11 @@ Criterios de aceite:
 
 - Prioridade: `P1`
 - Branch sugerida: `codex/deletion-cascade`
+- Status: `CRM contact soft-delete/recovery slice implemented in codex/crm-governance`; message-level lineage cascade remains pending.
 
 Escopo:
 
+- aplicar uma lixeira reversivel para contatos, com snapshot, auditoria e restauracao administrativa;
 - permitir apagar:
   - so a mensagem
   - a mensagem e os derivados
