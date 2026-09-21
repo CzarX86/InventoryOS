@@ -4,6 +4,14 @@ service firebase.storage {
       return request.auth != null && request.auth.token.accessApproved == true;
     }
 
+    function isApprovedWorkspace(workspaceId) {
+      return isApprovedMember() && request.auth.token.workspaceId == workspaceId;
+    }
+
+    match /crm-imports/{workspaceId}/{jobId}/{fileName} {
+      allow read, write: if isApprovedWorkspace(workspaceId);
+    }
+
     match /{allPaths=**} {
       allow read, write: if isApprovedMember();
     }

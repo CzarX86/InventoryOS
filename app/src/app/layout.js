@@ -4,19 +4,12 @@ import "./globals.css";
 import ServiceWorkerUpdater from "@/components/ServiceWorkerUpdater";
 import PWAInstallPrompt from "@/components/PWAInstallPrompt";
 import NotificationPrompt from "@/components/NotificationPrompt";
-import { JetBrains_Mono, Audiowide, Inter } from "next/font/google";
+import { JetBrains_Mono, Inter } from "next/font/google";
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   display: "swap",
   variable: "--font-mono",
-});
-
-const audiowide = Audiowide({
-  weight: "400",
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-display",
 });
 
 const inter = Inter({
@@ -31,7 +24,7 @@ export const metadata = {
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
+    statusBarStyle: "default",
     title: "InventoryOS",
   },
   icons: {
@@ -46,16 +39,15 @@ export const metadata = {
 };
 
 export const viewport = {
-  themeColor: "#09090b",
+  themeColor: "#f5f7fb",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="pt-BR" className={`${inter.variable} ${audiowide.variable} ${jetbrainsMono.variable}`}>
-      <body className="antialiased font-sans flex flex-col min-h-screen bg-background text-foreground">
+    <html lang="pt-BR" className={`${inter.variable} ${jetbrainsMono.variable}`}>
+      <body className="antialiased font-sans flex flex-col min-h-dvh bg-background text-foreground">
         <TooltipProvider>
           <ServiceWorkerUpdater />
           <NotificationPrompt />

@@ -21,6 +21,28 @@ Data de referencia: `2026-03-23`
 - Nao misturar manutencao rotineira da `main` com este backlog.
 - O sistema atual de inventario nao pode sofrer regressao.
 
+## Entregas consolidadas implementadas
+
+### Story 1.4 - Importacao assistida de CRM
+
+- Status: `implemented`
+- Flag: `crmImport`
+- Entregue: templates Excel simples/completo, upload Excel/CSV, normalizacao, validacao, deteccao de identidades repetidas, preview, upsert server-side e retencao do original por 90 dias.
+- Proxima evolucao: resolver conflitos contra registros existentes com uma tela de escolha por campo quando a regra de merge nao for suficiente.
+
+### Story 2.1.3 - WhatsApp para necessidade, cross-selling e workflow
+
+- Status: `implemented`
+- Flag: `crmAiWorkflow`
+- Entregue: sugestoes de oportunidade, tarefa e cross-selling com contexto, `crm_review_items`, Central de acoes com aprovar/descartar e writeback auditavel.
+- Proxima evolucao: adicionar contexto de catalogo/historico diretamente no card de revisao e permitir edicao do payload antes da aprovacao.
+
+### Story 0.3.4 - Gateway de IA e custo medido
+
+- Status: `implemented`
+- Entregue: callable `runAiExtraction`, registro de provedor/modelo, versao da politica de preco, custo por tokens medidos e diferenciacao entre custo medido e estimado no Admin.
+- Entregue: reconciliador diario opcional via BigQuery Billing Export, com custos oficiais, creditos, servicos e sincronizacao mensal no FinOps do Admin.
+
 ## Legenda de prioridade
 
 - `P0`: bloqueador estrutural
@@ -972,4 +994,3 @@ Criterios de aceite:
 
 - budgets e autoexecucao limitada funcionam
 - analytics macro respondem perguntas operacionais
-

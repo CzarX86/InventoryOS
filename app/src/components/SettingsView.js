@@ -14,15 +14,13 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 const WORKFLOWS = [
   {
     id: "real-time",
-    name: "Em tempo real",
-    code: "TEMPO_REAL",
+    name: "Real-time",
     desc: "Pesquisa de mercado durante o cadastro. Dados completos imediatamente.",
     icon: Zap,
   },
   {
     id: "background",
-    name: "Em segundo plano",
-    code: "SEGUNDO_PLANO",
+    name: "Background",
     desc: "Pula a pesquisa no scan. Itens marcados para validação posterior.",
     icon: Clock,
   },
@@ -38,7 +36,7 @@ export default function SettingsView() {
       <div className="px-4 md:px-6 pt-10 pb-8 bg-[#0e0e0e] border-b border-[#484848]/20 mb-8">
         <div className="flex items-center gap-3 mb-4">
           <Badge variant="outline" className="h-5 px-2 bg-[#1f2020] text-[#97a5ff] border-[#484848]/20 text-[9px] font-normal uppercase tracking-[0.2em] shadow-none rounded-none font-display">
-            PREFERÊNCIAS_DO_SISTEMA.CFG
+            SYSTEM_PREFERENCES.CFG
           </Badge>
         </div>
         <h1 className="text-3xl md:text-4xl font-normal uppercase tracking-tighter text-[#e7e5e5] leading-none font-display">
@@ -51,11 +49,11 @@ export default function SettingsView() {
         <section>
           <div className="px-4 md:px-6 py-4">
             <h2 className="text-[10px] font-normal uppercase tracking-[0.25em] text-[#acabaa]/50 font-display">
-              NÚCLEO_DE_EXTRAÇÃO_DA_IA
+              CORE_AI_EXTRACTION_ENGINE
             </h2>
           </div>
           <div className="flex flex-col gap-px bg-[#484848]/20 border-y border-[#484848]/20">
-            {WORKFLOWS.map(({ id, name, code, desc, icon: Icon }) => {
+            {WORKFLOWS.map(({ id, name, desc, icon: Icon }) => {
               const active = user?.aiWorkflow === id;
               return (
                 <button
@@ -71,11 +69,11 @@ export default function SettingsView() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1.5">
                       <p className={`text-sm font-normal uppercase tracking-widest font-display ${active ? "text-[#e7e5e5]" : "text-[#acabaa]/40"}`}>
-                        {code}_MODO
+                        {name.toUpperCase()}_MODE
                       </p>
                       {active && (
                         <Badge variant="default" className="h-4 px-1.5 text-[7px] font-bold uppercase tracking-widest bg-[#293e48] text-[#acc3ce] rounded-none font-mono">
-                          ESTADO_ATIVO
+                          ACTIVE_STATE
                         </Badge>
                       )}
                     </div>
@@ -96,11 +94,11 @@ export default function SettingsView() {
         <section>
           <div className="px-4 md:px-6 py-4">
             <h2 className="text-[10px] font-normal uppercase tracking-[0.25em] text-[#acabaa]/50 font-display">
-              CONTROLE_DA_SESSÃO
+              AUTH_SESSION_CONTROL
             </h2>
           </div>
           <div className="mx-4 md:mx-6 p-6 border border-[#484848]/20 bg-[#131313] rounded-none relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-2 text-[8px] font-mono text-[#484848] uppercase tracking-widest">DADOS_DE_AUTENTICAÇÃO_CRIPTOGRAFADOS</div>
+            <div className="absolute top-0 right-0 p-2 text-[8px] font-mono text-[#484848] uppercase tracking-widest">ENCRYPTED_AUTH_DATA</div>
             <div className="flex items-center justify-between relative z-10">
               {isHiddenOwner ? <div className="flex items-center gap-3 text-xs text-[#acabaa]/50"><Shield size={16} className="text-[#97a5ff]" /> Sessão protegida</div> : <div className="flex items-center gap-4">
                 <div className="h-12 w-12 rounded-none bg-[#1f2020] border border-[#484848]/20 flex items-center justify-center text-[#97a5ff] font-black text-lg">
@@ -110,9 +108,9 @@ export default function SettingsView() {
                   <p className="text-sm font-bold text-[#e7e5e5] leading-none mb-1.5 font-mono uppercase tracking-tight">{user?.email}</p>
                   <div className="flex items-center gap-2">
                     <Badge variant={isAdmin ? "default" : "secondary"} className={`h-5 px-1.5 text-[8px] font-normal uppercase tracking-widest rounded-none font-display ${isAdmin ? "bg-[#293e48] text-[#acc3ce]" : "bg-[#191a1a] text-[#acabaa]"}`}>
-                      {isAdmin ? "ADMINISTRADOR_DO_SISTEMA" : "USUÁRIO_AUTENTICADO"}
+                      {isAdmin ? "SYSTEM_ROOT" : "AUTH_USER"}
                     </Badge>
-                    <span className="text-[8px] text-[#acabaa]/30 uppercase font-bold tracking-widest font-mono">PROVEDOR_DE_AUTENTICAÇÃO_FIREBASE</span>
+                    <span className="text-[8px] text-[#acabaa]/30 uppercase font-bold tracking-widest font-mono">FIREBASE_JWT_PROVIDER</span>
                   </div>
                 </div>
               </div>}
@@ -122,7 +120,7 @@ export default function SettingsView() {
                 onClick={logout}
                 className="text-[9px] font-normal uppercase tracking-widest border-[#7f2927]/20 text-[#ee7d77] hover:bg-[#7f2927]/10 rounded-none transition-none font-display h-10 px-6"
               >
-                <LogOut size={14} className="mr-2" /> ENCERRAR_SESSÃO
+                <LogOut size={14} className="mr-2" /> EXIT_SESSION
               </Button>
             </div>
           </div>
@@ -137,7 +135,7 @@ export default function SettingsView() {
               variant="outline"
               className="text-[10px] font-normal uppercase tracking-[0.25em] h-14 justify-start border-[#484848]/20 bg-[#0e0e0e] hover:bg-[#131313] rounded-none transition-none font-display text-[#acabaa]"
               onClick={async () => {
-                if (window.confirm("CONFIRMAR_AÇÃO: LIMPAR_CACHE_E_RECARREGAR?")) {
+                if (window.confirm("CONFIRM_ACTION: CLEAR_CACHE_AND_FORCE_REBOOT?")) {
                   try {
                     if ("serviceWorker" in window.navigator) {
                       const registrations = await window.navigator.serviceWorker.getRegistrations();
@@ -159,15 +157,15 @@ export default function SettingsView() {
                 }
               }}
             >
-              <RefreshCw size={14} className="mr-3 text-[#97a5ff]" /> LIMPAR_CACHE_E_SINCRONIZAR
+              <RefreshCw size={14} className="mr-3 text-[#97a5ff]" /> CLEAR_CACHE_AND_SYNC_BUFFERS
             </Button>
 
             <div className="flex items-center justify-between pt-4 border-t border-[#484848]/5">
               <p className="text-[8px] font-bold uppercase tracking-[0.4em] text-[#acabaa]/20 font-mono">
-                NÚCLEO_DO_SISTEMA_IOS_V{process.env.NEXT_PUBLIC_APP_VERSION || "1.0.2"}
+                IOS_SYSTEM_CORE_V{process.env.NEXT_PUBLIC_APP_VERSION || "1.0.2"}
               </p>
               <Badge variant="outline" className="text-[7px] font-normal uppercase tracking-widest border-[#484848]/10 text-[#acabaa]/20 rounded-none font-display">
-                VERSÃO_ESTÁVEL_PUBLICADA
+                DEPLOYED_STABLE_BUILD
               </Badge>
             </div>
           </div>

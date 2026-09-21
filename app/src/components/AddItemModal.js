@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { X, Loader2, Camera, Check, Sparkles, Mic, Square } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { db, storage } from "@/lib/firebase";
@@ -33,38 +33,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { INVENTORY_STATUS_LABELS } from "@/lib/uiText";
-import AutocompleteInput from "@/components/AutocompleteInput";
 
 const STATUS_OPTIONS = ["IN STOCK", "SOLD", "REPAIR", "RESERVED"];
 
 const EMPTY_FORM = {
-  type: "", brand: "", model: "", partNumber: "",
+  type: "", brand: "", model: "", partNumber: "", gtin: "",
   specifications: "", status: "IN STOCK", audioUrl: "", productImageUrl: "",
 };
 
-function buildItemFieldOptions(items, field) {
-  const seen = new Set();
-  return items
-    .map((item) => String(item?.[field] || "").trim())
-    .filter((value) => {
-      const key = value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-      if (!value || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .sort((left, right) => left.localeCompare(right, "pt-BR", { sensitivity: "base" }))
-    .map((value) => ({ value, label: value }));
-}
-
-export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null, existingItems = [] }) {
+export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null }) {
   const { user } = useAuth();
-  const itemFieldOptions = useMemo(() => ({
-    type: buildItemFieldOptions(existingItems, "type"),
-    brand: buildItemFieldOptions(existingItems, "brand"),
-    model: buildItemFieldOptions(existingItems, "model"),
-    partNumber: buildItemFieldOptions(existingItems, "partNumber"),
-  }), [existingItems]);
   const [taskLedger, setTaskLedger] = useState(() =>
     createTaskLedger({
       taskId: createAuditTaskId(),
@@ -441,7 +419,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                 transition={{ duration: 0.05, delay: 0.2 }}
                 className="text-muted-foreground text-[10px] font-mono font-bold uppercase tracking-[0.4em] mb-12 text-center"
               >
-                  ATUALIZAÇÃO_CONCLUÍDA // ID_DO_ATIVO_SINCRONIZADO
+                SYSTEMS_UPDATE_SUCCESS // ATIVO_ID_SINC
               </motion.p>
 
               <div className="flex flex-col w-full gap-px bg-foreground/10 border border-foreground/10 max-w-sm">
@@ -486,13 +464,13 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                     </DialogTitle>
                     {editItem && (
                       <p className="font-mono text-[9px] text-primary mt-1 uppercase tracking-widest">
-                        ID_UUID: {editItem.id}
+                        UUID_REF: {editItem.id}
                       </p>
                     )}
                   </div>
                 </div>
                 <DialogDescription className="hidden">
-                  Módulo de digitalização de ativos industriais via OCR e extração semântica.
+                  Módulo de digitalização de ativos industriais via OCR Vision e Extração Semântica.
                 </DialogDescription>
               </DialogHeader>
 
@@ -516,9 +494,9 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                           </motion.div>
                         </div>
                         <div className="text-center">
-                          <p className="text-sm font-display font-normal uppercase tracking-[0.4em] text-foreground">EXTRAINDO_DADOS</p>
+                          <p className="text-sm font-display font-normal uppercase tracking-[0.4em] text-foreground">EXTRACTING_DATA</p>
                           <p className="text-[9px] font-mono uppercase tracking-widest text-primary/60 mt-2 animate-pulse">
-                            CAMINHO_NEURAL_ATIVO // FLUXO_DE_DADOS...
+                            NEURAL_PATH_ENGAGED // STREAM_DATA...
                           </p>
                         </div>
                       </div>
@@ -536,7 +514,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                           <Camera size={28} className="shrink-0 mb-5 text-muted-foreground group-hover:text-primary transition-none" />
                           <p className="text-[10px] font-display font-normal uppercase tracking-[0.2em] text-center text-foreground">ETIQUETA_OCR</p>
                           <div className="mt-4 px-2 py-0.5 border border-foreground/20 bg-[#0e0e0e] text-[8px] font-mono font-black uppercase tracking-widest text-muted-foreground group-hover:text-primary group-hover:border-primary">
-                            INICIAR_LEITURA
+                            INIT_SCAN
                           </div>
                         </div>
 
@@ -559,10 +537,10 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                             {productImageFile ? <Check size={28} strokeWidth={3} /> : <Camera size={28} />}
                           </div>
                           <p className={`text-[10px] font-display font-normal uppercase tracking-[0.2em] text-center ${productImageFile ? "text-primary" : "text-foreground"}`}>
-                            FOTO_REFERÊNCIA
+                            FOTO_REFERÊN
                           </p>
                           <div className={`mt-4 px-2 py-0.5 border text-[8px] font-mono font-black uppercase tracking-widest ${productImageFile ? "border-primary/40 bg-primary/10 text-primary" : "border-foreground/20 bg-[#0e0e0e] text-muted-foreground group-hover:border-primary group-hover:text-primary"}`}>
-                            REFERÊNCIA_VISUAL
+                            VISUAL_REF
                           </div>
                         </div>
 
@@ -576,9 +554,9 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                               <motion.div animate={{ opacity: [1, 0.4, 1] }} transition={{ duration: 0.3, repeat: Infinity }}>
                                 <Square size={28} className="mb-5 fill-red-500 text-red-500" />
                               </motion.div>
-                              <p className="text-[10px] font-display font-normal uppercase tracking-[0.2em] text-red-500">PARAR_GRAVAÇÃO</p>
+                              <p className="text-[10px] font-display font-normal uppercase tracking-[0.2em] text-red-500">STOP_RECORD</p>
                               <div className="mt-4 px-2 py-0.5 border border-red-500/40 bg-red-500/10 text-[8px] font-mono font-black uppercase tracking-widest text-red-500">
-                                GRAVAÇÃO_ATIVA
+                                REC_ACTIVE
                               </div>
                             </div>
                           ) : (
@@ -586,7 +564,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                               <Mic size={28} className="shrink-0 mb-5 text-muted-foreground group-hover:text-primary transition-none" />
                               <p className="text-[10px] font-display font-normal uppercase tracking-[0.2em] text-center text-foreground">COMANDO_VOZ</p>
                               <div className="mt-4 px-2 py-0.5 border border-foreground/20 bg-[#0e0e0e] text-[8px] font-mono font-black uppercase tracking-widest text-muted-foreground group-hover:border-primary group-hover:text-primary">
-                                COMANDO_DE_VOZ
+                                VOICE_DRIVE
                               </div>
                             </>
                           )}
@@ -597,7 +575,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                 ) : (
                   <div className="border-b border-foreground/10 p-4 text-center bg-[#131313]/40 relative z-10 flex items-center justify-center gap-3">
                     <div className="w-1 h-3 bg-primary/40" />
-                    <p className="text-[9px] font-mono font-black uppercase tracking-[0.4em] text-muted-foreground/60">BUFFER://MODO_DE_EDIÇÃO</p>
+                    <p className="text-[9px] font-mono font-black uppercase tracking-[0.4em] text-muted-foreground/60">BUFFER://ATTRIBUTE_EDIT_MODE</p>
                     <div className="w-1 h-3 bg-primary/40" />
                   </div>
                 )}
@@ -609,7 +587,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                       <Mic size={24} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[9px] font-mono font-black uppercase tracking-[0.3em] text-primary mb-3">FLUXO_DE_CAPTURA_DE_VOZ</p>
+                      <p className="text-[9px] font-mono font-black uppercase tracking-[0.3em] text-primary mb-3">RAW_VOICE_CAPTURE_STREAM</p>
                       <audio 
                           src={audioBlob ? URL.createObjectURL(audioBlob) : formData.audioUrl} 
                           controls 
@@ -627,7 +605,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                   <div className="px-6 py-5 bg-red-950/20 border-b border-red-500/30 relative z-10">
                     <div className="flex items-center gap-3">
                       <div className="w-1.5 h-4 bg-red-500" />
-                      <p className="text-[10px] font-mono font-black text-red-500 uppercase tracking-widest leading-none">RELATÓRIO_DE_ERRO:// {validationError}</p>
+                      <p className="text-[10px] font-mono font-black text-red-500 uppercase tracking-widest leading-none">ERROR_REPORT:// {validationError}</p>
                     </div>
                   </div>
                 )}
@@ -646,7 +624,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                   <div className="space-y-5">
                     <div className="flex items-center gap-3">
                       <div className="w-1.5 h-3 bg-primary/40" />
-                      <Label className="text-[10px] font-display font-normal uppercase tracking-[0.25em] text-muted-foreground">STATUS_DO_ATIVO</Label>
+                      <Label className="text-[10px] font-display font-normal uppercase tracking-[0.25em] text-muted-foreground">ATIVO_STATUS_SYSTEM</Label>
                     </div>
                     <ToggleGroup 
                       type="single" 
@@ -660,7 +638,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                           value={s}
                           className="px-6 h-12 text-[10px] font-display font-normal uppercase tracking-[0.1em] rounded-none border-0 bg-[#0e0e0e] border-r border-foreground/5 data-[state=on]:bg-primary data-[state=on]:text-[#0e0e0e] hover:bg-white/5 transition-none flex-1"
                         >
-                          {INVENTORY_STATUS_LABELS[s] || s}
+                          {s}
                         </ToggleGroupItem>
                       ))}
                     </ToggleGroup>
@@ -669,10 +647,11 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                   {/* Main Fields */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                     {[
-                      { id: "type",                 label: "TIPO_DE_EQUIPAMENTO",  placeholder: "DRIVE / PLC / SENSOR" },
-                      { id: "brand",                label: "FABRICANTE",    placeholder: "SIEMENS / WEG / ABB" },
-                      { id: "model",                label: "REFERÊNCIA_DO_MODELO",                placeholder: "REFERÊNCIA_DO_SISTEMA" },
-                      { id: "partNumber",           label: "NÚMERO_DE_SÉRIE",           placeholder: "ID / NÚMERO_DE_SÉRIE", mono: true },
+                      { id: "type",                 label: "TIPO_EQUIP",  placeholder: "DRIVE / PLC / SENSOR" },
+                      { id: "brand",                label: "MANUFACTURER",    placeholder: "SIEMENS / WEG / ABB" },
+                      { id: "model",                label: "MODEL_REF",                placeholder: "SYS_REFERENCE" },
+                      { id: "partNumber",           label: "SERIAL_PN",           placeholder: "S/N ID", mono: true },
+                      { id: "gtin",                 label: "GTIN_EAN",            placeholder: "EAN / UPC / GTIN", mono: true },
                     ].map(field => (
                       <div key={field.id} className="space-y-4">
                         <div className="flex items-center justify-between px-1">
@@ -684,28 +663,17 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                           </div>
                           {isAI(field.id) && (
                             <div className="px-2 py-0.5 border border-primary/20 bg-primary/5 text-[8px] font-mono font-black text-primary uppercase tracking-tighter flex items-center gap-1.5">
-                              <Sparkles size={8} /> SUGESTÃO_IA
+                              <Sparkles size={8} /> IA_SUGG
                             </div>
                           )}
                         </div>
-                        {field.id === "type" || field.id === "brand" || field.id === "model" || field.id === "partNumber" ? (
-                          <AutocompleteInput
-                            id={field.id}
-                            options={itemFieldOptions[field.id]}
-                            className={`h-12 rounded-none border-foreground/10 bg-[#131313]/60 focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary transition-none border-[1px] ${field.mono ? "font-mono text-sm tracking-tight" : "font-display font-normal text-xs uppercase tracking-wider"} ${isAI(field.id) ? "border-primary/40 bg-primary/[0.02]" : ""}`}
-                            placeholder={field.placeholder}
-                            value={formData[field.id]}
-                            onValueChange={value => set(field.id, (value || "").toUpperCase())}
-                          />
-                        ) : (
-                          <Input
-                            id={field.id}
-                            className={`h-12 rounded-none border-foreground/10 bg-[#131313]/60 focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary transition-none border-[1px] ${field.mono ? "font-mono text-sm tracking-tight" : "font-display font-normal text-xs uppercase tracking-wider"} ${isAI(field.id) ? "border-primary/40 bg-primary/[0.02]" : ""}`}
-                            placeholder={field.placeholder}
-                            value={formData[field.id]}
-                            onChange={e => set(field.id, (e.target.value || "").toUpperCase())}
-                          />
-                        )}
+                        <Input
+                          id={field.id}
+                          className={`h-12 rounded-none border-foreground/10 bg-[#131313]/60 focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary transition-none border-[1px] ${field.mono ? "font-mono text-sm tracking-tight" : "font-display font-normal text-xs uppercase tracking-wider"} ${isAI(field.id) ? "border-primary/40 bg-primary/[0.02]" : ""}`}
+                          placeholder={field.placeholder}
+                          value={formData[field.id]}
+                          onChange={e => set(field.id, (e.target.value || "").toUpperCase())}
+                        />
                       </div>
                     ))}
                   </div>
@@ -715,16 +683,16 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                     <div className="flex items-center justify-between px-1">
                       <div className="flex items-center gap-2">
                         <div className="w-1 h-3 bg-primary/30" />
-                        <Label className="text-[10px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground">ESPECIFICAÇÕES_DO_MÓDULO</Label>
+                        <Label className="text-[10px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground">MOD_SPECIFICATIONS</Label>
                       </div>
                       {isAI("specifications") && (
                         <div className="px-2 py-0.5 border border-primary/20 bg-primary/5 text-[8px] font-mono font-black text-primary uppercase tracking-tighter flex items-center gap-1.5">
-                          <Sparkles size={8} /> GERADO_POR_IA
+                          <Sparkles size={8} /> IA_GENERATED
                         </div>
                       )}
                     </div>
                     <div className="relative">
-                      <div className="absolute top-3 right-3 font-mono text-[8px] text-muted-foreground pointer-events-none opacity-40 uppercase tracking-widest">BLOCO_DE_TEXTO_BRUTO</div>
+                      <div className="absolute top-3 right-3 font-mono text-[8px] text-muted-foreground pointer-events-none opacity-40 uppercase tracking-widest">RAW_TEXT_BLOCK</div>
                       <Textarea
                         className={`font-mono text-xs min-h-[160px] rounded-none border-foreground/10 bg-[#131313]/60 focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary border-[1px] leading-relaxed resize-none p-5 transition-none break-all ${isAI("specifications") ? "border-primary/40 bg-primary/[0.02]" : ""}`}
                         placeholder="POTÊNCIA // TENSÃO // CORRENTE // DIMENSÕES"
@@ -752,7 +720,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                           </div>
                           <div>
                             <p className="text-xs font-display font-normal uppercase tracking-[0.25em] text-[#0e0e0e] leading-none mb-2">REVISÃO_PENDENTE</p>
-                            <p className="text-[9px] font-mono text-[#0e0e0e]/70 uppercase tracking-widest font-bold">ANÁLISE_CONCLUÍDA // CONFIRMAÇÃO_NECESSÁRIA</p>
+                            <p className="text-[9px] font-mono text-[#0e0e0e]/70 uppercase tracking-widest font-bold">ANALYTICS_COMPLETE // CONFIRM_REQUIRED</p>
                           </div>
                         </div>
                         <div className="flex gap-px bg-black/10 border border-black/10 w-full sm:w-auto sm:ml-auto">
@@ -785,7 +753,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                   className="flex-1 font-display font-normal uppercase tracking-[0.3em] text-[10px] h-20 rounded-none bg-[#131313] hover:bg-white/5 text-muted-foreground transition-none"
                   onClick={() => { setValidationError(""); setSupportError(null); onClose(); }}
                 >
-                  CANCELAR_CADASTRO
+                  ABORT_SESSION
                 </Button>
                 <Button
                   disabled={saving || isExtracting || hasPendingConfirmation}
@@ -795,14 +763,14 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                   {saving ? (
                     <>
                       <Loader2 className="animate-spin mr-3" size={16} />
-                      SINCRONIZAÇÃO_ATIVA...
+                      MOD_SYNC_ACTIVE...
                     </>
                   ) : hasPendingConfirmation ? (
                     "REVISÃO_REQUERIDA"
                   ) : editItem ? (
-                    "SALVAR_ALTERAÇÕES"
+                    "COMMIT_CHANGES"
                   ) : (
-                    "SALVAR_NOVO_ITEM"
+                    "INIT_DATA_COMMIT"
                   )}
                 </Button>
               </div>

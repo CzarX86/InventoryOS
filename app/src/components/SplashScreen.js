@@ -53,7 +53,7 @@ export default function SplashScreen({ onComplete }) {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img 
                 src="/icons/icon-144x144.png" 
-                alt="Logotipo do InventoryOS"
+                alt="InventoryOS Logo" 
                 className="w-full h-full object-cover"
               />
 
@@ -85,7 +85,7 @@ export default function SplashScreen({ onComplete }) {
               transition={{ delay: 1.2, duration: 1 }}
               className="text-xs font-black uppercase tracking-[0.4em] text-zinc-500"
             >
-              Ativos Inteligentes
+              Intelligent Assets
             </motion.p>
           </div>
 
@@ -98,7 +98,7 @@ export default function SplashScreen({ onComplete }) {
           >
             <div className="w-1.5 h-1.5 rounded-none bg-blue-500 animate-pulse" />
             <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600">
-              Sistema Pronto {process.env.NEXT_PUBLIC_APP_VERSION && `v${process.env.NEXT_PUBLIC_APP_VERSION}`}
+              System Ready {process.env.NEXT_PUBLIC_APP_VERSION && `v${process.env.NEXT_PUBLIC_APP_VERSION}`}
             </span>
           </motion.div>
           

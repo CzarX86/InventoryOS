@@ -1,15 +1,17 @@
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot } from "firebase/firestore";
-import { TrendingUp, Activity, DollarSign, Brain } from "lucide-react";
+import { TrendingUp, Activity, DollarSign, Brain, ReceiptText } from "lucide-react";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 
 export default function AdminUsageStats() {
   const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(Boolean(db));
 
   useEffect(() => {
+    if (!db) return undefined;
+
     const now = new Date();
     const monthKey = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}`;
     
@@ -32,75 +34,81 @@ export default function AdminUsageStats() {
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   
   const mtdCost = stats?.totalCostUsd || 0;
+  const officialCost = stats?.officialCostUsd == null ? null : Number(stats.officialCostUsd);
   const runRate = (mtdCost / dayOfMonth) * daysInMonth;
   const totalTasks = stats?.totalRequests || 0;
   const avgCostPerTask = totalTasks > 0 ? mtdCost / totalTasks : 0;
 
   const metrics = [
     {
-      label: "GASTO_MENSAL_DA_IA",
+      label: "Custo registrado no mês",
       value: `US$ ${mtdCost.toFixed(3)}`,
       icon: DollarSign,
       color: "text-emerald-500",
-      detail: "SINCRONIZAÇÃO_DO_MÊS_EM_TEMPO_REAL",
+      detail: `${stats?.measuredRequests || 0} operações com uso medido · ${stats?.estimatedRequests || 0} estimadas`,
       live: true
     },
     {
-      label: "PROJEÇÃO_MENSAL",
+      label: "Projeção para o mês",
       value: `US$ ${runRate.toFixed(2)}`,
       icon: TrendingUp,
       color: "text-primary",
-      detail: `ESTIMATIVA_FIM_${now.toLocaleString('pt-BR', { month: 'short' }).toUpperCase()}`
+      detail: `Estimativa até ${now.toLocaleDateString("pt-BR", { month: "short" })}`
     },
     {
-      label: "CUSTO_MÉDIO_POR_TAREFA",
+      label: "Custo médio por operação",
       value: `US$ ${avgCostPerTask.toFixed(4)}`,
       icon: Brain,
       color: "text-primary/60",
-      detail: `${totalTasks}_EXECUÇÕES_REGISTRADAS`
+      detail: `${totalTasks} execuções registradas`
+    },
+    {
+      label: "Custo oficial GCP",
+      value: officialCost == null || !Number.isFinite(officialCost) ? "Não configurado" : `US$ ${officialCost.toFixed(3)}`,
+      icon: ReceiptText,
+      color: "text-amber-600",
+      detail: officialCost == null ? "Conecte o Billing Export para reconciliar" : "Sincronizado pelo Google Cloud Billing Export"
     }
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
       {metrics.map((metric, i) => (
         <motion.div
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: i * 0.05 }}
           key={metric.label}
-          className="bg-[#131313] p-6 rounded-none relative overflow-hidden group border-l-2 border-foreground/5 hover:border-primary/40 transition-colors"
+          className="rounded-2xl border border-border/70 bg-card p-5 shadow-sm transition-colors hover:border-primary/30"
         >
           <div className="flex justify-between items-start mb-6">
-            <div className={`p-2 bg-foreground/5 ${metric.color}`}>
+              <div className={`rounded-lg bg-muted/70 p-2 ${metric.color}`}>
               <metric.icon size={16} />
             </div>
             {metric.live && (
-              <div className="flex items-center gap-1.5 bg-emerald-500/10 px-2 py-0.5 border border-emerald-500/20">
+                <div className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5">
                 <span className="relative flex h-1.5 w-1.5">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
                 </span>
-                <span className="text-[8px] font-display font-normal tracking-widest text-emerald-500 uppercase">Ao_vivo</span>
+                <span className="text-[9px] font-medium text-emerald-700">Atualizado</span>
               </div>
             )}
           </div>
           
           <div className="space-y-1">
-            <p className="text-[10px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground/60">{metric.label}</p>
-            <p className="text-3xl font-display font-normal text-foreground tracking-tighter">
+            <p className="text-xs font-medium text-muted-foreground">{metric.label}</p>
+            <p className="text-2xl font-semibold tracking-tight text-foreground">
               {metric.value}
             </p>
           </div>
           
-          <div className="mt-4 pt-4 border-t border-foreground/5">
-            <p className="text-[9px] font-mono uppercase tracking-[0.15em] text-muted-foreground/40 font-bold">
+          <div className="mt-4 border-t border-border/70 pt-4">
+            <p className="text-[10px] text-muted-foreground">
               {metric.detail}
             </p>
           </div>
 
-          {/* Decorative scanner line on hover */}
-          <div className="absolute bottom-0 left-0 w-full h-[1px] bg-primary/0 group-hover:bg-primary/20 transition-all duration-500 shadow-[0_0_15px_rgba(var(--primary),0.5)]" />
         </motion.div>
       ))}
     </div>

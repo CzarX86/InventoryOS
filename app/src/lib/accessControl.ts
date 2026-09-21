@@ -22,6 +22,7 @@ export interface AccessProfile {
   uid: string;
   email: string | null;
   displayName: string | null;
+  photoURL?: string | null;
   role: "user" | "admin";
   accessStatus: AccessStatus;
   workspaceId: string | null;
@@ -34,6 +35,7 @@ export interface AccessUserSummary {
   uid: string;
   email: string | null;
   displayName: string | null;
+  photoURL?: string | null;
   status: AccessStatus;
   role: "user" | "admin";
   requestedAt: unknown;

@@ -1,18 +1,20 @@
 /* global process, Image, document, fetch */
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { httpsCallable } from "firebase/functions";
 import { normalizeUsageMetadata } from "./audit";
+import { functions as firebaseFunctions } from "./firebase";
 
 const geminiApiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 const deepseekApiKey = process.env.NEXT_PUBLIC_DEEPSEEK_API_KEY;
 
-if (!geminiApiKey) {
-  console.warn("AI: NEXT_PUBLIC_GEMINI_API_KEY is missing!");
+let genAI;
+function getClientGemini() {
+  if (!genAI) {
+    if (!geminiApiKey && process.env.NODE_ENV !== "test") throw new Error("Gemini API Key missing. Configure o gateway Firebase para processar IA no servidor.");
+    genAI = new GoogleGenerativeAI(geminiApiKey);
+  }
+  return genAI;
 }
-if (!deepseekApiKey) {
-  console.warn("AI: NEXT_PUBLIC_DEEPSEEK_API_KEY is missing! DeepSeek models will fail.");
-}
-
-const genAI = new GoogleGenerativeAI(geminiApiKey);
 
 // Utility to resize image to save tokens and improve performance
 const resizeImage = async (base64Str, maxWidth = 1024) => {
@@ -73,6 +75,28 @@ export function getAiModelConfig(modelName, options = {}) {
  * Core execution function for structured output
  */
 export async function generateStructuredOutput(prompt, modelName = "gemini-2.0-flash", parts = [], options = {}) {
+  // Production calls go through the callable gateway. This keeps provider
+  // keys out of the browser path and creates one auditable ai_run per request.
+  if (firebaseFunctions) {
+    const runAiExtraction = httpsCallable(firebaseFunctions, "runAiExtraction");
+    const result = await runAiExtraction({
+      prompt,
+      model: modelName,
+      parts,
+      json: options.json !== false,
+      useSearch: options.useSearch === true,
+      taskType: options.taskType || "client_ai_extraction",
+    });
+    const data = result.data || {};
+    return {
+      output: data.output,
+      usage: normalizeUsageMetadata(data.usage),
+      model: data.model || modelName,
+      runId: data.runId || null,
+      actualCostUsd: data.actualCostUsd ?? null,
+    };
+  }
+
   if (modelName.startsWith("deepseek-")) {
     return generateDeepSeekStructuredOutput(prompt, modelName, parts, options);
   }
@@ -82,7 +106,7 @@ export async function generateStructuredOutput(prompt, modelName = "gemini-2.0-f
 async function generateGeminiStructuredOutput(prompt, modelName, parts, options) {
   try {
     const config = getAiModelConfig(modelName, options);
-    const model = genAI.getGenerativeModel(config, { apiVersion: "v1beta" });
+    const model = getClientGemini().getGenerativeModel(config, { apiVersion: "v1beta" });
     
     const contentParts = [prompt, ...parts];
     const result = await model.generateContent(contentParts);
@@ -167,7 +191,7 @@ async function callWithFallback(prompt, visualData = null, useSearch = false) {
   for (const modelName of models) {
     try {
       const parts = visualData ? [visualData] : [];
-      const { output, usage } = await generateStructuredOutput(prompt, modelName, parts, { useSearch, json: true });
+      const { output, usage } = await generateStructuredOutput(prompt, modelName, parts, { useSearch, json: true, taskType: "client_media_extraction" });
       
       const call = {
         model: modelName,

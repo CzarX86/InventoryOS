@@ -33,9 +33,13 @@ export function routeTask(taskType: string, options: RouteOptions = {}): string 
   return TASK_ROUTING[taskType] || TASK_ROUTING.default;
 }
 
-interface Pricing {
+export interface Pricing {
   inputUsdPer1M: number;
   outputUsdPer1M: number;
+  cachedInputUsdPer1M?: number;
+  currency: "USD";
+  source: "provider_catalog_estimate";
+  priceVersion: string;
 }
 
 /**
@@ -43,10 +47,10 @@ interface Pricing {
  */
 export function getModelPricing(model: string): Pricing {
   const catalog: Record<string, Pricing> = {
-    "gemini-2.0-flash": { inputUsdPer1M: 0.15, outputUsdPer1M: 0.6 },
-    "gemini-1.5-flash": { inputUsdPer1M: 0.075, outputUsdPer1M: 0.3 },
-    "gemini-2.0-flash-thinking": { inputUsdPer1M: 0.15, outputUsdPer1M: 0.6 },
-    "deepseek-chat": { inputUsdPer1M: 0.1, outputUsdPer1M: 0.2 },
+    "gemini-2.0-flash": { inputUsdPer1M: 0.15, outputUsdPer1M: 0.6, currency: "USD", source: "provider_catalog_estimate", priceVersion: "2026-01" },
+    "gemini-1.5-flash": { inputUsdPer1M: 0.075, outputUsdPer1M: 0.3, currency: "USD", source: "provider_catalog_estimate", priceVersion: "2026-01" },
+    "gemini-2.0-flash-thinking": { inputUsdPer1M: 0.15, outputUsdPer1M: 0.6, currency: "USD", source: "provider_catalog_estimate", priceVersion: "2026-01" },
+    "deepseek-chat": { inputUsdPer1M: 0.1, outputUsdPer1M: 0.2, currency: "USD", source: "provider_catalog_estimate", priceVersion: "2026-01" },
   };
   
   return catalog[model] || catalog["gemini-2.0-flash"];

@@ -3,11 +3,10 @@ import { useState, useRef, useMemo, useEffect } from "react";
 import {
   Search, Plus, Mic, Package, Boxes, Settings,
   Shield, LogOut, MoreHorizontal, Loader2, X, Share2, Trash2, MessageSquare,
-  CheckSquare, UserRound
+  CheckSquare, UserRound, BarChart3, LayoutDashboard
 } from "lucide-react";
 import { motion, AnimatePresence, useMotionValue, useTransform, useAnimation } from "framer-motion";
 import AddItemModal from "@/components/AddItemModal";
-import AutocompleteInput from "@/components/AutocompleteInput";
 import ItemDetailModal from "@/components/ItemDetailModal";
 import VoiceSearch from "@/components/VoiceSearch";
 import AdminDashboard from "@/components/AdminDashboard";
@@ -16,63 +15,86 @@ import WhatsappView from "@/components/WhatsappView";
 import SplashScreen from "@/components/SplashScreen";
 import ActionInbox from "@/components/ActionInbox";
 import CrmView from "@/components/CrmView";
+import CrmImportView from "@/components/CrmImportView";
+import CrmPerformanceDashboard from "@/components/CrmPerformanceDashboard";
+import WorkspaceHome from "@/components/WorkspaceHome";
 import AccessGate from "@/components/AccessGate";
 import NotificationsBell from "@/components/NotificationsBell";
 import PWAInstallPrompt from "@/components/PWAInstallPrompt"; // Added PWAInstallPrompt import
+import UserAvatar from "@/components/UserAvatar";
 import { Button } from "@/components/ui/button";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import useAuth from "@/hooks/useAuth";
+import useFeatureFlags from "@/hooks/useFeatureFlags";
 import useInventory from "@/hooks/useInventory";
 import { buildActivityEvent, logInventoryActivity } from "@/lib/audit";
 import { escalateErrorReport, recordAppError, toUserFacingError } from "@/lib/errorReporting";
 import { db } from "@/lib/firebase";
 import { getBrandMeta } from "@/lib/utils";
-import { INVENTORY_STATUS_LABELS } from "@/lib/uiText";
-import { buildInventoryGroups, buildInventorySearchOptions } from "@/lib/inventoryView";
+import { isFeatureEnabled } from "@/lib/featureFlags";
 
 const STATUS_CONFIG = {
   "IN STOCK":  { 
-    label: INVENTORY_STATUS_LABELS["IN STOCK"],
-    cls: "text-[#acc3ce]", // on_secondary_container
-    dot: "bg-[#8ba1ac]", // secondary
-    bg: "bg-[#293e48]"   // secondary_container
+    cls: "text-emerald-700",
+    dot: "bg-emerald-500",
+    bg: "bg-emerald-50"
   },
   "SOLD":      { 
-    label: INVENTORY_STATUS_LABELS.SOLD,
-    cls: "text-[#acabaa]", // on_surface_variant
-    dot: "bg-[#484848]", // outline_variant
-    bg: "bg-[#191a1a]"   // surface_container
+    cls: "text-slate-500",
+    dot: "bg-slate-400",
+    bg: "bg-slate-100"
   },
   "REPAIR":    { 
-    label: INVENTORY_STATUS_LABELS.REPAIR,
-    cls: "text-[#ee7d77]", // error
-    dot: "bg-[#7f2927]", // error_container
-    bg: "bg-[#7f2927]/20"
+    cls: "text-red-700",
+    dot: "bg-red-500",
+    bg: "bg-red-50"
   },
   "RESERVED":  { 
-    label: INVENTORY_STATUS_LABELS.RESERVED,
-    cls: "text-[#97a5ff]", // tertiary
-    dot: "bg-[#8596ff]", // tertiary_container
-    bg: "bg-[#8596ff]/10"
+    cls: "text-primary",
+    dot: "bg-primary",
+    bg: "bg-accent"
   },
 };
 
 export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("INVENTORY");
+  const [activeTab, setActiveTab] = useState("HOME");
   const [itemToEdit, setItemToEdit] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
   const [activeMenuId, setActiveMenuId] = useState(null);
   const [showSplash, setShowSplash] = useState(true);
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState(null);
 
   const { user, loading: authLoading, isAdmin, isApproved, isHiddenOwner, accessStatus, login, logout } = useAuth();
+  const { flags: expansionFlags } = useFeatureFlags(isApproved ? user : null);
   const { loading: invLoading, searchQuery, setSearchQuery, filteredItems, items, deleteItem, syncError } = useInventory(user, isApproved);
+  const crmPerformanceEnabled = isAdmin && isFeatureEnabled(expansionFlags, "crmPerformanceDashboard");
+
+  const handleLogin = async () => {
+    setLoginError(null);
+    setLoginLoading(true);
+
+    try {
+      await login();
+    } catch (error) {
+      const messages = {
+        "auth/popup-closed-by-user": "A janela de login foi fechada. Tente novamente.",
+        "auth/unauthorized-domain": "Este endereço ainda não está autorizado no Firebase.",
+        "auth/operation-not-allowed": "O login com Google ainda não está habilitado no Firebase.",
+        "auth/network-request-failed": "Não foi possível conectar ao Firebase. Verifique sua internet.",
+      };
+      setLoginError(messages[error?.code] || "Não foi possível iniciar o login. Tente novamente.");
+    } finally {
+      setLoginLoading(false);
+    }
+  };
 
   const [notification, setNotification] = useState(null);
   const [removedItems, setRemovedItems] = useState(new Set());
@@ -90,12 +112,16 @@ export default function Dashboard() {
   }, [syncError]);
 
   const navItems = [
+    { id: "HOME", label: "Início", icon: LayoutDashboard },
     { id: "INVENTORY", label: "Inventário", icon: Boxes },
-    ...(isApproved ? [{ id: "CRM", label: "CRM", icon: UserRound }] : []),
+    ...(isApproved ? [
+      { id: "CRM", label: "CRM", icon: UserRound },
+      ...(crmPerformanceEnabled ? [{ id: "CRM_PERFORMANCE", label: "Performance", mobileLabel: "Equipe", icon: BarChart3 }] : []),
+    ] : []),
     ...(isAdmin ? [
-      { id: "ACTIONS", label: "Ações", icon: CheckSquare },
+      { id: "ACTIONS", label: "Central de ações", mobileLabel: "Ações", icon: CheckSquare },
       { id: "WHATSAPP", label: "WhatsApp", icon: MessageSquare },
-      { id: "ADMIN", label: "Administração", icon: Shield }
+      { id: "ADMIN", label: "Admin", icon: Shield }
     ] : []),
     { id: "SETTINGS", label: "Config.", icon: Settings },
   ];
@@ -105,7 +131,6 @@ export default function Dashboard() {
     inStock: items.filter(i => i.status === "IN STOCK").length,
     sold: items.filter(i => i.status === "SOLD").length,
   };
-  const searchSuggestions = useMemo(() => buildInventorySearchOptions(items), [items]);
 
   if (authLoading) {
     return (
@@ -123,24 +148,32 @@ export default function Dashboard() {
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-xs"
         >
-          <h1 className="text-4xl font-normal uppercase tracking-tight text-foreground mb-2 font-display">
-            Inventory<br />OS
+          <h1 className="text-4xl font-semibold tracking-tight text-foreground mb-2 font-display">
+            Inventory<span className="text-primary">OS</span>
           </h1>
-          <p className="text-base text-zinc-300 mb-1 leading-relaxed">
-            Gestão de estoque com extração inteligente por IA.
+          <p className="text-base text-muted-foreground mb-1 leading-relaxed">
+            Inventário, relacionamento e operação em um só lugar.
           </p>
           {process.env.NEXT_PUBLIC_APP_VERSION && (
             <p className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-10 font-mono">
               Versão {process.env.NEXT_PUBLIC_APP_VERSION}
             </p>
           )}
-          <div className="h-px bg-white/[0.08] mb-8" />
+          <div className="h-px bg-border mb-8" />
+          {loginError && (
+            <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+              {loginError}
+            </p>
+          )}
           <button
-            onClick={login}
-            className="w-full flex items-center justify-center gap-2.5 bg-white hover:bg-zinc-100 text-[#141414] font-bold text-base py-3 transition-colors"
+            type="button"
+            onClick={handleLogin}
+            disabled={loginLoading}
+            aria-busy={loginLoading}
+            className="w-full flex items-center justify-center gap-2.5 bg-primary hover:bg-primary/90 disabled:cursor-wait disabled:opacity-70 text-primary-foreground font-semibold text-base py-3.5 transition-colors rounded-lg shadow-sm"
           >
-            <GoogleIcon />
-            Entrar com Google
+            {loginLoading ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : <GoogleIcon />}
+            {loginLoading ? "Abrindo login..." : "Entrar com Google"}
           </button>
         </motion.div>
       </div>
@@ -287,64 +320,49 @@ export default function Dashboard() {
         {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
       </AnimatePresence>
 
-      <div className="flex h-screen overflow-hidden bg-background text-foreground selection:bg-primary/20 selection:text-primary">
-        <style jsx global>{`
-          html, body {
-            overflow: hidden;
-            position: fixed;
-            width: 100%;
-            height: 100%;
-            -webkit-overflow-scrolling: touch;
-            touch-action: none;
-          }
-          #__next, main, .overflow-y-auto {
-            touch-action: pan-y;
-          }
-        `}</style>
+      <div className="flex min-h-dvh bg-background text-foreground selection:bg-primary/20 selection:text-primary">
 
         {/* ── Sidebar (desktop) ── */}
-        <aside className="hidden md:flex flex-col w-44 shrink-0 border-r border-[#484848]/20 bg-[#0e0e0e]">
+        <aside className="hidden md:flex flex-col w-60 shrink-0 border-r border-border/70 bg-card">
           {/* Logo */}
-          <div className="px-6 pt-8 pb-6 border-b border-[#484848]/20">
-            <h1 className="text-lg font-normal uppercase tracking-tighter text-[#e7e5e5] leading-none font-display">
-              IOS<span className="text-[#97a5ff]">.</span>
+          <div className="px-6 pt-7 pb-6 border-b border-border/70">
+            <h1 className="text-xl font-semibold tracking-tight text-foreground leading-none font-display">
+              Inventory<span className="text-primary">OS</span>
               <br />
-              <span className="text-[8px] tracking-[0.3em] opacity-30 uppercase font-normal font-display">INVENTORY_OS</span>
+              <span className="text-[10px] tracking-[0.08em] text-muted-foreground font-medium">Workspace operacional</span>
             </h1>
           </div>
 
           {/* Nav */}
-          <nav className="flex-1 py-6 px-3 space-y-1">
-            {navItems.map(({ id, label, icon: Icon }) => (
+          <nav className="flex-1 py-6 px-3 space-y-1.5">
+            {navItems.map(({ id, label, mobileLabel, icon: Icon }) => (
               <Button
                 key={id}
                 variant={activeTab === id ? "secondary" : "ghost"}
                 size="sm"
                 onClick={() => setActiveTab(id)}
-                className={`w-full justify-start gap-3 h-10 font-normal uppercase tracking-widest text-[11px] rounded-none transition-none font-display ${
+                className={`w-full justify-start gap-3 h-10 font-medium text-sm rounded-lg transition-colors ${
                   activeTab === id 
-                    ? "bg-[#1f2020] text-[#e7e5e5]" 
-                    : "text-[#acabaa]/60 hover:text-[#e7e5e5] hover:bg-[#131313]"
+                    ? "bg-accent text-primary shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 }`}
               >
-                <Icon size={14} className={activeTab === id ? "text-[#97a5ff]" : ""} />
+                <Icon size={16} className={activeTab === id ? "text-primary" : ""} />
                 {label}
               </Button>
             ))}
           </nav>
 
           {/* User Account */}
-          <div className="p-4 border-t border-[#484848]/20 bg-[#131313]">
+          <div className="p-4 border-t border-border/70 bg-muted/40">
             {!isHiddenOwner && <div className="flex items-center gap-3 mb-4">
-              <div className="w-8 h-8 rounded-none bg-[#1f2020] border border-[#484848]/20 flex items-center justify-center text-[#97a5ff] font-black text-xs shrink-0">
-                {user.email?.[0].toUpperCase()}
-              </div>
+              <UserAvatar user={user} size="lg" className="border-primary/15" />
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-normal uppercase tracking-widest text-[#e7e5e5] truncate font-display">
+                <p className="text-xs font-semibold text-foreground truncate font-display">
                   {user.displayName || user.email?.split("@")[0]}
                 </p>
-                <Badge variant="outline" className="h-4 px-1.5 py-0 border-[#97a5ff]/20 text-[#97a5ff] bg-[#97a5ff]/5 text-[10px] font-normal uppercase tracking-widest shadow-none rounded-none font-display">
-                  ADMINISTRADOR
+                <Badge variant="outline" className="h-5 px-2 py-0 border-primary/20 text-primary bg-primary/5 text-[10px] font-medium shadow-none rounded-full font-display">
+                  {isAdmin ? "Administrador" : "Equipe"}
                 </Badge>
               </div>
             </div>}
@@ -352,40 +370,37 @@ export default function Dashboard() {
               variant="outline"
               size="sm"
               onClick={logout}
-              className="w-full justify-center gap-2 h-8 text-[11px] font-normal uppercase tracking-widest border-[#ee7d77]/10 text-[#ee7d77] hover:bg-[#ee7d77]/10 hover:border-[#ee7d77]/20 transition-none rounded-none font-display"
+              className="w-full justify-center gap-2 h-9 text-xs font-medium border-destructive/20 text-destructive hover:bg-destructive/10 hover:border-destructive/30 transition-colors rounded-lg font-display"
             >
-              <LogOut size={12} /> ENCERRAR_SESSÃO
+              <LogOut size={14} /> Sair
             </Button>
           </div>
         </aside>
 
         {/* ── Main content area ── */}
-        <div className="flex-1 flex flex-col overflow-hidden min-w-0 bg-background relative">
+        <div className="flex-1 flex flex-col min-w-0 bg-background relative">
           
           {/* Top Bar / Header */}
-          <header className="flex items-center h-14 gap-4 px-4 md:px-6 border-b border-[#484848]/10 shrink-0 bg-[#0e0e0e] z-30">
+          <header className="sticky top-0 flex items-center min-h-16 gap-3 px-4 md:px-8 border-b border-border/70 shrink-0 bg-card/95 backdrop-blur-sm z-30">
             {/* Mobile Brand indicator */}
-            <span className="md:hidden text-lg font-normal uppercase tracking-tighter text-[#e7e5e5] bg-[#1f2020] px-2 py-0.5 rounded-none font-display">IOS</span>
+            <span className="md:hidden text-base font-semibold tracking-tight text-foreground bg-secondary px-2.5 py-1 rounded-lg font-display">InventoryOS</span>
 
             {/* Search Input */}
             <div className="flex-1 max-w-md relative group">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#acabaa]/30 group-focus-within:text-[#97a5ff] transition-none" />
-              <AutocompleteInput
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
+              <Input
                 type="text"
-                placeholder="BUSCAR_NO_INVENTÁRIO..."
+                placeholder={activeTab === "HOME" ? "Buscar no inventário" : "Buscar por modelo, marca ou código"}
                 value={searchQuery}
-                options={searchSuggestions}
-                onValueChange={setSearchQuery}
-                onOptionSelect={(option) => setSearchQuery(option.value)}
-                className="pl-10 h-9 bg-[#131313] border-none shadow-none focus-visible:ring-1 focus-visible:ring-[#97a5ff]/20 placeholder:text-[#acabaa]/20 text-[11px] font-normal uppercase tracking-[0.1em] transition-none rounded-none font-display"
+                onChange={e => setSearchQuery(e.target.value)}
+                className="pl-10 h-10 bg-muted/60 border-border/70 shadow-none focus-visible:ring-2 focus-visible:ring-primary/20 placeholder:text-muted-foreground/70 text-sm transition-colors rounded-lg font-display"
               />
               {searchQuery && (
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  aria-label="Limpar pesquisa"
                   onClick={() => setSearchQuery("")}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-[#acabaa]/30 hover:text-[#e7e5e5] transition-none rounded-none"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-foreground transition-colors rounded-lg"
                 >
                   <X size={14} />
                 </Button>
@@ -399,32 +414,32 @@ export default function Dashboard() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    aria-label="Pesquisar por voz"
                     onClick={() => setIsVoiceOpen(true)}
-                    className="h-9 w-9 text-muted-foreground/30 hover:text-primary hover:bg-primary/5 transition-all rounded-none"
+                    className="h-10 w-10 text-muted-foreground hover:text-primary hover:bg-accent transition-colors rounded-lg"
                   >
                     <Mic size={16} />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent className="rounded-none">
-                  <p className="text-[10px] font-black uppercase">Busca por Voz</p>
+                <TooltipContent className="rounded-lg">
+                  <p className="text-xs font-medium">Busca por voz</p>
                 </TooltipContent>
               </Tooltip>
 
               <Button
                 onClick={() => { setItemToEdit(null); setIsModalOpen(true); }}
-                className="gap-2 bg-[#e7e5e5] hover:bg-[#c6c6c7] text-[#0e0e0e] text-[11px] font-normal uppercase tracking-widest h-9 px-4 shadow-none rounded-none transition-none font-display border border-[#484848]/10"
+                className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold h-10 px-4 shadow-sm rounded-lg transition-colors font-display border border-primary/10"
               >
                 <Plus size={16} />
-                <span className="hidden sm:inline">ADICIONAR_ITEM</span>
+                <span className="hidden sm:inline">Novo item</span>
               </Button>
+
+              {!isHiddenOwner && <UserAvatar user={user} size="sm" className="md:hidden border-primary/15" />}
 
               <Button
                 variant="ghost"
                 size="icon"
-                aria-label="Encerrar sessão"
                 onClick={logout}
-                className="md:hidden h-9 w-9 text-destructive/40 bg-destructive/5 hover:bg-destructive/20 hover:text-destructive transition-all border border-destructive/10 rounded-none"
+                className="md:hidden h-10 w-10 text-destructive/70 bg-destructive/5 hover:bg-destructive/20 hover:text-destructive transition-colors border border-destructive/10 rounded-lg"
               >
                 <LogOut size={16} />
               </Button>
@@ -432,7 +447,7 @@ export default function Dashboard() {
           </header>
 
           {/* Main area scrollable */}
-          <main className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth">
+          <main className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth pb-20 md:pb-0">
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeTab}
@@ -442,14 +457,20 @@ export default function Dashboard() {
                 transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
                 className="h-full"
               >
-                {activeTab === "CRM" ? (
-                  <CrmView user={user} />
+                {activeTab === "CRM_PERFORMANCE" && crmPerformanceEnabled ? (
+                  <CrmPerformanceDashboard user={user} />
+                ) : activeTab === "HOME" ? (
+                  <WorkspaceHome user={user} inventoryCount={stats.inStock} onOpenCrm={() => setActiveTab("CRM")} />
+                ) : activeTab === "CRM_IMPORT" && isFeatureEnabled(expansionFlags, "crmImport") ? (
+                  <CrmImportView user={user} onBack={() => setActiveTab("CRM")} />
+                ) : activeTab === "CRM" ? (
+                  <CrmView user={user} onOpenImport={() => setActiveTab("CRM_IMPORT")} />
                 ) : activeTab === "ADMIN" && isAdmin ? (
                   <AdminDashboard items={items} user={user} />
                 ) : activeTab === "WHATSAPP" ? (
-                  <WhatsappView />
+                  <WhatsappView user={user} />
                 ) : activeTab === "ACTIONS" ? (
-                  <ActionInbox />
+                  <ActionInbox user={user} onOpenCrm={() => setActiveTab("CRM")} />
                 ) : activeTab === "SETTINGS" ? (
 
                   <SettingsView />
@@ -475,22 +496,22 @@ export default function Dashboard() {
           </main>
 
           {/* Mobile bottom nav using shadcn/ui buttons */}
-          <div className="md:hidden flex border-t border-foreground/2 shrink-0 bg-background h-16 items-center justify-around px-2 z-40">
-            {navItems.map(({ id, label, icon: Icon }) => (
+          <div className="md:hidden fixed bottom-3 left-3 right-3 flex border border-border/80 bg-card/95 backdrop-blur-sm h-[4.5rem] items-center justify-start gap-1 overflow-x-auto rounded-2xl px-2 shadow-lg z-40">
+            {navItems.map(({ id, label, mobileLabel, icon: Icon }) => (
               <Button
                 key={id}
                 variant="ghost"
                 onClick={() => setActiveTab(id)}
-                className={`flex-1 flex flex-col items-center justify-center gap-1.5 h-16 py-0 hover:bg-transparent rounded-none ${
+                className={`min-w-[76px] flex-none flex flex-col items-center justify-center gap-1 h-16 py-0 hover:bg-transparent rounded-xl ${
                   activeTab === id ? "text-primary" : "text-muted-foreground/40"
                 }`}
               >
-                <Icon size={16} strokeWidth={activeTab === id ? 3 : 2} className={activeTab === id ? "drop-shadow-[0_0_8px_rgba(var(--primary),0.5)]" : ""} />
-                <span className="text-[10px] font-normal font-display uppercase tracking-[0.15em]">{label}</span>
+                <Icon size={17} strokeWidth={activeTab === id ? 2.5 : 2} />
+                <span className="text-[10px] font-medium font-display">{mobileLabel || label}</span>
                 {activeTab === id && (
                   <motion.div 
                     layoutId="activeTabDot" 
-                    className="w-1.5 h-1.5 rounded-none bg-primary"
+                    className="w-1.5 h-1.5 rounded-full bg-primary"
                     transition={{ type: "spring", stiffness: 350, damping: 30 }}
                   />
                 )}
@@ -509,22 +530,22 @@ export default function Dashboard() {
             exit={{ y: 100, opacity: 0 }}
             className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-32px)] max-w-sm"
           >
-            <div className="bg-[#1a1a1a] border border-white/[0.1] shadow-2xl p-4 rounded-none">
+            <div className="bg-card border border-border shadow-xl p-4 rounded-xl">
               {notification.error ? (
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-1.5 h-1.5 rounded-none bg-red-500 animate-pulse" />
-                    <span className="text-xs font-black uppercase tracking-widest text-zinc-300">
+                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                    <span className="text-sm font-medium text-foreground">
                       {notification.error.humanMessage}
                     </span>
                   </div>
                   {notification.error.knownReason && (
-                    <p className="text-xs text-zinc-400">{notification.error.knownReason}</p>
+                    <p className="text-xs text-muted-foreground">{notification.error.knownReason}</p>
                   )}
                   <div className="flex flex-wrap gap-2">
                     <button
                       onClick={notification.onAction || (() => setNotification(null))}
-                      className="text-[10px] font-black uppercase tracking-[0.2em] text-white bg-white/10 px-3 py-1.5 hover:bg-white/20 transition-colors rounded-none"
+                      className="text-xs font-medium text-foreground bg-muted px-3 py-2 hover:bg-muted/80 transition-colors rounded-lg"
                     >
                       {notification.actionLabel || "Fechar"}
                     </button>
@@ -532,13 +553,13 @@ export default function Dashboard() {
                       <button
                         onClick={handleNotificationSupport}
                         disabled={reportingNotification}
-                        className="text-[10px] font-black uppercase tracking-[0.2em] text-white bg-red-500/20 px-3 py-1.5 hover:bg-red-500/30 disabled:opacity-50 transition-colors rounded-none"
+                        className="text-xs font-medium text-red-700 bg-red-50 px-3 py-2 hover:bg-red-100 disabled:opacity-50 transition-colors rounded-lg"
                       >
-                        {reportingNotification ? "Enviando..." : "Enviar log para suporte"}
+                        {reportingNotification ? "Enviando…" : "Enviar log para suporte"}
                       </button>
                     )}
                     {(notification.error.ticketId || notification.error.errorId) && (
-                      <span className="text-[10px] font-mono text-zinc-500 py-1.5">
+                      <span className="text-[10px] font-mono text-muted-foreground py-1.5">
                         {notification.error.ticketId || notification.error.errorId}
                       </span>
                     )}
@@ -547,14 +568,14 @@ export default function Dashboard() {
               ) : (
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-1.5 h-1.5 rounded-none bg-red-500 animate-pulse" />
-                    <span className="text-xs font-black uppercase tracking-widest text-zinc-300">
+                    <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                    <span className="text-sm font-medium text-foreground">
                       {notification.message}
                     </span>
                   </div>
                   <button
                     onClick={notification.onAction || (() => undoDelete?.(notification.id))}
-                    className="text-[10px] font-black uppercase tracking-[0.2em] text-white bg-white/10 px-3 py-1.5 hover:bg-white/20 transition-colors rounded-none"
+                    className="text-xs font-medium text-primary bg-accent px-3 py-2 hover:bg-secondary transition-colors rounded-lg"
                   >
                     {notification.actionLabel || "Fechar"}
                   </button>
@@ -580,7 +601,6 @@ export default function Dashboard() {
         onClose={() => { setIsModalOpen(false); setItemToEdit(null); }}
         onAdded={() => {}}
         editItem={itemToEdit}
-        existingItems={items}
       />
       
       <VoiceSearch
@@ -594,7 +614,6 @@ export default function Dashboard() {
 
 function InventoryContent({ items, filteredItems, stats, loading, searchQuery, activeMenuId, setActiveMenuId, onEdit, onDelete, onView = () => {}, onShare = () => {} }) {
   const [selectedBrandKey, setSelectedBrandKey] = useState(null);
-  const [groupBy, setGroupBy] = useState("none");
 
   const availableBrands = useMemo(() => {
     const brands = new Map();
@@ -617,86 +636,56 @@ function InventoryContent({ items, filteredItems, stats, loading, searchQuery, a
     return filtered;
   }, [filteredItems, selectedBrandKey]);
 
-  const groupedItems = useMemo(() => buildInventoryGroups(displayItems, groupBy), [displayItems, groupBy]);
-
-  const groupingLabel = groupBy === "brand" ? "MARCA" : groupBy === "type" ? "TIPO" : "NENHUM";
-
-  const renderItemRows = (list) => list.map((item, idx) => (
-    <ItemRow
-      key={item.id}
-      item={item}
-      idx={idx}
-      isMenuOpen={activeMenuId === item.id}
-      onMenuToggle={() => setActiveMenuId(activeMenuId === item.id ? null : item.id)}
-      onEdit={onEdit}
-      onDelete={onDelete}
-      onView={onView}
-      onShare={onShare}
-    />
-  ));
-
   if (loading && items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4">
         <Loader2 className="animate-spin text-primary/40" size={32} />
-        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.3em]">Sincronizando Ativos...</p>
+        <p className="text-xs text-muted-foreground font-medium">Sincronizando ativos…</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-0.5">
+    <div className="space-y-0">
       {/* Page Title & Context */}
-      <div className="px-4 md:px-6 pt-10 pb-8 bg-[#0e0e0e]">
-        <div className="flex items-center gap-3 mb-4">
-          <Badge variant="outline" className="h-5 px-2 bg-[#1f2020] text-[#97a5ff] border-[#484848]/20 text-[11px] font-normal uppercase tracking-[0.2em] shadow-none rounded-none font-display">
-            STATUS_OPERACIONAL.SYS
+      <div className="px-4 md:px-8 pt-7 pb-6 bg-background">
+        <div className="flex items-center gap-3 mb-3">
+          <Badge variant="outline" className="h-6 px-2.5 bg-accent text-primary border-primary/15 text-xs font-medium shadow-none rounded-full font-display">
+            Operação ativa
           </Badge>
         </div>
-        <h1 className="text-2xl md:text-3xl font-normal uppercase tracking-tighter text-[#e7e5e5] leading-none font-display">
-          CENTRAL_DE_<span className="text-[#acabaa]/30">INVENTÁRIO</span>
+        <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-foreground leading-tight font-display">
+          Central de inventário
         </h1>
+        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Consulte, organize e compartilhe os equipamentos da operação.</p>
       </div>
 
-      {/* Industrial Stats Grid */}
-      <div className="grid grid-cols-3 border-y border-[#484848]/20 bg-[#131313] divide-x divide-[#484848]/20">
+      {/* Operational stats */}
+      <div className="mx-4 grid grid-cols-3 overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm md:mx-8 divide-x divide-border/70">
         {[
-          { label: "TOTAL_DE_ITENS",      value: stats.total,   color: "text-[#e7e5e5]" },
-          { label: "EM_ESTOQUE",    value: stats.inStock,  color: "text-[#acc3ce]" },
-          { label: "VENDIDOS",   value: stats.sold,     color: "text-[#acabaa]/40" },
+          { label: "Total de itens", value: stats.total, color: "text-foreground" },
+          { label: "Em estoque", value: stats.inStock, color: "text-emerald-700" },
+          { label: "Vendidos", value: stats.sold, color: "text-muted-foreground" },
         ].map(({ label, value, color }) => (
-          <div key={label} className="p-3 md:p-5 space-y-1">
-            <p className="text-[10px] font-normal uppercase tracking-[0.2em] text-[#acabaa]/50 font-display">{label}</p>
-            <p className={`text-xl md:text-2xl font-bold tracking-tighter font-mono ${color}`}>{value}</p>
+          <div key={label} className="p-3.5 md:p-5 space-y-1">
+            <p className="text-xs text-muted-foreground font-display">{label}</p>
+            <p className={`text-xl md:text-2xl font-semibold tracking-tight font-mono ${color}`}>{value}</p>
           </div>
         ))}
       </div>
 
-      {/* Filters and grouping */}
-      <div className="sticky top-0 z-20 flex items-center gap-2 overflow-x-auto border-b border-[#484848]/20 bg-[#0e0e0e]/95 px-4 py-4 backdrop-blur-md no-scrollbar md:px-6">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" aria-label="Escolher agrupamento do inventário" className="h-8 shrink-0 rounded-none border-[#97a5ff]/20 bg-[#191a1a] text-[10px] font-normal uppercase tracking-[0.15em] text-[#97a5ff] transition-none font-display">
-              AGRUPAR: {groupingLabel}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-44 rounded-none border-[#484848] bg-[#1f2020] shadow-none">
-            <DropdownMenuItem onClick={() => setGroupBy("none")} className="cursor-pointer text-[10px] font-normal uppercase tracking-widest transition-none font-display">SEM_AGRUPAMENTO</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setGroupBy("brand")} className="cursor-pointer text-[10px] font-normal uppercase tracking-widest transition-none font-display">POR_MARCA</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setGroupBy("type")} className="cursor-pointer text-[10px] font-normal uppercase tracking-widest transition-none font-display">POR_TIPO</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
+      {/* Brand filter pills */}
+      <div className="sticky top-16 z-20 bg-background/95 backdrop-blur-md py-4 px-4 md:px-8 flex items-center gap-2 overflow-x-auto no-scrollbar">
         {availableBrands.map(brand => (
           <Button
             key={brand.key}
             variant={selectedBrandKey === brand.key ? "default" : "outline"}
             size="sm"
             onClick={() => setSelectedBrandKey(selectedBrandKey === brand.key ? null : brand.key)}
-            className={`h-8 shrink-0 rounded-none text-[11px] font-normal uppercase tracking-[0.15em] transition-none font-display ${
-              selectedBrandKey === brand.key
-                ? "bg-[#e7e5e5] text-[#0e0e0e] shadow-none"
-                : "border-[#484848]/10 bg-[#191a1a] text-[#acabaa] hover:bg-[#1f2020] hover:text-[#e7e5e5]"
+            className={`h-9 rounded-full text-xs font-medium transition-colors font-display shrink-0 ${
+              selectedBrandKey === brand.key 
+                ? "bg-foreground text-background shadow-sm"
+                : "bg-card border-border/70 text-muted-foreground hover:bg-muted hover:text-foreground"
             }`}
           >
             {brand.label}
@@ -706,41 +695,37 @@ function InventoryContent({ items, filteredItems, stats, loading, searchQuery, a
 
 
       {/* Inventory List Layout */}
-      <div className="min-h-screen pb-32">
+      <div className="min-h-[60vh] pb-8">
         {displayItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-32 space-y-4 opacity-30">
             <Package size={48} strokeWidth={1} />
-            <p className="text-[11px] font-black uppercase tracking-[0.4em]">
-              {searchQuery ? "Nenhum Ativo Encontrado" : "Base de Dados Vazia"}
+            <p className="text-sm font-medium text-muted-foreground">
+              {searchQuery ? "Nenhum item encontrado" : "Ainda não há itens no inventário"}
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-foreground/[0.01]">
+          <div className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm">
             {/* Desktop Table Header */}
-            <div className="hidden md:flex items-center gap-6 px-8 py-3 bg-[#131313] text-[10px] font-normal uppercase tracking-[0.3em] text-[#acabaa]/40 border-b border-[#484848]/10 font-display">
-              <span className="flex-1">ESPECIFICAÇÕES_DO_ATIVO</span>
-              <span className="w-32">CATEGORIA</span>
-              <span className="w-32 px-4">STATUS</span>
-              <span className="w-10 text-right">AÇÕES</span>
+            <div className="hidden md:flex items-center gap-6 px-8 py-3 bg-muted/45 text-xs font-medium text-muted-foreground border-b border-border/70 font-display">
+              <span className="flex-1">Equipamento</span>
+              <span className="w-32">Categoria</span>
+              <span className="w-32 px-4">Status</span>
+              <span className="w-10 text-right">Ações</span>
             </div>
 
-            {groupBy === "none" ? renderItemRows(displayItems) : (
-              <Accordion type="multiple" defaultValue={groupedItems.map((group) => group.id)} key={`${groupBy}:${groupedItems.map((group) => group.id).join("|")}`} className="divide-y divide-[#484848]/10">
-                {groupedItems.map((group) => (
-                  <AccordionItem key={group.id} value={group.id}>
-                    <AccordionTrigger>
-                      <span className="flex min-w-0 items-center gap-3">
-                        <span className="truncate">{group.label}</span>
-                        <Badge variant="outline" className="rounded-none border-[#484848]/30 text-[9px] text-[#acabaa]/70">{group.items.length}</Badge>
-                      </span>
-                    </AccordionTrigger>
-                    <AccordionContent className="pb-0">
-                      <div className="divide-y divide-foreground/[0.01]">{renderItemRows(group.items)}</div>
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            )}
+            {displayItems.map((item, idx) => (
+              <ItemRow
+                key={item.id}
+                item={item}
+                idx={idx}
+                isMenuOpen={activeMenuId === item.id}
+                onMenuToggle={() => setActiveMenuId(activeMenuId === item.id ? null : item.id)}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onView={onView}
+                onShare={onShare}
+              />
+            ))}
           </div>
         )}
       </div>
@@ -769,7 +754,7 @@ function ItemRow({ item, idx, isMenuOpen, onMenuToggle, onEdit, onDelete, onView
       >
         <div className="flex flex-col items-center gap-1 text-white">
           <Share2 size={18} />
-            <span className="text-[10px] font-black uppercase tracking-tighter">COMPARTILHAR</span>
+          <span className="text-[10px] font-semibold">Compartilhar</span>
         </div>
       </motion.div>
 
@@ -780,7 +765,7 @@ function ItemRow({ item, idx, isMenuOpen, onMenuToggle, onEdit, onDelete, onView
       >
         <div className="flex flex-col items-center gap-1 text-white">
           <Trash2 size={18} />
-          <span className="text-[10px] font-black uppercase tracking-tighter">EXCLUIR</span>
+          <span className="text-[10px] font-semibold">Excluir</span>
         </div>
       </motion.div>
 
@@ -795,33 +780,33 @@ function ItemRow({ item, idx, isMenuOpen, onMenuToggle, onEdit, onDelete, onView
           else if (info.offset.x > 60) controls.start({ x: 100 });
           else controls.start({ x: 0 });
         }}
-        className="relative z-10 w-full min-w-full bg-[#09090b] touch-pan-y"
+        className="relative z-10 w-full min-w-full bg-card touch-pan-y"
       >
         <div 
-          className="flex items-center gap-4 px-4 md:px-8 py-5 hover:bg-[#131313] active:bg-[#191a1a] transition-none cursor-pointer border-b border-[#484848]/5"
+          className="flex items-center gap-4 px-4 md:px-8 py-4 hover:bg-muted/45 active:bg-muted transition-colors cursor-pointer border-b border-border/60 last:border-b-0"
           onClick={() => x.get() === 0 ? onView(item) : controls.start({ x: 0 })}
         >
           {/* Avatar / Thumbnail */}
-          <div className="w-10 h-10 md:w-12 md:h-12 rounded-none bg-[#131313] border border-[#484848]/20 p-1 overflow-hidden shrink-0 flex items-center justify-center shadow-none group-hover:scale-100 transition-none">
+          <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-muted border border-border/70 p-1 overflow-hidden shrink-0 flex items-center justify-center shadow-none group-hover:scale-100 transition-none">
             {item.productImageUrl ? (
-              <img src={item.productImageUrl} alt={item.model} className="w-full h-full object-cover rounded-none grayscale group-hover:grayscale-0" />
+              <img src={item.productImageUrl} alt={item.model} className="w-full h-full object-cover rounded-lg" />
             ) : (
-              <Package size={20} className="text-[#484848]" />
+              <Package size={20} className="text-muted-foreground/60" />
             )}
           </div>
 
           {/* Item Bio */}
           <div className="flex-1 min-w-0 py-0.5">
             <div className="flex items-center gap-2 mb-0.5">
-              <span className="text-sm md:text-base font-normal text-[#e7e5e5] truncate uppercase tracking-tight font-display">{item.model}</span>
+              <span className="text-sm md:text-base font-semibold text-foreground truncate tracking-tight font-display">{item.model}</span>
             </div>
             <div className="flex items-center gap-2 text-[11px] md:text-[12px] font-mono">
-              <span className="font-semibold text-[#acabaa] uppercase">{item.brand}</span>
+              <span className="font-medium text-muted-foreground">{item.brand}</span>
 
               {item.partNumber && (
                 <>
-                  <span className="text-[#484848]">/</span>
-                  <span className="text-[#acabaa]/30">{item.partNumber}</span>
+                  <span className="text-border">·</span>
+                  <span className="text-muted-foreground/70">{item.partNumber}</span>
                 </>
               )}
             </div>
@@ -829,16 +814,16 @@ function ItemRow({ item, idx, isMenuOpen, onMenuToggle, onEdit, onDelete, onView
 
           {/* Metadata Desktop */}
           <div className="hidden md:block w-32 shrink-0">
-            <Badge variant="secondary" className="bg-[#191a1a] text-[#acabaa] border border-[#484848]/20 font-mono text-[10px] font-black px-2 py-0.5 shadow-none rounded-none uppercase tracking-widest">
+            <Badge variant="secondary" className="bg-muted text-muted-foreground border border-border/70 font-mono text-[10px] font-medium px-2 py-0.5 shadow-none rounded-full">
               {item.type || "GERAL"}
             </Badge>
           </div>
 
           {/* Status Pillar */}
           <div className="w-24 shrink-0 flex items-center gap-2 px-2 font-mono">
-            <div className={`w-1 h-1 rounded-none ${status.dot}`} />
-            <span className={`text-[10px] font-normal font-display uppercase tracking-[0.1em] ${status.cls}`}>
-              {status.label}
+            <div className={`w-2 h-2 rounded-full ${status.dot}`} />
+            <span className={`text-[11px] font-medium font-display ${status.cls}`}>
+              {item.status}
             </span>
           </div>
 
@@ -846,24 +831,24 @@ function ItemRow({ item, idx, isMenuOpen, onMenuToggle, onEdit, onDelete, onView
           <div className="w-10 shrink-0 flex justify-end">
             <DropdownMenu open={isMenuOpen} onOpenChange={onMenuToggle}>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="Abrir ações do item" className="h-8 w-8 text-[#484848] hover:text-[#e7e5e5] transition-none rounded-none">
+                <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground transition-colors rounded-lg">
                   <MoreHorizontal size={16} />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48 bg-[#1f2020] border-[#484848] rounded-none shadow-none">
-                <DropdownMenuItem onClick={() => onEdit(item)} className="text-[11px] font-normal uppercase tracking-widest py-3 cursor-pointer transition-none font-display">
-                  EDITAR_REGISTRO
+              <DropdownMenuContent align="end" className="w-48 bg-popover border-border rounded-xl shadow-lg">
+                <DropdownMenuItem onClick={() => onEdit(item)} className="text-sm font-medium py-3 cursor-pointer transition-colors font-display">
+                  Editar item
                 </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-[#484848]/20" />
-                <DropdownMenuItem onClick={() => onShare(item, "whatsapp")} className="text-[9px] font-normal uppercase tracking-widest py-3 text-[#acc3ce] cursor-pointer transition-none font-display">
-                  EXPORTAR_PARA_WHATSAPP
+                <DropdownMenuSeparator className="bg-border" />
+                <DropdownMenuItem onClick={() => onShare(item, "whatsapp")} className="text-sm font-medium py-3 text-emerald-700 cursor-pointer transition-colors font-display">
+                  Compartilhar no WhatsApp
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onShare(item)} className="text-[9px] font-normal uppercase tracking-widest py-3 cursor-pointer transition-none font-display">
-                  GERAR_PDF
+                <DropdownMenuItem onClick={() => onShare(item)} className="text-sm font-medium py-3 cursor-pointer transition-colors font-display">
+                  Compartilhar
                 </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-[#484848]/20" />
-                <DropdownMenuItem onClick={() => onDelete(item)} className="text-[9px] font-normal uppercase tracking-widest py-3 text-[#ee7d77] cursor-pointer transition-none font-display">
-                  EXCLUIR_REGISTRO
+                <DropdownMenuSeparator className="bg-border" />
+                <DropdownMenuItem onClick={() => onDelete(item)} className="text-sm font-medium py-3 text-destructive cursor-pointer transition-colors font-display">
+                  Excluir item
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

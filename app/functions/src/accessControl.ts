@@ -11,6 +11,7 @@ export interface AccessUserSummary {
   uid: string;
   email: string | null;
   displayName: string | null;
+  photoURL: string | null;
   status: AccessStatus;
   role: AccessRole;
   requestedAt: unknown;
@@ -215,6 +216,7 @@ export async function listAccessUsers(auth: any, status?: AccessStatus) {
         uid: item.id,
         email: data.email || null,
         displayName: data.displayName || null,
+        photoURL: data.photoURL || null,
         status: data.accessStatus || "pending",
         role: data.role || "user",
         requestedAt: data.requestedAt || null,

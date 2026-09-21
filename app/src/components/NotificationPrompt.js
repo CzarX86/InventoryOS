@@ -66,7 +66,6 @@ export default function NotificationPrompt() {
             <Button 
               variant="ghost" 
               size="icon"
-              aria-label="Fechar aviso de notificações"
               onClick={handleDismiss} 
               className="absolute top-2 right-2 h-7 w-7 rounded-full text-muted-foreground hover:text-foreground"
             >

@@ -7,15 +7,15 @@ import { Badge } from "@/components/ui/badge";
 
 function getInitialPushState(isAdmin) {
   if (!isAdmin || typeof Notification === "undefined") {
-    return { status: "unsupported", message: "NOTIFICAÇÕES_DO_SISTEMA_NÃO_SÃO_COMPATÍVEIS" };
+    return { status: "unsupported", message: "Notificações não estão disponíveis neste navegador." };
   }
 
   if (Notification.permission === "granted") {
-    return { status: "enabled", message: "NOTIFICAÇÕES_ATIVAS_NESTE_DISPOSITIVO" };
+    return { status: "enabled", message: "Alertas administrativos ativos neste dispositivo." };
   }
 
   if (Notification.permission === "denied") {
-    return { status: "blocked", message: "ACESSO_NEGADO_PELO_NAVEGADOR" };
+    return { status: "blocked", message: "Notificações bloqueadas no navegador. Libere-as nas configurações para ativar." };
   }
 
   return { status: "idle", message: "" };
@@ -36,13 +36,13 @@ export default function AdminPushRegistration({ user, isAdmin }) {
       await registerAdminPushToken(user);
       setPushState({
         status: "enabled",
-        message: "NOTIFICAÇÕES_ATIVADAS_COM_SUCESSO",
+        message: "Alertas administrativos ativos neste dispositivo.",
       });
     } catch (error) {
       console.error("Admin push registration failed:", error);
       setPushState({
         status: "error",
-        message: error.message || "FALHA_AO_ATIVAR_NOTIFICAÇÕES",
+        message: error.message || "Não foi possível ativar as notificações.",
       });
     }
   };
@@ -63,25 +63,25 @@ export default function AdminPushRegistration({ user, isAdmin }) {
         </div>
         <div className="space-y-1">
           <div className="flex items-center gap-3">
-            <h3 className="text-sm font-display font-normal uppercase tracking-[0.2em] text-foreground">
-              PONTE_DE_NOTIFICAÇÕES_ADMIN_V1
+            <h3 className="text-sm font-display font-normal tracking-tight text-foreground">
+              Notificações administrativas
             </h3>
             {status === "enabled" && (
               <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-none h-5 px-2 text-[9px] font-display font-normal uppercase tracking-widest rounded-none">
-                ATIVO
+                Ativos
               </Badge>
             )}
           </div>
-          <p className="text-[10px] font-mono text-muted-foreground/60 uppercase tracking-wider">
-            {message || "ATIVAR_ALERTAS_EM_TEMPO_REAL_PARA_ERROS_CRÍTICOS"}
+          <p className="max-w-xl text-xs leading-relaxed text-muted-foreground">
+            {message || "Receba alertas sobre solicitações de acesso e ocorrências importantes."}
           </p>
         </div>
       </div>
 
       <div className="flex items-center gap-3">
         {status === "error" && (
-          <div className="flex items-center gap-2 text-[10px] font-display font-normal text-red-500 uppercase mr-2 tracking-widest">
-            <AlertCircle size={14} /> FALHA_NA_SINCRONIZAÇÃO
+            <div className="flex items-center gap-2 text-[10px] font-display font-normal text-red-500 mr-2 tracking-widest">
+            <AlertCircle size={14} /> Falha ao sincronizar
           </div>
         )}
         <Button
@@ -97,15 +97,15 @@ export default function AdminPushRegistration({ user, isAdmin }) {
           {status === "processing" ? (
             <>
               <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-              SINCRONIZANDO...
+              Ativando...
             </>
           ) : status === "enabled" ? (
             <>
               <CheckCircle2 className="mr-2 h-3.5 w-3.5" />
-              PONTE_ESTABELECIDA
+              Alertas ativos
             </>
           ) : (
-            "ATIVAR_NOTIFICAÇÕES"
+            "Ativar alertas"
           )}
         </Button>
       </div>

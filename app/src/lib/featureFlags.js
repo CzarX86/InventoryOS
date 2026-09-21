@@ -6,6 +6,9 @@ export const EXPANSION_FEATURE_FLAGS = [
   "txtImport",
   "supplierRfq",
   "semiAutonomousAi",
+  "crmPerformanceDashboard",
+  "crmImport",
+  "crmAiWorkflow",
 ];
 
 export const DEFAULT_FEATURE_FLAGS = Object.freeze({
@@ -16,6 +19,9 @@ export const DEFAULT_FEATURE_FLAGS = Object.freeze({
   txtImport: false,
   supplierRfq: false,
   semiAutonomousAi: false,
+  crmPerformanceDashboard: true,
+  crmImport: true,
+  crmAiWorkflow: true,
 });
 
 function normalizeFlagValue(value) {

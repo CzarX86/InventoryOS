@@ -91,6 +91,18 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // FinOps summaries are server-owned. Only administrators can see the
+    // measured/estimated ledger and the optional official Billing Export data.
+    match /system_usage/{summaryId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /system_billing_reconciliation/{monthKey} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     match /usage_stats/{userId} {
       allow read: if isAdmin() || (isApprovedMember() && request.auth.uid == userId);
       allow create, update: if isApprovedMember() && request.auth.uid == userId;
@@ -162,6 +174,14 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin() || canReadSharedResource();
     }
 
+    match /crm_import_jobs/{jobId} {
+      // The original file and all state transitions are controlled by
+      // Cloud Functions; approved workspace members can only inspect the
+      // scoped status and validation preview.
+      allow read: if isAdmin() || canReadSharedResource();
+      allow create, update, delete: if false;
+    }
+
     match /message_dispatch_jobs/{jobId} {
       allow create: if canCreateSharedResource();
       allow read, update, delete: if isAdmin() || canReadSharedResource();
@@ -183,6 +203,19 @@ service cloud.firestore {
         request.resource.data.createdByUserId == request.auth.uid &&
         get(/databases/$(database)/documents/error_reports/$(request.resource.data.errorId)).data.userId == request.auth.uid;
       allow read, update, delete: if isAdmin();
+    }
+
+    match /module_requests/{requestId} {
+      allow create: if isApprovedMember() &&
+        request.resource.data.requesterUserId == request.auth.uid &&
+        request.resource.data.workspaceId == workspaceId() &&
+        request.resource.data.module == "whatsapp";
+      allow read: if isAdmin() ||
+        (isApprovedMember() && requestId == request.auth.uid + "_whatsapp");
+      allow update: if isAdmin() ||
+        (isApprovedMember() && resource.data.requesterUserId == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(["message", "updatedAt"]));
+      allow delete: if isAdmin();
     }
 
     match /admin_device_tokens/{tokenId} {
@@ -245,6 +278,13 @@ service cloud.firestore {
       allow create: if canCreateSharedResource();
       allow read: if canReadSharedResource();
       allow update, delete: if canWriteSharedResource() || isAdmin();
+    }
+
+    match /crm_review_items/{reviewId} {
+      // Suggestions are created and resolved by Cloud Functions so the
+      // approval trail cannot be bypassed with a client-side write.
+      allow read: if isAdmin() || canReadSharedResource();
+      allow create, update, delete: if false;
     }
 
     match /interests/{interestId} {
