@@ -320,7 +320,7 @@ export default function Dashboard() {
         {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
       </AnimatePresence>
 
-      <div className="flex min-h-dvh bg-background text-foreground selection:bg-primary/20 selection:text-primary">
+      <div className="app-shell-height flex bg-background text-foreground selection:bg-primary/20 selection:text-primary">
 
         {/* ── Sidebar (desktop) ── */}
         <aside className="hidden md:flex flex-col w-60 shrink-0 border-r border-border/70 bg-card">
@@ -447,7 +447,7 @@ export default function Dashboard() {
           </header>
 
           {/* Main area scrollable */}
-          <main className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth pb-20 md:pb-0">
+          <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scroll-smooth pb-24 md:pb-0">
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeTab}
@@ -496,7 +496,7 @@ export default function Dashboard() {
           </main>
 
           {/* Mobile bottom nav using shadcn/ui buttons */}
-          <div className="md:hidden fixed bottom-3 left-3 right-3 flex border border-border/80 bg-card/95 backdrop-blur-sm h-[4.5rem] items-center justify-start gap-1 overflow-x-auto rounded-2xl px-2 shadow-lg z-40">
+          <div className="mobile-bottom-nav-safe-area md:hidden fixed left-3 right-3 flex h-[4.5rem] items-center justify-start gap-1 overflow-x-auto rounded-2xl border border-border/80 bg-card/95 px-2 shadow-lg backdrop-blur-sm z-40">
             {navItems.map(({ id, label, mobileLabel, icon: Icon }) => (
               <Button
                 key={id}
