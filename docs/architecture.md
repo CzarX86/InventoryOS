@@ -99,6 +99,10 @@ The CRM uses `accounts` as companies and `contacts` as people. Each record carri
 
 The administrative CRM performance surface uses the `getCrmPerformanceSnapshot` callable to read workspace-scoped `crm_events`, `contacts`, `accounts`, and approved access summaries in one request. Event queries are bounded to the selected period plus the comparable previous period (or the existing 2,000-event safety cap for all-time views), avoiding several client-side realtime listeners. The employee comparison is attributed by `actorUserId` (falling back to `ownerId` only when it is not a system actor), while automated/system activity is retained in an explicit `Sem atribuição` row instead of being assigned to a person.
 
+### Bounded operational reads
+
+Large operational collections are never loaded wholesale by the browser. The inventory hook listens to the first 100 records and loads subsequent pages with a cursor; total, in-stock and sold counters use Firestore aggregation counts. The employee Home queries only the current seven-day window, while CRM reference lists use bounded one-shot reads and keep realtime listeners only for the selected contact's history and equipment. Central de ações reads up to 100 records per queue when opened. The WhatsApp review queue shows up to 100 contacts and 100 groups and batches opportunity/task signals in `in` queries of 30 JIDs, avoiding per-row listeners; expanded message history remains limited to 10 messages.
+
 The initial KPI contract is:
 
 - `Ligações registradas`: CRM events with `channelType == "phone"` in the selected period.

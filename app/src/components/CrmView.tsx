@@ -29,6 +29,7 @@ import {
   addDoc,
   collection,
   doc,
+  getDocs,
   limit,
   onSnapshot,
   query,
@@ -370,20 +371,22 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
     const companyQuery = query(collection(db, "accounts"), where("workspaceId", "==", workspaceId), limit(200));
     const contactQuery = query(collection(db, "contacts"), where("workspaceId", "==", workspaceId), limit(500));
     const catalogQuery = query(collection(db, "catalog_items"), where("workspaceId", "==", workspaceId), limit(300));
-    const unsubscribeCompanies = onSnapshot(companyQuery, (snapshot) => {
-      setCompanies(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as Company)).sort((left, right) => String(left.name || "").localeCompare(String(right.name || ""), "pt-BR")));
-    }, () => setStatus({ tone: "error", text: "Não foi possível carregar as empresas." }));
-    const unsubscribeContacts = onSnapshot(contactQuery, (snapshot) => {
-      const nextContacts = snapshot.docs
-        .map((item) => ({ id: item.id, ...item.data() } as Contact))
-        .filter((contact) => contact.status !== "deleted");
-      setContacts(nextContacts);
-      setSelectedContactId((current) => current && nextContacts.some((contact) => contact.id === current) ? current : nextContacts[0]?.id || null);
-    }, () => setStatus({ tone: "error", text: "Não foi possível carregar os contatos." }));
-    const unsubscribeCatalog = onSnapshot(catalogQuery, (snapshot) => {
-      setCatalogItems(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as CatalogItem)));
-    }, () => setStatus({ tone: "error", text: "Não foi possível carregar o catálogo de equipamentos." }));
-    return () => { unsubscribeCompanies(); unsubscribeContacts(); unsubscribeCatalog(); };
+    let cancelled = false;
+    void Promise.all([getDocs(companyQuery), getDocs(contactQuery), getDocs(catalogQuery)])
+      .then(([companiesSnapshot, contactsSnapshot, catalogSnapshot]) => {
+        if (cancelled) return;
+        setCompanies(companiesSnapshot.docs.map((item) => ({ id: item.id, ...item.data() } as Company)).sort((left, right) => String(left.name || "").localeCompare(String(right.name || ""), "pt-BR")));
+        const nextContacts = contactsSnapshot.docs
+          .map((item) => ({ id: item.id, ...item.data() } as Contact))
+          .filter((contact) => contact.status !== "deleted");
+        setContacts(nextContacts);
+        setSelectedContactId((current) => current && nextContacts.some((contact) => contact.id === current) ? current : nextContacts[0]?.id || null);
+        setCatalogItems(catalogSnapshot.docs.map((item) => ({ id: item.id, ...item.data() } as CatalogItem)));
+      })
+      .catch(() => {
+        if (!cancelled) setStatus({ tone: "error", text: "Não foi possível carregar os dados do CRM." });
+      });
+    return () => { cancelled = true; };
   }, [workspaceId]);
 
   useEffect(() => {
@@ -512,6 +515,18 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
           updatedAt: serverTimestamp(),
         });
       }
+      const nextCompany = {
+        id: companyId,
+        name: companyName,
+        sector: contactForm.companySector.trim() || null,
+        locality: contactForm.companyLocality.trim() || contactForm.companyAddress.city.trim() || null,
+        address: Object.values(contactForm.companyAddress).some(Boolean) ? contactForm.companyAddress : null,
+        workspaceId,
+      };
+      setCompanies((current) => [
+        ...current.filter((company) => company.id !== companyId),
+        nextCompany,
+      ].sort((left, right) => String(left.name || "").localeCompare(String(right.name || ""), "pt-BR")));
 
       const phones = contactForm.phones.filter((phone) => phone.value.trim()).map((phone) => ({ ...phone, value: phone.value.trim(), digits: normalizePhoneDigits(phone.value) }));
       const emails = contactForm.emails.filter((email) => email.value.trim()).map((email) => ({ ...email, value: email.value.trim() }));

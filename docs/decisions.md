@@ -258,6 +258,12 @@ Location: `system_usage/ai_usage_summary_{YYYYMM}`
 - **Follow-up implementation**: Optional provider secrets are not bound to callable Functions unless configured, so the absence of `DEEPSEEK_API_KEY` does not block a Gemini-only deployment.
 - **Status**: Active.
 
+## Decision: Bounded client collection reads
+- **Decision**: Operational list screens must use a bounded read strategy: paginated inventory reads, period-scoped activity queries, one-shot reads for non-live queues, and batched CRM insight lookups instead of one listener per row.
+- **Reason**: Unbounded Firestore listeners increase initial latency, repeated document reads and mobile data usage. N+1 listeners also make screen cost grow with the number of WhatsApp contacts displayed.
+- **Implications**: Inventory exposes a “carregar mais” path and uses aggregation counts for global KPIs. Home reads only the current seven-day window. CRM, Central de ações and the WhatsApp review list refresh when the screen is opened; contact detail/history remains realtime only while selected. Queue screens disclose when their 100-record safety window is reached.
+- **Status**: Active.
+
 ## Technical Reference
 - **Project Context**: [agent_context.md](file:///Users/juliocezar/Dev/personal/InventoryOS/docs/agent_context.md)
 - **Architecture Overview**: [architecture.md](file:///Users/juliocezar/Dev/personal/InventoryOS/docs/architecture.md)

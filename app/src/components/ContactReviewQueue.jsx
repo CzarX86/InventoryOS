@@ -1,6 +1,6 @@
 "use client";
-import React, { useState, useEffect } from "react";
-import { collection, query, where, orderBy, limit, onSnapshot, doc, updateDoc } from "firebase/firestore";
+import React, { useState, useEffect, useMemo } from "react";
+import { collection, getDocs, query, where, orderBy, limit, onSnapshot, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
@@ -122,50 +122,10 @@ function MessagePreview({ jid }) {
   );
 }
 /**
- * Hook to listen for CRM insights for a specific contact
- */
-function useContactCrmInsights(jid) {
-  const [insights, setInsights] = useState({ opportunities: [], tasks: [], loading: Boolean(db && jid) });
-
-  useEffect(() => {
-    if (!jid || !db) return undefined;
-    
-    // Listen for active opportunities
-    const oppsQuery = query(
-      collection(db, "opportunities"),
-      where("remoteJid", "==", jid)
-    );
-    
-    // Listen for pending tasks
-    const tasksQuery = query(
-      collection(db, "tasks"),
-      where("remoteJid", "==", jid)
-    );
-
-    const unsubOpps = onSnapshot(oppsQuery, (snap) => {
-      const opps = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setInsights(prev => ({ ...prev, opportunities: opps, loading: false }));
-    });
-
-    const unsubTasks = onSnapshot(tasksQuery, (snap) => {
-      const tasks = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setInsights(prev => ({ ...prev, tasks: tasks, loading: false }));
-    });
-
-    return () => {
-      unsubOpps();
-      unsubTasks();
-    };
-  }, [jid]);
-
-  return insights;
-}
-
-/**
  * Small indicator for the table row
  */
-function ContactCrmQuickSignals({ jid }) {
-  const { opportunities, tasks, loading } = useContactCrmInsights(jid);
+function ContactCrmQuickSignals({ insights }) {
+  const { opportunities = [], tasks = [], loading = false } = insights || {};
   
   if (loading || (opportunities.length === 0 && tasks.length === 0)) return null;
 
@@ -208,8 +168,8 @@ function ContactCrmQuickSignals({ jid }) {
 /**
  * Detailed CRM view for the expanded row
  */
-function ContactCrmDetailView({ jid }) {
-  const { opportunities, tasks, loading } = useContactCrmInsights(jid);
+function ContactCrmDetailView({ insights }) {
+  const { opportunities = [], tasks = [], loading = false } = insights || {};
 
   if (loading) return null;
   if (opportunities.length === 0 && tasks.length === 0) return null;
@@ -271,22 +231,30 @@ export default function ContactReviewQueue() {
   const [loading, setLoading] = useState(Boolean(db));
   const [expandedId, setExpandedId] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [crmInsights, setCrmInsights] = useState({});
+  const [queueLimitReached, setQueueLimitReached] = useState(false);
+
+  const insightJids = useMemo(() => Array.from(new Set(
+    [...contacts, ...groups].map((item) => item.id).filter(Boolean),
+  )), [contacts, groups]);
 
   useEffect(() => {
     if (!db) return undefined;
 
     // Escutar contatos individuais
-    const contactsQuery = query(collection(db, "whatsapp_contacts"), orderBy("lastMessageAt", "desc"));
+    const contactsQuery = query(collection(db, "whatsapp_contacts"), orderBy("lastMessageAt", "desc"), limit(100));
     const unsubContacts = onSnapshot(contactsQuery, (snap) => {
       const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data(), type: "contact" }));
       setContacts(data);
+      setQueueLimitReached((current) => current || snap.size >= 100);
     });
 
     // Escutar grupos
-    const groupsQuery = query(collection(db, "whatsapp_groups"), orderBy("lastMessageAt", "desc"));
+    const groupsQuery = query(collection(db, "whatsapp_groups"), orderBy("lastMessageAt", "desc"), limit(100));
     const unsubGroups = onSnapshot(groupsQuery, (snap) => {
       const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data(), type: "group" }));
       setGroups(data);
+      setQueueLimitReached((current) => current || snap.size >= 100);
       setLoading(false);
     });
 
@@ -295,6 +263,44 @@ export default function ContactReviewQueue() {
       unsubGroups();
     };
   }, []);
+
+  useEffect(() => {
+    if (!db || insightJids.length === 0) {
+      setCrmInsights({});
+      return undefined;
+    }
+
+    let cancelled = false;
+    const loadCrmInsights = async () => {
+      const nextInsights = {};
+      for (let index = 0; index < insightJids.length; index += 30) {
+        const chunk = insightJids.slice(index, index + 30);
+        const [opportunitiesSnapshot, tasksSnapshot] = await Promise.all([
+          getDocs(query(collection(db, "opportunities"), where("remoteJid", "in", chunk), limit(100))),
+          getDocs(query(collection(db, "tasks"), where("remoteJid", "in", chunk), limit(100))),
+        ]);
+        opportunitiesSnapshot.docs.forEach((item) => {
+          const data = item.data();
+          const jid = data.remoteJid;
+          if (!nextInsights[jid]) nextInsights[jid] = { opportunities: [], tasks: [], loading: false };
+          nextInsights[jid].opportunities.push({ id: item.id, ...data });
+        });
+        tasksSnapshot.docs.forEach((item) => {
+          const data = item.data();
+          const jid = data.remoteJid;
+          if (!nextInsights[jid]) nextInsights[jid] = { opportunities: [], tasks: [], loading: false };
+          nextInsights[jid].tasks.push({ id: item.id, ...data });
+        });
+      }
+      if (!cancelled) setCrmInsights(nextInsights);
+    };
+
+    void loadCrmInsights().catch((error) => {
+      console.error("Failed to load WhatsApp CRM insights:", error);
+      if (!cancelled) setCrmInsights({});
+    });
+    return () => { cancelled = true; };
+  }, [insightJids]);
 
   const handleUpdateStatus = async (item, newStatus) => {
     if (!db) return;
@@ -425,7 +431,7 @@ export default function ContactReviewQueue() {
           </div>
         </div>
         
-        <div className="flex items-center gap-4 w-full md:w-auto">
+      <div className="flex items-center gap-4 w-full md:w-auto">
           <Button 
             variant="outline" 
             size="sm" 
@@ -446,6 +452,7 @@ export default function ContactReviewQueue() {
             )}
           </Button>
         </div>
+        {queueLimitReached && <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/40">Exibindo até 100 contatos e 100 grupos mais recentes.</p>}
       </div>
 
       <div className="p-0">
@@ -503,7 +510,7 @@ export default function ContactReviewQueue() {
                           )}
                           <span className="truncate max-w-[250px]">{item.name || item.pushName || "UNIDENTIFIED_USER"}</span>
                         </span>
-                        <ContactCrmQuickSignals jid={item.id} />
+                        <ContactCrmQuickSignals insights={crmInsights[item.id]} />
 
                         <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-tighter">
                           <span className="text-muted-foreground/30">{item.id}</span>
@@ -570,7 +577,7 @@ export default function ContactReviewQueue() {
                               exit={{ height: 0, opacity: 0 }}
                               transition={{ duration: 0.3, ease: "circOut" }}
                             >
-                              <ContactCrmDetailView jid={item.id} />
+                              <ContactCrmDetailView insights={crmInsights[item.id]} />
                               <MessagePreview jid={item.id} />
                             </motion.div>
                         </TableCell>

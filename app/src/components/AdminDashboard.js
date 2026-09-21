@@ -53,7 +53,7 @@ function formatUsdCost(value) {
   return `US$ ${Number(value).toFixed(4)}`;
 }
 
-export default function AdminDashboard({ items = [], user = null }) {
+export default function AdminDashboard({ items = [], inventorySummary = null, user = null }) {
   const [telemetry, setTelemetry] = useState([]);
   const [systemHealth, setSystemHealth] = useState(null);
   const [tokenUsage, setTokenUsage] = useState([]);
@@ -126,11 +126,12 @@ export default function AdminDashboard({ items = [], user = null }) {
     );
   }, [activityLog]);
 
-  const inventoryStats = useMemo(() => items.reduce((acc, item) => {
+  const loadedInventoryStats = useMemo(() => items.reduce((acc, item) => {
     if (item.status === "IN STOCK") acc.inStock += 1;
     if (item.status === "SOLD") acc.sold += 1;
     return acc;
   }, { inStock: 0, sold: 0 }), [items]);
+  const inventoryStats = inventorySummary || loadedInventoryStats;
 
   const handleUndo = async (activity) => {
     if (!user || !activity) return;
