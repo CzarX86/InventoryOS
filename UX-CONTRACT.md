@@ -12,6 +12,7 @@
 
 - A contact belongs to a company and may carry multiple responsible people with distinct roles.
 - CRM is organized as a contact list plus a dedicated contact detail view. “Novo contato” opens a modal; after saving, the new contact is selected automatically so the user can immediately register an interaction.
+- Administrators find “Excluir contato” in the selected contact header, beside the interaction action; it opens the reversible lixeira confirmation instead of deleting data immediately.
 - Company autocomplete is intentionally progressive: it stays empty on focus and only searches the workspace-backed company list after at least two typed characters.
 - Contact creation supports company, sector, locality, full company address, multiple labeled e-mails, and multiple labeled phones. WhatsApp is a checkbox on each phone; the backend derives normalized phone matching and the UI never asks for a WhatsApp remote ID.
 - An interaction creates an immutable timeline event and updates last/next contact fields.
