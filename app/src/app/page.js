@@ -390,7 +390,7 @@ export default function Dashboard() {
         <div className="flex-1 flex flex-col min-w-0 bg-background relative">
           
           {/* Top Bar / Header */}
-          <header className="sticky top-0 flex items-center min-h-16 gap-3 px-4 md:px-8 border-b border-border/70 shrink-0 bg-card/95 backdrop-blur-sm z-30">
+          <header className="app-top-safe-area app-topbar sticky top-0 flex items-center gap-3 px-4 md:px-8 border-b border-border/70 shrink-0 bg-card/95 backdrop-blur-sm z-30">
             {/* Mobile Brand indicator */}
             <span className="md:hidden text-base font-semibold tracking-tight text-foreground bg-secondary px-2.5 py-1 rounded-lg font-display">InventoryOS</span>
 

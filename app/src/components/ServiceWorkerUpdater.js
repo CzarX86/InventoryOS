@@ -181,7 +181,7 @@ export default function ServiceWorkerUpdater() {
   return (
     <>
       {isOffline && (
-        <div className="fixed top-0 left-0 w-full bg-red-600 text-white text-[10px] font-black uppercase tracking-widest py-1.5 text-center z-[9999]" role="status" aria-live="polite">
+        <div className="app-top-safe-area fixed top-0 left-0 w-full bg-red-600 text-white text-[10px] font-black uppercase tracking-widest py-1.5 text-center z-[9999]" role="status" aria-live="polite">
           SEM CONEXÃO — MODO OFFLINE
         </div>
       )}

@@ -48,6 +48,7 @@
 - The default product theme is light and uses the shared tokens in `DESIGN.md`.
 - Desktop uses a persistent sidebar; mobile uses a horizontally scrollable bottom navigation with visible labels and touch targets of at least 44px.
 - The document remains scrollable on narrow screens; the shell must not lock the body or rely on `100vh` for content height.
+- The PWA shell reserves the device top and bottom safe areas so the top bar and mobile navigation remain clear of the iOS status area, Dynamic Island, and home indicator.
 
 ## Safety and feedback
 

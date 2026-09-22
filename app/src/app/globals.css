@@ -96,6 +96,20 @@ body {
   min-height: 100dvh;
 }
 
+/* Keep fixed/sticky app chrome below the iOS status area and Dynamic Island. */
+.app-top-safe-area {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.app-topbar {
+  min-height: calc(4rem + env(safe-area-inset-top, 0px));
+}
+
+.app-top-progress-safe-area {
+  height: calc(3px + env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
 .mobile-bottom-nav-safe-area {
   bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
 }
