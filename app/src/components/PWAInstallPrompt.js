@@ -1,219 +1,151 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
-import { Download, X, Loader2, Smartphone, Apple } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+
+import { useEffect, useState } from "react";
+import { Apple, Download, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 function getClientInstallState() {
   if (typeof window === "undefined") {
-    return {
-      isIOS: false,
-      isStandalone: false,
-      isInstallable: false,
-    };
+    return { mode: null, isStandalone: false };
   }
 
+  const userAgent = window.navigator.userAgent.toLowerCase();
+  const platform = window.navigator.platform?.toLowerCase() || "";
   const isStandalone =
-    window.matchMedia("(display-mode: standalone)").matches ||
+    window.matchMedia?.("(display-mode: standalone)").matches ||
     window.navigator.standalone === true;
-  const isIOS = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
+  const isIOS =
+    /iphone|ipad|ipod/.test(userAgent) ||
+    (platform === "macintel" && window.navigator.maxTouchPoints > 1);
+  const isMacOS = /macintosh|mac os x/.test(userAgent) || platform.includes("mac");
+  const isMacSafari =
+    !isIOS &&
+    isMacOS &&
+    /safari/.test(userAgent) &&
+    !/chrome|chromium|crios|edg|opr|opera|firefox|fxios|android/.test(userAgent);
+  let mode = null;
+
+  if (!isStandalone) {
+    if (isIOS) mode = "ios-safari";
+    else if (isMacSafari) mode = "mac-safari";
+    else if (isMacOS) mode = "mac-desktop";
+  }
 
   return {
-    isIOS,
     isStandalone,
-    isInstallable: (isIOS && !isStandalone) || (!isIOS && !isStandalone),
+    mode,
   };
 }
+
+const instructions = {
+  "ios-safari": "No Safari, toque em Compartilhar e escolha “Adicionar à Tela de Início”.",
+  "mac-safari": "No Safari no macOS Sonoma 14 ou posterior, escolha Arquivo > Adicionar ao Dock.",
+  "mac-desktop": "No Chrome ou Edge, abra o menu e escolha “Instalar app”. No Safari, use Arquivo > Adicionar ao Dock (macOS Sonoma 14 ou posterior).",
+  "browser-menu": "Abra o menu do navegador e escolha “Instalar app” ou “Instalar InventoryOS”.",
+};
 
 export default function PWAInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isInstalling, setIsInstalling] = useState(false);
   const [dismissed, setDismissed] = useState(false);
-  const [progress, setProgress] = useState(1);
-  const [isHovered, setIsHovered] = useState(false);
-  const [speedMultiplier, setSpeedMultiplier] = useState(1);
-  const [clientState, setClientState] = useState({
-    isIOS: false,
-    isStandalone: false,
-    isInstallable: false,
-  });
-
-  const { isIOS, isStandalone, isInstallable } = clientState;
-  const lastTimeRef = useRef(null);
-  const TOTAL_TIMEOUT = 12000; // 12 seconds standard for reading instructions
+  const [mode, setMode] = useState(null);
+  const [isStandalone, setIsStandalone] = useState(false);
 
   useEffect(() => {
-    const state = getClientInstallState();
-    setTimeout(() => {
-      setClientState(state);
-    }, 0);
+    const initialState = getClientInstallState();
+    setMode(initialState.mode);
+    setIsStandalone(initialState.isStandalone);
 
-    if (state.isStandalone) return;
+    if (initialState.isStandalone) return undefined;
 
-    const handler = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setClientState(prev => ({ ...prev, isInstallable: true }));
+    const onBeforeInstallPrompt = (event) => {
+      event.preventDefault();
+      setDeferredPrompt(event);
+      setMode("native");
     };
-    
+
     const onAppInstalled = () => {
       setDeferredPrompt(null);
       setIsInstalling(false);
-      setClientState({
-        isIOS: clientState.isIOS,
-        isStandalone: true,
-        isInstallable: false
-      });
+      setIsStandalone(true);
+      setMode(null);
     };
 
-    window.addEventListener("beforeinstallprompt", handler);
+    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
     window.addEventListener("appinstalled", onAppInstalled);
 
     return () => {
-      window.removeEventListener("beforeinstallprompt", handler);
+      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
       window.removeEventListener("appinstalled", onAppInstalled);
     };
   }, []);
 
-  // Progress Bar Logic
-  useEffect(() => {
-    if (dismissed || !isInstallable || isStandalone) return;
-
-    let requestRef;
-    
-    const animate = (time) => {
-      if (lastTimeRef.current !== undefined) {
-        if (!isHovered) {
-          const delta = time - lastTimeRef.current;
-          // Progress decreases. Multiplier accelerates it after hover.
-          setProgress((prev) => {
-            const next = prev - (delta / TOTAL_TIMEOUT) * speedMultiplier;
-            if (next <= 0) {
-              setDismissed(true);
-              return 0;
-            }
-            return next;
-          });
-        }
-      }
-      lastTimeRef.current = time;
-      requestRef = requestAnimationFrame(animate);
-    };
-
-    requestRef = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(requestRef);
-  }, [dismissed, isInstallable, isStandalone, isHovered, speedMultiplier]);
-
-  const handleMouseEnter = () => {
-    setIsHovered(true);
-    setProgress(1); // Reset to 100%
-  };
-
-  const handleMouseLeave = () => {
-    setIsHovered(false);
-    setSpeedMultiplier(1.1); // 10% faster than initially
-    lastTimeRef.current = undefined; // Reset delta check
-  };
-
   const handleInstall = async () => {
-    if (!deferredPrompt && !isIOS) return;
-    
+    if (!deferredPrompt) return;
+
     setIsInstalling(true);
-
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
+    try {
+      await deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === "accepted") {
-        setDeferredPrompt(null);
-        setClientState(prev => ({ ...prev, isInstallable: false }));
-      }
+      setDeferredPrompt(null);
+      setMode(outcome === "accepted" ? null : "browser-menu");
+    } catch {
+      setDeferredPrompt(null);
+      setMode("browser-menu");
+    } finally {
+      setIsInstalling(false);
     }
-    
-    if (isIOS && !deferredPrompt) {
-      setTimeout(() => {
-        setIsInstalling(false);
-      }, 1500);
-      return;
-    }
-
-    setIsInstalling(false);
   };
 
-  if (!isInstallable || dismissed || isStandalone) return null;
+  if (!mode || dismissed || isStandalone) return null;
+
+  const PlatformIcon = mode === "ios-safari" || mode === "mac-safari" ? Apple : Download;
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ y: 100, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 100, opacity: 0 }}
-        className="fixed bottom-6 left-4 right-4 z-[100] max-w-sm mx-auto pointer-events-auto"
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
+    <div className="fixed bottom-6 left-4 right-4 z-[100] mx-auto max-w-sm">
+      <aside
+        role="region"
+        aria-label="Instalação do InventoryOS"
+        className="relative rounded-2xl border border-border bg-card p-5 pr-12 shadow-lg"
       >
-        <div className="bg-[#131313]/90 backdrop-blur-xl border border-white/10 shadow-2xl overflow-hidden relative group">
-          {/* Progress Bar Detail */}
-          <div className="absolute top-0 left-0 w-full h-[3px] bg-white/5" />
-          <div 
-            className="absolute top-0 left-0 h-[3px] bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.8)] transition-none" 
-            style={{ width: `${progress * 100}%` }}
-          />
-          
-          <div className="p-5 pt-7">
-            <Button 
-              variant="ghost" 
-              size="icon"
-              onClick={() => setDismissed(true)} 
-              className="absolute top-2 right-2 h-8 w-8 rounded-none text-muted-foreground hover:text-white hover:bg-white/5"
-            >
-              <X size={16} />
-            </Button>
-            
-            <div className="flex items-start gap-4 mb-6">
-              <div className="w-12 h-12 bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                {isIOS ? <Apple size={24} className="text-emerald-500" /> : <Smartphone size={24} className="text-emerald-500" />}
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 mb-2">
-                  <h3 className="text-[10px] font-normal uppercase tracking-[0.2em] text-white font-display">
-                    MODO_APLICATIVO
-                  </h3>
-                  <div className="px-1.5 py-0.5 border border-emerald-500/30 text-[8px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-500/5 font-mono">
-                    PWA_MODE
-                  </div>
-                </div>
-                <p className="text-[10px] font-bold text-muted-foreground/80 leading-relaxed uppercase tracking-wide font-mono">
-                  {isIOS && !deferredPrompt 
-                    ? "SISTEMA: ACESSE COMPARTILHAR > ADICIONAR À TELA DE INÍCIO"
-                    : "INSTALE O NÚCLEO INVENTORYOS PARA PERFORMANCE OTIMIZADA"}
-                </p>
-              </div>
-            </div>
-            
-            {(!isIOS || deferredPrompt) && (
-              <Button
-                onClick={handleInstall}
-                disabled={isInstalling}
-                className="w-full h-12 bg-white text-black font-normal uppercase tracking-[0.2em] text-[10px] rounded-none hover:bg-zinc-200 transition-all font-display"
-              >
-                {isInstalling ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin mr-2" />
-                    EXECUTANDO_SETUP...
-                  </>
-                ) : (
-                  <>
-                    <Download size={14} className="mr-2" />
-                    INSTALAR_SISTEMA
-                  </>
-                )}
-              </Button>
-            )}
-          </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setDismissed(true)}
+          aria-label="Fechar aviso de instalação"
+          className="absolute right-2 top-2 h-8 w-8"
+        >
+          <X size={16} />
+        </Button>
 
-          <div className="absolute bottom-0 right-0 w-2 h-2 border-r border-b border-white/20" />
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent text-primary">
+            <PlatformIcon size={20} aria-hidden="true" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-foreground">Instale o InventoryOS</h2>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              {mode === "native" ? "Abra o InventoryOS em uma janela própria." : instructions[mode]}
+            </p>
+          </div>
         </div>
-      </motion.div>
-    </AnimatePresence>
+
+        {mode === "native" && (
+          <Button onClick={handleInstall} disabled={isInstalling} className="mt-4 w-full">
+            {isInstalling ? (
+              <>
+                <Loader2 size={16} className="mr-2 animate-spin" aria-hidden="true" />
+                Abrindo instalação…
+              </>
+            ) : (
+              <>
+                <Download size={16} className="mr-2" aria-hidden="true" />
+                Instalar app
+              </>
+            )}
+          </Button>
+        )}
+      </aside>
+    </div>
   );
 }

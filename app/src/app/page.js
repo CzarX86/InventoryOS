@@ -12,7 +12,6 @@ import VoiceSearch from "@/components/VoiceSearch";
 import AdminDashboard from "@/components/AdminDashboard";
 import SettingsView from "@/components/SettingsView";
 import WhatsappView from "@/components/WhatsappView";
-import SplashScreen from "@/components/SplashScreen";
 import { BrandMark, BrandWordmark } from "@/components/BrandLogo";
 import ActionInbox from "@/components/ActionInbox";
 import CrmView from "@/components/CrmView";
@@ -21,7 +20,6 @@ import CrmPerformanceDashboard from "@/components/CrmPerformanceDashboard";
 import WorkspaceHome from "@/components/WorkspaceHome";
 import AccessGate from "@/components/AccessGate";
 import NotificationsBell from "@/components/NotificationsBell";
-import PWAInstallPrompt from "@/components/PWAInstallPrompt"; // Added PWAInstallPrompt import
 import UserAvatar from "@/components/UserAvatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,7 +67,6 @@ export default function Dashboard() {
   const [itemToEdit, setItemToEdit] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
   const [activeMenuId, setActiveMenuId] = useState(null);
-  const [showSplash, setShowSplash] = useState(true);
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState(null);
 
@@ -327,10 +324,6 @@ export default function Dashboard() {
 
   return (
     <TooltipProvider>
-      <AnimatePresence>
-        {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
-      </AnimatePresence>
-
       <div className="app-shell-height flex bg-background text-foreground selection:bg-primary/20 selection:text-primary">
 
         {/* ── Sidebar (desktop) ── */}
@@ -507,8 +500,6 @@ export default function Dashboard() {
                 )}
               </motion.div>
             </AnimatePresence>
-            {/* Optional PWA Install Prompt - Only after splash */}
-            <PWAInstallPrompt />
           </main>
 
           {/* Mobile bottom nav using shadcn/ui buttons */}
