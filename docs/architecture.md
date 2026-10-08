@@ -88,7 +88,11 @@ graph TD
 
 ## CRM v1 Data Flow
 
-The CRM uses `accounts` as companies and `contacts` as people. Each record carries `workspaceId`; contacts also carry `companyId`, role, locality, normalized phone digits, optional `phoneNumbers`/`phoneDigitsList`/`whatsappPhoneDigits` arrays, and optional `whatsappRemoteJid` for legacy/inbound linkage. Company records may carry a structured `address` object.
+The CRM uses `accounts` as companies and `contacts` as people. Each record carries `workspaceId`; contacts also carry `companyId`, role, locality, normalized phone digits, optional `phoneNumbers`/`phoneDigitsList`/`whatsappPhoneDigits` arrays, optional `emails`, and optional `whatsappRemoteJid` for legacy/inbound linkage. `contact_channels` stores one phone number or e-mail address per active channel document and mirrors the contact's embedded channel arrays. The contact profile remains editable after creation.
+
+Phone and e-mail inputs are normalized conservatively. Recognized Brazilian phone values and valid e-mail addresses pasted into one row are expanded into separate entries; exact duplicates are removed within a contact. Unrecognized text is preserved for manual correction instead of being discarded. `scripts/normalize-crm-contact-channels.mjs` provides a production-scoped dry-run by default and an explicit `--apply` mode for one-time legacy cleanup; it backs up only changed documents to a mode-0600 file in the system temporary directory before writing.
+
+See [CRM contact channel normalization](crm-contact-channel-normalization.md) for parser behavior and the guarded migration procedure.
 
 1. Approved user creates a company/contact from the CRM screen.
 2. A manual interaction writes an immutable `crm_events` record and updates the contact's last/next contact fields.

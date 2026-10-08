@@ -264,6 +264,12 @@ Location: `system_usage/ai_usage_summary_{YYYYMM}`
 - **Implications**: Inventory exposes a “carregar mais” path and uses aggregation counts for global KPIs. Home reads only the current seven-day window. CRM, Central de ações and the WhatsApp review list refresh when the screen is opened; contact detail/history remains realtime only while selected. Queue screens disclose when their 100-record safety window is reached.
 - **Status**: Active.
 
+## Decision: Conservative CRM channel normalization
+- **Decision**: Store each contact phone number and e-mail address as its own CRM channel entry and keep the contact's embedded arrays aligned with `contact_channels`. Split only recognizable values and retain unparseable text for manual editing.
+- **Reason**: Legacy data and pasted multi-value inputs can place several values in one field. Separating them supports editing, search, WhatsApp matching and future data correction without silently losing ambiguous content.
+- **Implications**: The CRM editor normalizes values on load and save. The one-time Firestore migration is dry-run by default, targets production only when `--apply` is explicit, and writes a secure backup before changing documents.
+- **Status**: Active.
+
 ## Technical Reference
 - **Project Context**: [agent_context.md](file:///Users/juliocezar/Dev/personal/InventoryOS/docs/agent_context.md)
 - **Architecture Overview**: [architecture.md](file:///Users/juliocezar/Dev/personal/InventoryOS/docs/architecture.md)
