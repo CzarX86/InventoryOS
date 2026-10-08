@@ -7,6 +7,7 @@ import {
   Building2,
   CalendarClock,
   Check,
+  ChevronDown,
   ChevronRight,
   Clock3,
   FileSpreadsheet,
@@ -101,6 +102,17 @@ type EmailEntry = {
   value: string;
 };
 
+type ContactChannelSnapshot = {
+  type: "phone" | "email";
+  label: string;
+  value: string;
+  source: "contact" | "manual";
+};
+
+const PHONE_LABEL_OPTIONS = ["Celular", "Comercial", "Residencial", "WhatsApp"];
+const EMAIL_LABEL_OPTIONS = ["Principal", "Comercial", "Financeiro", "Pessoal"];
+const CUSTOM_LABEL_OPTION = "__custom_label__";
+
 type Company = {
   id: string;
   name?: string | null;
@@ -139,6 +151,7 @@ type CrmEvent = {
   id: string;
   eventType?: string | null;
   channelType?: string | null;
+  contactChannel?: ContactChannelSnapshot | null;
   summary?: string | null;
   source?: string | null;
   occurredAt?: unknown;
@@ -196,7 +209,14 @@ type ContactFormState = {
   nextContactAt: string;
 };
 
-type InteractionFormState = { channelType: string; occurredAt: string; nextContactAt: string; summary: string };
+type InteractionFormState = {
+  channelType: string;
+  contactChannelSelection: string;
+  otherContactChannelValue: string;
+  occurredAt: string;
+  nextContactAt: string;
+  summary: string;
+};
 type EquipmentFormState = { relationType: string; catalogItemId: string; equipmentType: string; brand: string; model: string };
 type StatusMessage = { tone: "success" | "error"; text: string } | null;
 
@@ -220,8 +240,16 @@ function createEmptyContactForm(): ContactFormState {
   };
 }
 
-function createEmptyInteraction(): InteractionFormState {
-  return { channelType: "phone", occurredAt: new Date().toISOString().slice(0, 16), nextContactAt: "", summary: "" };
+function createEmptyInteraction(contact?: Contact | null): InteractionFormState {
+  const hasSavedPhone = contact ? contactPhones(contact).some((phone) => phone.value.trim()) : false;
+  return {
+    channelType: "phone",
+    contactChannelSelection: hasSavedPhone ? "" : "other",
+    otherContactChannelValue: "",
+    occurredAt: new Date().toISOString().slice(0, 16),
+    nextContactAt: "",
+    summary: "",
+  };
 }
 
 const EMPTY_EQUIPMENT: EquipmentFormState = { relationType: "interest", catalogItemId: "", equipmentType: "", brand: "", model: "" };
@@ -279,6 +307,13 @@ function contactEmails(contact: Contact): EmailEntry[] {
     ? contact.emails
     : contact.email ? [{ label: "Principal", value: contact.email }] : [];
   return normalizeEmailEntries(source).entries as EmailEntry[];
+}
+
+function interactionContactChannels(contact: Contact | null, channelType: string): Array<PhoneEntry | EmailEntry> {
+  if (!contact) return [];
+  if (channelType === "email") return contactEmails(contact).filter((channel) => channel.value.trim());
+  const phones = contactPhones(contact).filter((channel) => channel.value.trim());
+  return channelType === "whatsapp" ? phones.filter((phone) => phone.hasWhatsapp) : phones;
 }
 
 function safeStorageSegment(value: string) {
@@ -441,7 +476,7 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
     if (contactId !== selectedContactId) {
       setAudioAttachment(null);
       setAudioResetKey((current) => current + 1);
-      setInteractionForm(createEmptyInteraction());
+      setInteractionForm(createEmptyInteraction(contacts.find((contact) => contact.id === contactId)));
     }
     setSelectedContactId(contactId);
     setDetailTab("overview");
@@ -716,6 +751,22 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
   const handleInteractionSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (!db || !user?.uid || !workspaceId || !selectedContact || (!interactionForm.summary.trim() && !audioAttachment)) { setStatus({ tone: "error", text: "Selecione um contato e descreva a interação ou anexe um áudio." }); return; }
+    const usesContactChannel = ["phone", "whatsapp", "email"].includes(interactionForm.channelType);
+    let contactChannel: ContactChannelSnapshot | null = null;
+    if (usesContactChannel) {
+      const channelType = interactionForm.channelType === "email" ? "email" : "phone";
+      const savedChannels = interactionContactChannels(selectedContact, interactionForm.channelType);
+      if (interactionForm.contactChannelSelection === "other") {
+        const value = interactionForm.otherContactChannelValue.trim();
+        if (!value) { setStatus({ tone: "error", text: "Informe o telefone ou e-mail usado nesta interação." }); return; }
+        contactChannel = { type: channelType, label: "Outro", value, source: "manual" };
+      } else {
+        const savedIndex = Number(interactionForm.contactChannelSelection.replace("saved:", ""));
+        const savedChannel = interactionForm.contactChannelSelection.startsWith("saved:") && Number.isInteger(savedIndex) ? savedChannels[savedIndex] : null;
+        if (!savedChannel?.value.trim()) { setStatus({ tone: "error", text: "Selecione o telefone ou e-mail usado nesta interação." }); return; }
+        contactChannel = { type: channelType, label: savedChannel.label || (channelType === "email" ? "E-mail" : "Telefone"), value: savedChannel.value, source: "contact" };
+      }
+    }
     const occurredAt = new Date(interactionForm.occurredAt);
     if (Number.isNaN(occurredAt.getTime())) { setStatus({ tone: "error", text: "Informe uma data válida para a interação." }); return; }
     setSavingInteraction(true);
@@ -772,6 +823,7 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
         eventType: "contact_interaction",
         source: audioAttachment ? "manual_audio" : "manual",
         channelType: interactionForm.channelType,
+        contactChannel,
         summary,
         transcript: audioAnalysis?.transcript || null,
         audioUrl,
@@ -800,7 +852,7 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
       });
       batch.update(doc(db, "contacts", selectedContact.id), contactUpdate);
       await batch.commit();
-      setInteractionForm(createEmptyInteraction());
+      setInteractionForm(createEmptyInteraction(selectedContact));
       setAudioAttachment(null);
       setAudioResetKey((current) => current + 1);
       setInteractionOpen(false);
@@ -884,7 +936,7 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
       <div className="mx-auto grid max-w-7xl gap-5 px-4 py-5 md:px-8 xl:grid-cols-[minmax(300px,0.72fr)_minmax(0,1.6fr)]">
         <section className={cn("min-w-0", mobilePane === "detail" && "hidden xl:block")}><div className="rounded-2xl border border-border/70 bg-card shadow-sm"><div className="border-b border-border/70 p-4"><div className="flex items-center justify-between gap-3"><div><h2 className="text-base font-semibold">Sua carteira</h2><p className="mt-1 text-xs text-muted-foreground">{contacts.length} {contacts.length === 1 ? "contato" : "contatos"}</p></div><UsersRound className="text-primary" size={18} /></div><div className="relative mt-4"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} /><Input value={contactSearch} onChange={(event) => setContactSearch(event.target.value)} className="h-10 pl-9 pr-9" placeholder="Buscar contato ou empresa" aria-label="Buscar contato ou empresa" />{contactSearch && <button type="button" onClick={() => setContactSearch("")} className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Limpar busca"><X size={14} /></button>}</div></div><div className="divide-y divide-border/60">{visibleContacts.length === 0 ? <div className="px-5 py-12 text-center"><UserRound className="mx-auto text-muted-foreground/50" size={28} /><p className="mt-3 text-sm font-medium">{contactSearch ? "Nenhum contato encontrado" : "Sua carteira está vazia"}</p><p className="mt-1 text-xs leading-relaxed text-muted-foreground">{contactSearch ? "Tente buscar por outro nome, empresa ou telefone." : "Cadastre um contato para começar a acompanhar os relacionamentos."}</p>{!contactSearch && <Button type="button" variant="outline" onClick={() => { setEditingContactId(null); setContactForm(createEmptyContactForm()); setCreateOpen(true); }} className="mt-4 gap-2"><Plus size={14} /> Cadastrar contato</Button>}</div> : visibleContacts.map((contact) => { const state = followUpState(contact); const company = companies.find((item) => item.id === contact.companyId); return <button key={contact.id} type="button" onClick={() => selectContact(contact.id)} className={cn("flex min-h-[76px] w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/60 focus-visible:bg-muted focus-visible:outline-none", selectedContactId === contact.id && "bg-accent/60")} aria-current={selectedContactId === contact.id ? "true" : undefined}><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-semibold text-primary">{(contact.displayName || contact.name || "?").trim().charAt(0).toUpperCase()}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{contact.displayName || contact.name || "Contato sem nome"}</span><span className="mt-0.5 block truncate text-xs text-muted-foreground">{company?.name || "Empresa não vinculada"}{contact.role ? ` · ${contact.role}` : ""}</span><span className="mt-1 block text-[11px] text-muted-foreground">{state.label}</span></span><ChevronRight className="shrink-0 text-muted-foreground" size={16} /></button>; })}</div></div></section>
 
-        <section className={cn("min-w-0", mobilePane === "list" && "hidden xl:block")}>{!selectedContact ? <div className="flex min-h-[360px] items-center justify-center rounded-2xl border border-dashed border-border bg-card p-8 text-center"><div><UserRound className="mx-auto text-muted-foreground/50" size={30} /><h2 className="mt-4 text-base font-semibold">Selecione um contato</h2><p className="mt-1 max-w-sm text-sm text-muted-foreground">Escolha uma pessoa na carteira para acessar dados, histórico e próximas ações.</p></div></div> : <div className="space-y-5 md:sticky md:top-24 md:self-start"><Button type="button" variant="ghost" onClick={() => setMobilePane("list")} className="h-10 gap-2 px-0 text-muted-foreground hover:bg-transparent hover:text-foreground xl:hidden"><ArrowLeft size={16} /> Voltar para contatos</Button><div className="rounded-2xl border border-border/70 bg-card shadow-sm"><div className="flex flex-col gap-4 border-b border-border/70 p-5 sm:flex-row sm:items-start sm:justify-between"><div className="flex min-w-0 items-start gap-3"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent text-lg font-semibold text-primary">{(selectedContact.displayName || selectedContact.name || "?").trim().charAt(0).toUpperCase()}</span><div className="min-w-0"><h2 className="truncate text-xl font-semibold">{selectedContact.displayName || selectedContact.name}</h2><p className="mt-1 truncate text-sm text-muted-foreground">{selectedCompany?.name || "Empresa não vinculada"}{selectedContact.role ? ` · ${selectedContact.role}` : ""}</p><div className="mt-3 flex flex-wrap gap-2"><Badge variant="outline" className={cn("rounded-full px-2.5 py-1 text-[11px] font-medium", followUpState(selectedContact).className)}>{followUpState(selectedContact).label}</Badge>{selectedContact.sector && <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-[11px] font-medium">{selectedContact.sector}</Badge>}</div></div></div><div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row"><Button type="button" variant="outline" onClick={startContactEdit} className="h-10 w-full gap-2 sm:w-auto"><Pencil size={15} /> Editar cadastro</Button><Button type="button" onClick={() => { setInteractionForm(createEmptyInteraction()); setInteractionOpen(true); }} className="h-10 w-full gap-2 sm:w-auto"><Plus size={15} /> Registrar interação</Button>{isAdmin && <Button type="button" variant="outline" onClick={() => setDeleteOpen(true)} className="h-10 w-full gap-2 border-destructive/30 text-destructive hover:border-destructive/50 hover:bg-destructive/10 hover:text-destructive sm:w-auto"><Trash2 size={15} /> Excluir contato</Button>}</div></div><div className="flex overflow-x-auto border-b border-border/70 px-3" role="tablist" aria-label="Detalhes do contato">{[{ id: "overview", label: "Resumo" }, { id: "interactions", label: "Interações", count: events.length }, { id: "equipment", label: "Equipamentos", count: equipmentLinks.length }].map((tab) => <button key={tab.id} type="button" role="tab" aria-selected={detailTab === tab.id} onClick={() => setDetailTab(tab.id as typeof detailTab)} className={cn("min-h-12 shrink-0 border-b-2 px-3 text-sm font-medium transition-colors", detailTab === tab.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>{tab.label}{typeof tab.count === "number" && <span className="ml-1.5 text-xs text-muted-foreground">{tab.count}</span>}</button>)}</div><div className="p-5">{detailTab === "overview" && <div className="space-y-6"><div className="grid gap-4 sm:grid-cols-2"><InfoItem icon={Mail} label="E-mails" value={contactEmails(selectedContact).map((email) => email.value).join(" · ") || "Ainda não informado"} /><InfoItem icon={Phone} label="Telefones" value={contactPhones(selectedContact).map((phone) => phone.value).join(" · ") || "Ainda não informado"} /><InfoItem icon={MapPin} label="Localidade" value={selectedContact.locality || selectedCompany?.locality || "Ainda não informado"} /><InfoItem icon={Clock3} label="Último contato" value={formatDate(selectedContact.lastContactAt)} /></div><div className="rounded-xl border border-border/70 bg-muted/35 p-4"><div className="flex items-center gap-2 text-sm font-semibold"><Building2 size={16} className="text-primary" /> {selectedCompany?.name || "Empresa não vinculada"}</div><p className="mt-2 text-sm leading-relaxed text-muted-foreground">{formatAddress(selectedCompany?.address)}</p></div>{selectedContact.notes && <div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Observações</p><p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground/80">{selectedContact.notes}</p></div>}<div className="grid gap-3 border-t border-border/70 pt-5 sm:grid-cols-2"><div><p className="text-xs text-muted-foreground">Próximo contato</p><p className="mt-1 text-sm font-semibold">{formatDate(selectedContact.nextContactAt)}</p></div><div><p className="text-xs text-muted-foreground">Origem da data</p><p className="mt-1 text-sm font-semibold">{selectedContact.nextContactSource === "ai" ? "Sugestão da IA" : selectedContact.nextContactAt ? "Definida pela equipe" : "Ainda não definida"}</p></div></div></div>}{detailTab === "interactions" && <InteractionTimeline events={events} onRegister={() => setInteractionOpen(true)} />}{detailTab === "equipment" && <EquipmentPanel catalogItems={catalogItems} equipmentForm={equipmentForm} setEquipmentForm={setEquipmentForm} equipmentLinks={equipmentLinks} savingEquipment={savingEquipment} onSubmit={handleEquipmentSubmit} editingEquipmentId={editingEquipmentId} equipmentEditForm={equipmentEditForm} setEquipmentEditForm={setEquipmentEditForm} savingEquipmentEdit={savingEquipmentEdit} onStartEdit={(link) => { setEquipmentEditForm({ relationType: link.relationType === "installed" ? "installed" : "interest", catalogItemId: link.catalogItemId || "", equipmentType: link.equipmentType || "", brand: link.brand || "", model: link.model || "" }); setEditingEquipmentId(link.sourceCollection + ":" + link.id); setStatus(null); }} onCancelEdit={() => { setEditingEquipmentId(null); setEquipmentEditForm(EMPTY_EQUIPMENT); }} onEditSubmit={handleEquipmentEditSubmit} />}</div></div></div>}</section>
+        <section className={cn("min-w-0", mobilePane === "list" && "hidden xl:block")}>{!selectedContact ? <div className="flex min-h-[360px] items-center justify-center rounded-2xl border border-dashed border-border bg-card p-8 text-center"><div><UserRound className="mx-auto text-muted-foreground/50" size={30} /><h2 className="mt-4 text-base font-semibold">Selecione um contato</h2><p className="mt-1 max-w-sm text-sm text-muted-foreground">Escolha uma pessoa na carteira para acessar dados, histórico e próximas ações.</p></div></div> : <div className="space-y-5 md:sticky md:top-24 md:self-start"><Button type="button" variant="ghost" onClick={() => setMobilePane("list")} className="h-10 gap-2 px-0 text-muted-foreground hover:bg-transparent hover:text-foreground xl:hidden"><ArrowLeft size={16} /> Voltar para contatos</Button><div className="rounded-2xl border border-border/70 bg-card shadow-sm"><div className="flex flex-col gap-4 border-b border-border/70 p-5 sm:flex-row sm:items-start sm:justify-between"><div className="flex min-w-0 items-start gap-3"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent text-lg font-semibold text-primary">{(selectedContact.displayName || selectedContact.name || "?").trim().charAt(0).toUpperCase()}</span><div className="min-w-0"><h2 className="truncate text-xl font-semibold">{selectedContact.displayName || selectedContact.name}</h2><p className="mt-1 truncate text-sm text-muted-foreground">{selectedCompany?.name || "Empresa não vinculada"}{selectedContact.role ? ` · ${selectedContact.role}` : ""}</p><div className="mt-3 flex flex-wrap gap-2"><Badge variant="outline" className={cn("rounded-full px-2.5 py-1 text-[11px] font-medium", followUpState(selectedContact).className)}>{followUpState(selectedContact).label}</Badge>{selectedContact.sector && <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-[11px] font-medium">{selectedContact.sector}</Badge>}</div></div></div><div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row"><Button type="button" variant="outline" onClick={startContactEdit} className="h-10 w-full gap-2 sm:w-auto"><Pencil size={15} /> Editar cadastro</Button><Button type="button" onClick={() => { setInteractionForm(createEmptyInteraction(selectedContact)); setInteractionOpen(true); }} className="h-10 w-full gap-2 sm:w-auto"><Plus size={15} /> Registrar interação</Button>{isAdmin && <Button type="button" variant="outline" onClick={() => setDeleteOpen(true)} className="h-10 w-full gap-2 border-destructive/30 text-destructive hover:border-destructive/50 hover:bg-destructive/10 hover:text-destructive sm:w-auto"><Trash2 size={15} /> Excluir contato</Button>}</div></div><div className="flex overflow-x-auto border-b border-border/70 px-3" role="tablist" aria-label="Detalhes do contato">{[{ id: "overview", label: "Resumo" }, { id: "interactions", label: "Interações", count: events.length }, { id: "equipment", label: "Equipamentos", count: equipmentLinks.length }].map((tab) => <button key={tab.id} type="button" role="tab" aria-selected={detailTab === tab.id} onClick={() => setDetailTab(tab.id as typeof detailTab)} className={cn("min-h-12 shrink-0 border-b-2 px-3 text-sm font-medium transition-colors", detailTab === tab.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>{tab.label}{typeof tab.count === "number" && <span className="ml-1.5 text-xs text-muted-foreground">{tab.count}</span>}</button>)}</div><div className="p-5">{detailTab === "overview" && <div className="space-y-6"><div className="grid gap-4 sm:grid-cols-2"><InfoItem icon={Mail} label="E-mails" value={contactEmails(selectedContact).map((email) => email.value).join(" · ") || "Ainda não informado"} /><InfoItem icon={Phone} label="Telefones" value={contactPhones(selectedContact).map((phone) => phone.value).join(" · ") || "Ainda não informado"} /><InfoItem icon={MapPin} label="Localidade" value={selectedContact.locality || selectedCompany?.locality || "Ainda não informado"} /><InfoItem icon={Clock3} label="Último contato" value={formatDate(selectedContact.lastContactAt)} /></div><div className="rounded-xl border border-border/70 bg-muted/35 p-4"><div className="flex items-center gap-2 text-sm font-semibold"><Building2 size={16} className="text-primary" /> {selectedCompany?.name || "Empresa não vinculada"}</div><p className="mt-2 text-sm leading-relaxed text-muted-foreground">{formatAddress(selectedCompany?.address)}</p></div>{selectedContact.notes && <div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Observações</p><p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground/80">{selectedContact.notes}</p></div>}<div className="grid gap-3 border-t border-border/70 pt-5 sm:grid-cols-2"><div><p className="text-xs text-muted-foreground">Próximo contato</p><p className="mt-1 text-sm font-semibold">{formatDate(selectedContact.nextContactAt)}</p></div><div><p className="text-xs text-muted-foreground">Origem da data</p><p className="mt-1 text-sm font-semibold">{selectedContact.nextContactSource === "ai" ? "Sugestão da IA" : selectedContact.nextContactAt ? "Definida pela equipe" : "Ainda não definida"}</p></div></div></div>}{detailTab === "interactions" && <InteractionTimeline events={events} onRegister={() => setInteractionOpen(true)} />}{detailTab === "equipment" && <EquipmentPanel catalogItems={catalogItems} equipmentForm={equipmentForm} setEquipmentForm={setEquipmentForm} equipmentLinks={equipmentLinks} savingEquipment={savingEquipment} onSubmit={handleEquipmentSubmit} editingEquipmentId={editingEquipmentId} equipmentEditForm={equipmentEditForm} setEquipmentEditForm={setEquipmentEditForm} savingEquipmentEdit={savingEquipmentEdit} onStartEdit={(link) => { setEquipmentEditForm({ relationType: link.relationType === "installed" ? "installed" : "interest", catalogItemId: link.catalogItemId || "", equipmentType: link.equipmentType || "", brand: link.brand || "", model: link.model || "" }); setEditingEquipmentId(link.sourceCollection + ":" + link.id); setStatus(null); }} onCancelEdit={() => { setEditingEquipmentId(null); setEquipmentEditForm(EMPTY_EQUIPMENT); }} onEditSubmit={handleEquipmentEditSubmit} />}</div></div></div>}</section>
       </div>
 
       {status && <div role={status.tone === "error" ? "alert" : "status"} aria-live="polite" className={cn("fixed bottom-20 left-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-xl border px-4 py-3 text-sm shadow-lg md:bottom-6", status.tone === "error" ? "border-red-200 bg-red-50 text-red-800" : "border-emerald-200 bg-emerald-50 text-emerald-800")}>{status.text}</div>}
@@ -949,11 +1001,26 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
                 </section>
                 <section>
                   <SectionEyebrow icon={Phone} label="Telefones" />
-                  <div className="space-y-3">{contactForm.phones.map((phone, index) => <div key={`phone-${index}`} className="grid gap-2 sm:grid-cols-[120px_minmax(0,1fr)_auto_auto]"><Input aria-label={`Rótulo do telefone ${index + 1}`} value={phone.label} onChange={(event) => updatePhone(index, { label: event.target.value })} className="h-10" placeholder="Celular" /><Input aria-label={`Telefone ${index + 1}`} type="tel" value={phone.value} onChange={(event) => updatePhone(index, { value: event.target.value })} className="h-10" placeholder="(00) 00000-0000" /><label className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-border px-3 text-xs text-muted-foreground hover:bg-muted"><input type="checkbox" checked={phone.hasWhatsapp} onChange={(event) => updatePhone(index, { hasWhatsapp: event.target.checked })} className="h-4 w-4 accent-primary" /> WhatsApp</label>{contactForm.phones.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => setContactForm((previous) => ({ ...previous, phones: previous.phones.filter((_, phoneIndex) => phoneIndex !== index) }))} className="h-10 w-10 text-muted-foreground hover:text-destructive" aria-label={`Remover telefone ${index + 1}`}><Trash2 size={15} /></Button>}</div>)}<Button type="button" variant="outline" onClick={() => setContactForm((previous) => ({ ...previous, phones: [...previous.phones, { label: "Outro", value: "", hasWhatsapp: false }] }))} className="gap-2"><Plus size={14} /> Adicionar telefone</Button></div>
+                  <div className="space-y-3">
+                    {contactForm.phones.map((phone, index) => <div key={"phone-" + index} className="grid gap-2 sm:grid-cols-[minmax(150px,0.8fr)_minmax(0,1.6fr)_auto_auto]">
+                      <ContactChannelLabelControl kind="phone" index={index} label={phone.label} onChange={(label) => updatePhone(index, { label })} />
+                      <Input aria-label={"Telefone " + (index + 1)} type="tel" value={phone.value} onChange={(event) => updatePhone(index, { value: event.target.value })} className="h-10" placeholder="(00) 00000-0000" />
+                      <label className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-border px-3 text-xs text-muted-foreground hover:bg-muted"><input type="checkbox" checked={phone.hasWhatsapp} onChange={(event) => updatePhone(index, { hasWhatsapp: event.target.checked })} className="h-4 w-4 accent-primary" /> WhatsApp</label>
+                      {contactForm.phones.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => setContactForm((previous) => ({ ...previous, phones: previous.phones.filter((_, phoneIndex) => phoneIndex !== index) }))} className="h-10 w-10 text-muted-foreground hover:text-destructive" aria-label={"Remover telefone " + (index + 1)}><Trash2 size={15} /></Button>}
+                    </div>)}
+                    <Button type="button" variant="outline" onClick={() => setContactForm((previous) => ({ ...previous, phones: [...previous.phones, { label: "Celular", value: "", hasWhatsapp: false }] }))} className="gap-2"><Plus size={14} /> Adicionar telefone</Button>
+                  </div>
                 </section>
                 <section>
                   <SectionEyebrow icon={AtSign} label="E-mails" />
-                  <div className="space-y-3">{contactForm.emails.map((email, index) => <div key={`email-${index}`} className="grid gap-2 sm:grid-cols-[120px_minmax(0,1fr)_auto]"><Input aria-label={`Rótulo do e-mail ${index + 1}`} value={email.label} onChange={(event) => updateEmail(index, { label: event.target.value })} className="h-10" placeholder="Principal" /><Input aria-label={`E-mail ${index + 1}`} type="email" value={email.value} onChange={(event) => updateEmail(index, { value: event.target.value })} className="h-10" placeholder="contato@empresa.com" />{contactForm.emails.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => setContactForm((previous) => ({ ...previous, emails: previous.emails.filter((_, emailIndex) => emailIndex !== index) }))} className="h-10 w-10 text-muted-foreground hover:text-destructive" aria-label={`Remover e-mail ${index + 1}`}><Trash2 size={15} /></Button>}</div>)}<Button type="button" variant="outline" onClick={() => setContactForm((previous) => ({ ...previous, emails: [...previous.emails, { label: "Outro", value: "" }] }))} className="gap-2"><Plus size={14} /> Adicionar e-mail</Button></div>
+                  <div className="space-y-3">
+                    {contactForm.emails.map((email, index) => <div key={"email-" + index} className="grid gap-2 sm:grid-cols-[minmax(150px,0.8fr)_minmax(0,2fr)_auto]">
+                      <ContactChannelLabelControl kind="email" index={index} label={email.label} onChange={(label) => updateEmail(index, { label })} />
+                      <Input aria-label={"E-mail " + (index + 1)} type="email" value={email.value} onChange={(event) => updateEmail(index, { value: event.target.value })} className="h-10" placeholder="contato@empresa.com" />
+                      {contactForm.emails.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => setContactForm((previous) => ({ ...previous, emails: previous.emails.filter((_, emailIndex) => emailIndex !== index) }))} className="h-10 w-10 text-muted-foreground hover:text-destructive" aria-label={"Remover e-mail " + (index + 1)}><Trash2 size={15} /></Button>}
+                    </div>)}
+                    <Button type="button" variant="outline" onClick={() => setContactForm((previous) => ({ ...previous, emails: [...previous.emails, { label: "Comercial", value: "" }] }))} className="gap-2"><Plus size={14} /> Adicionar e-mail</Button>
+                  </div>
                 </section>
                 <section><SectionEyebrow icon={History} label="Contexto" /><Label htmlFor="contactNotes">Observações</Label><Textarea id="contactNotes" value={contactForm.notes} onChange={(event) => setContactForm((previous) => ({ ...previous, notes: event.target.value }))} className="mt-2 min-h-24 resize-none" placeholder="Contexto inicial, preferências ou próximos passos" /><div className="mt-4"><Label htmlFor="contactNextContactAt">Próximo contato</Label><Input id="contactNextContactAt" type="datetime-local" value={contactForm.nextContactAt} onChange={(event) => setContactForm((previous) => ({ ...previous, nextContactAt: event.target.value }))} className={fieldClassName()} /><p className="mt-1 text-xs text-muted-foreground">A data fica registrada no contato. O último contato continua sendo preenchido pelo histórico.</p></div></section>
               </div>
@@ -963,13 +1030,175 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
         </DialogContent>
       </Dialog>
 
-      <Dialog open={interactionOpen} onOpenChange={(open: boolean) => { setInteractionOpen(open); if (!open) { setAudioAttachment(null); setAudioResetKey((current) => current + 1); } }}><DialogContent className="max-w-xl"><DialogHeader><DialogTitle>Registrar interação</DialogTitle><DialogDescription>Adicione o que aconteceu ou anexe uma conversa para a IA organizar o próximo passo.</DialogDescription></DialogHeader><form onSubmit={handleInteractionSubmit} noValidate className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="interactionChannel">Canal</Label><select id="interactionChannel" value={interactionForm.channelType} onChange={(event) => setInteractionForm((previous) => ({ ...previous, channelType: event.target.value }))} className={`${fieldClassName()} w-full px-3`}><option value="phone">Ligação</option><option value="whatsapp">WhatsApp</option><option value="email">E-mail</option><option value="meeting">Reunião</option><option value="other">Outro</option></select></div><div><Label htmlFor="interactionDate">Quando</Label><Input id="interactionDate" type="datetime-local" value={interactionForm.occurredAt} onChange={(event) => setInteractionForm((previous) => ({ ...previous, occurredAt: event.target.value }))} className={fieldClassName()} /></div></div><div><Label htmlFor="nextContactAt">Próximo contato</Label><Input id="nextContactAt" type="datetime-local" value={interactionForm.nextContactAt} onChange={(event) => setInteractionForm((previous) => ({ ...previous, nextContactAt: event.target.value }))} className={fieldClassName()} /><p className="mt-1 text-xs text-muted-foreground">Sem data, o sistema sugere um follow-up em 10 dias.</p></div><div><Label htmlFor="interactionSummary">Resumo ou observação</Label><Textarea id="interactionSummary" value={interactionForm.summary} onChange={(event) => setInteractionForm((previous) => ({ ...previous, summary: event.target.value }))} className="mt-2 min-h-28 resize-none" placeholder={audioAttachment ? "Opcional: acrescente uma observação ao áudio..." : "O que foi tratado e qual é a próxima ação?"} /></div><CrmAudioCapture key={`${selectedContact?.id || "contact"}-${audioResetKey}`} onAudioReady={setAudioAttachment} onError={(message) => setStatus({ tone: "error", text: message })} processing={savingInteraction && Boolean(audioAttachment)} disabled={savingInteraction} /><DialogFooter className="-mx-4 -mb-4"><DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose><Button type="submit" disabled={savingInteraction} className="gap-2">{savingInteraction ? <Loader2 size={15} className="animate-spin" /> : audioAttachment ? <AudioLines size={15} /> : <Check size={15} />} {savingInteraction ? (audioAttachment ? "Analisando áudio..." : "Registrando...") : audioAttachment ? "Transcrever e registrar" : "Registrar interação"}</Button></DialogFooter></form></DialogContent></Dialog>
+      <Dialog
+        open={interactionOpen}
+        onOpenChange={(open: boolean) => {
+          setInteractionOpen(open);
+          if (!open) {
+            setAudioAttachment(null);
+            setAudioResetKey((current) => current + 1);
+          }
+        }}
+      >
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Registrar interação</DialogTitle>
+            <DialogDescription>Adicione o que aconteceu ou anexe uma conversa para a IA organizar o próximo passo.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleInteractionSubmit} noValidate className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="interactionChannel">Canal</Label>
+                <div className="relative mt-2">
+                  <select
+                    id="interactionChannel"
+                    value={interactionForm.channelType}
+                    onChange={(event) => {
+                      const channelType = event.target.value;
+                      const savedChannels = interactionContactChannels(selectedContact, channelType);
+                      setInteractionForm((previous) => ({
+                        ...previous,
+                        channelType,
+                        contactChannelSelection: ["phone", "whatsapp", "email"].includes(channelType)
+                          ? (savedChannels.some((channel) => channel.value.trim()) ? "" : "other")
+                          : "",
+                        otherContactChannelValue: "",
+                      }));
+                    }}
+                    className="h-10 w-full appearance-none rounded-lg border border-border/80 bg-background px-3 pr-9 text-sm text-foreground"
+                  >
+                    <option value="phone">Ligação</option>
+                    <option value="whatsapp">WhatsApp</option>
+                    <option value="email">E-mail</option>
+                    <option value="meeting">Reunião</option>
+                    <option value="other">Outro</option>
+                  </select>
+                  <ChevronDown aria-hidden="true" size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="interactionDate">Quando</Label>
+                <Input
+                  id="interactionDate"
+                  type="datetime-local"
+                  value={interactionForm.occurredAt}
+                  onChange={(event) => setInteractionForm((previous) => ({ ...previous, occurredAt: event.target.value }))}
+                  className={fieldClassName()}
+                />
+              </div>
+            </div>
+
+            {["phone", "whatsapp", "email"].includes(interactionForm.channelType) && (
+              <div>
+                <Label htmlFor="interactionContactChannel">
+                  {interactionForm.channelType === "email" ? "E-mail usado" : "Telefone usado"}
+                </Label>
+                <div className="relative mt-2">
+                  <select
+                    id="interactionContactChannel"
+                    value={interactionForm.contactChannelSelection}
+                    onChange={(event) => setInteractionForm((previous) => ({
+                      ...previous,
+                      contactChannelSelection: event.target.value,
+                      otherContactChannelValue: "",
+                    }))}
+                    className="h-10 w-full appearance-none rounded-lg border border-border/80 bg-background px-3 pr-9 text-sm text-foreground"
+                    required
+                  >
+                    <option value="">Selecione um {interactionForm.channelType === "email" ? "e-mail" : "telefone"}</option>
+                    {interactionContactChannels(selectedContact, interactionForm.channelType)
+                      .map((channel, index) => (
+                        <option key={channel.label + "-" + channel.value + "-" + index} value={"saved:" + index}>
+                          {channel.label || (interactionForm.channelType === "email" ? "E-mail" : "Telefone")} · {channel.value}
+                        </option>
+                      ))}
+                    <option value="other">Outro (informar manualmente)</option>
+                  </select>
+                  <ChevronDown aria-hidden="true" size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                </div>
+                {interactionForm.contactChannelSelection === "other" && (
+                  <Input
+                    aria-label={interactionForm.channelType === "email" ? "E-mail usado nesta interação" : "Telefone usado nesta interação"}
+                    type={interactionForm.channelType === "email" ? "email" : "tel"}
+                    value={interactionForm.otherContactChannelValue}
+                    onChange={(event) => setInteractionForm((previous) => ({ ...previous, otherContactChannelValue: event.target.value }))}
+                    className={fieldClassName()}
+                    placeholder={interactionForm.channelType === "email" ? "contato@empresa.com" : "(00) 00000-0000"}
+                    required
+                  />
+                )}
+                <p className="mt-1 text-xs text-muted-foreground">
+                  O valor fica salvo no histórico mesmo que o cadastro do contato mude depois.
+                </p>
+              </div>
+            )}
+
+            <div>
+              <Label htmlFor="nextContactAt">Próximo contato</Label>
+              <Input
+                id="nextContactAt"
+                type="datetime-local"
+                value={interactionForm.nextContactAt}
+                onChange={(event) => setInteractionForm((previous) => ({ ...previous, nextContactAt: event.target.value }))}
+                className={fieldClassName()}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">Sem data, o sistema sugere um follow-up em 10 dias.</p>
+            </div>
+            <div>
+              <Label htmlFor="interactionSummary">Resumo ou observação</Label>
+              <Textarea
+                id="interactionSummary"
+                value={interactionForm.summary}
+                onChange={(event) => setInteractionForm((previous) => ({ ...previous, summary: event.target.value }))}
+                className="mt-2 min-h-28 resize-none"
+                placeholder={audioAttachment ? "Opcional: acrescente uma observação ao áudio..." : "O que foi tratado e qual é a próxima ação?"}
+              />
+            </div>
+            <CrmAudioCapture
+              key={(selectedContact?.id || "contact") + "-" + audioResetKey}
+              onAudioReady={setAudioAttachment}
+              onError={(message) => setStatus({ tone: "error", text: message })}
+              processing={savingInteraction && Boolean(audioAttachment)}
+              disabled={savingInteraction}
+            />
+            <DialogFooter className="-mx-4 -mb-4">
+              <DialogClose asChild>
+                <Button type="button" variant="outline">Cancelar</Button>
+              </DialogClose>
+              <Button type="submit" disabled={savingInteraction} className="gap-2">
+                {savingInteraction ? <Loader2 size={15} className="animate-spin" /> : audioAttachment ? <AudioLines size={15} /> : <Check size={15} />}
+                {savingInteraction
+                  ? (audioAttachment ? "Analisando áudio..." : "Registrando...")
+                  : audioAttachment
+                    ? "Transcrever e registrar"
+                    : "Registrar interação"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
 function SectionEyebrow({ icon: Icon, label }: { icon: typeof Building2; label: string }) {
   return <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground"><Icon size={14} className="text-primary" /> {label}</div>;
+}
+
+function ContactChannelLabelControl({ kind, index, label, onChange }: { kind: "phone" | "email"; index: number; label: string; onChange: (value: string) => void }) {
+  const options = kind === "phone" ? PHONE_LABEL_OPTIONS : EMAIL_LABEL_OPTIONS;
+  const isStandard = options.includes(label);
+  const fieldName = kind === "phone" ? "telefone" : "e-mail";
+  return <div className="grid gap-2">
+    <div className="relative">
+      <select aria-label={"Rótulo do " + fieldName + " " + (index + 1)} value={isStandard ? label : CUSTOM_LABEL_OPTION} onChange={(event) => onChange(event.target.value === CUSTOM_LABEL_OPTION ? "" : event.target.value)} className="h-10 w-full appearance-none rounded-lg border border-border/80 bg-background px-3 pr-9 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        {options.map((option) => <option key={option} value={option}>{option}</option>)}
+        <option value={CUSTOM_LABEL_OPTION}>Personalizado</option>
+      </select>
+      <ChevronDown aria-hidden="true" size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+    </div>
+    {!isStandard && <Input aria-label={"Rótulo personalizado do " + fieldName + " " + (index + 1)} value={label} onChange={(event) => onChange(event.target.value)} className="h-10" placeholder="Digite um rótulo" />}
+  </div>;
 }
 
 function InfoItem({ icon: Icon, label, value }: { icon: typeof Mail; label: string; value: string }) {
@@ -981,7 +1210,7 @@ function InteractionTimeline({ events, onRegister }: { events: CrmEvent[]; onReg
   return <div className="space-y-5">{events.map((event) => {
     const suggestions = event.aiAnalysis;
     const suggestionCount = (suggestions?.opportunities?.length || 0) + (suggestions?.tasks?.length || 0) + (suggestions?.equipmentLinks?.length || 0);
-    return <div key={event.id} className="relative border-l-2 border-primary/20 pl-5"><span className="absolute -left-[7px] top-1 h-3 w-3 rounded-full border-2 border-card bg-primary" /><div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className="rounded-full px-2 py-0.5 text-[11px] font-medium">{channelLabel(event.channelType)}</Badge>{event.source === "manual_audio" && <Badge variant="secondary" className="gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"><AudioLines size={11} /> Áudio</Badge>}<span className="text-xs text-muted-foreground">{formatDate(event.occurredAt)}</span></div><p className="mt-2 text-sm leading-relaxed">{event.summary}</p>{event.audioUrl && <audio controls src={event.audioUrl} className="mt-3 h-9 w-full max-w-md" aria-label={event.audioName ? `Áudio ${event.audioName}` : "Áudio da interação"} />}{event.transcript && <details className="mt-3 rounded-lg border border-border/70 bg-muted/20 px-3 py-2"><summary className="cursor-pointer text-xs font-medium text-primary">Ver transcrição</summary><p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">{event.transcript}</p></details>}{suggestionCount > 0 && <details className="mt-3 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2"><summary className="cursor-pointer text-xs font-medium text-primary">Sugestões da IA ({suggestionCount})</summary><div className="mt-2 space-y-1 text-xs text-muted-foreground">{suggestions?.opportunities?.map((item, index) => <p key={`opportunity-${index}`}><strong className="font-medium text-foreground">Oportunidade:</strong> {item.title || item.summary || "Sem título"}</p>)}{suggestions?.tasks?.map((item, index) => <p key={`task-${index}`}><strong className="font-medium text-foreground">Tarefa:</strong> {item.title || item.summary || "Sem título"}</p>)}{suggestions?.equipmentLinks?.map((item, index) => <p key={`equipment-${index}`}><strong className="font-medium text-foreground">Equipamento:</strong> {[item.equipmentType, item.brand, item.model].filter(Boolean).join(" · ") || item.summary || "Sem descrição"}</p>)}</div></details>}{Boolean(event.nextContactAt) && <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"><CalendarClock size={13} /> Próximo contato: {formatDate(event.nextContactAt)}{event.source === "whatsapp" ? " · WhatsApp" : ""}</p>}</div>;
+    return <div key={event.id} className="relative border-l-2 border-primary/20 pl-5"><span className="absolute -left-[7px] top-1 h-3 w-3 rounded-full border-2 border-card bg-primary" /><div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className="rounded-full px-2 py-0.5 text-[11px] font-medium">{channelLabel(event.channelType)}</Badge>{event.source === "manual_audio" && <Badge variant="secondary" className="gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"><AudioLines size={11} /> Áudio</Badge>}<span className="text-xs text-muted-foreground">{formatDate(event.occurredAt)}</span></div>{event.contactChannel && <p className="mt-2 break-words text-xs text-muted-foreground"><span className="font-medium text-foreground/80">{event.contactChannel.label || (event.contactChannel.type === "email" ? "E-mail" : "Telefone")}:</span> {event.contactChannel.value}{event.contactChannel.source === "manual" ? " · informado nesta interação" : ""}</p>}<p className="mt-2 text-sm leading-relaxed">{event.summary}</p>{event.audioUrl && <audio controls src={event.audioUrl} className="mt-3 h-9 w-full max-w-md" aria-label={event.audioName ? `Áudio ${event.audioName}` : "Áudio da interação"} />}{event.transcript && <details className="mt-3 rounded-lg border border-border/70 bg-muted/20 px-3 py-2"><summary className="cursor-pointer text-xs font-medium text-primary">Ver transcrição</summary><p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">{event.transcript}</p></details>}{suggestionCount > 0 && <details className="mt-3 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2"><summary className="cursor-pointer text-xs font-medium text-primary">Sugestões da IA ({suggestionCount})</summary><div className="mt-2 space-y-1 text-xs text-muted-foreground">{suggestions?.opportunities?.map((item, index) => <p key={`opportunity-${index}`}><strong className="font-medium text-foreground">Oportunidade:</strong> {item.title || item.summary || "Sem título"}</p>)}{suggestions?.tasks?.map((item, index) => <p key={`task-${index}`}><strong className="font-medium text-foreground">Tarefa:</strong> {item.title || item.summary || "Sem título"}</p>)}{suggestions?.equipmentLinks?.map((item, index) => <p key={`equipment-${index}`}><strong className="font-medium text-foreground">Equipamento:</strong> {[item.equipmentType, item.brand, item.model].filter(Boolean).join(" · ") || item.summary || "Sem descrição"}</p>)}</div></details>}{Boolean(event.nextContactAt) && <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"><CalendarClock size={13} /> Próximo contato: {formatDate(event.nextContactAt)}{event.source === "whatsapp" ? " · WhatsApp" : ""}</p>}</div>;
   })}<Button type="button" variant="outline" onClick={onRegister} className="gap-2"><Plus size={14} /> Registrar outra interação</Button></div>;
 }
 

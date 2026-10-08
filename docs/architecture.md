@@ -99,6 +99,9 @@ See [CRM contact channel normalization](crm-contact-channel-normalization.md) fo
 3. Equipment links write to `interests` or `installed_base`, referencing catalog type/brand/model when available.
 4. After the asynchronous WhatsApp Inbox/AI pipeline completes, the backend resolves a CRM contact by remote ID, primary normalized phone, or a matching additional phone. A match creates a WhatsApp timeline event, links extracted opportunities/tasks/events, and applies an AI next-contact date only if no manual next-contact date exists.
 
+Contact phone and e-mail labels use common choices with a custom text option. Manual phone, WhatsApp, and e-mail interactions record the selected saved channel, or a one-off value when the channel is not in the contact profile. Each event stores the channel type, label, value, and whether it came from the profile or was entered for that interaction; this immutable snapshot remains accurate when contact details are later edited.
+
+
 ### CRM Performance Dashboard
 
 The administrative CRM performance surface uses the `getCrmPerformanceSnapshot` callable to read workspace-scoped `crm_events`, `contacts`, `accounts`, and approved access summaries in one request. Event queries are bounded to the selected period plus the comparable previous period (or the existing 2,000-event safety cap for all-time views), avoiding several client-side realtime listeners. The employee comparison is attributed by `actorUserId` (falling back to `ownerId` only when it is not a system actor), while automated/system activity is retained in an explicit `Sem atribuição` row instead of being assigned to a person.
