@@ -13,6 +13,7 @@ import AdminDashboard from "@/components/AdminDashboard";
 import SettingsView from "@/components/SettingsView";
 import WhatsappView from "@/components/WhatsappView";
 import SplashScreen from "@/components/SplashScreen";
+import { BrandMark, BrandWordmark } from "@/components/BrandLogo";
 import ActionInbox from "@/components/ActionInbox";
 import CrmView from "@/components/CrmView";
 import CrmImportView from "@/components/CrmImportView";
@@ -335,12 +336,11 @@ export default function Dashboard() {
         {/* ── Sidebar (desktop) ── */}
         <aside className="hidden md:flex flex-col w-60 shrink-0 border-r border-border/70 bg-card">
           {/* Logo */}
-          <div className="px-6 pt-7 pb-6 border-b border-border/70">
-            <h1 className="text-xl font-semibold tracking-tight text-foreground leading-none font-display">
-              Inventory<span className="text-primary">OS</span>
-              <br />
-              <span className="text-[10px] tracking-[0.08em] text-muted-foreground font-medium">Workspace operacional</span>
-            </h1>
+          <div className="px-6 pt-5 pb-4 border-b border-border/70">
+            <BrandWordmark className="h-auto w-full max-w-[168px]" priority />
+            <p className="mt-1.5 text-[10px] tracking-[0.04em] text-muted-foreground">
+              InventoryOS · Workspace operacional
+            </p>
           </div>
 
           {/* Nav */}
@@ -393,7 +393,10 @@ export default function Dashboard() {
           {/* Top Bar / Header */}
           <header className="app-top-safe-area app-topbar sticky top-0 flex items-center gap-3 px-4 md:px-8 border-b border-border/70 shrink-0 bg-card/95 backdrop-blur-sm z-30">
             {/* Mobile Brand indicator */}
-            <span className="md:hidden text-base font-semibold tracking-tight text-foreground bg-secondary px-2.5 py-1 rounded-lg font-display">InventoryOS</span>
+            <div className="md:hidden flex shrink-0 items-center gap-1.5">
+              <BrandMark className="h-8 w-8" priority />
+              <span className="text-sm font-semibold tracking-tight text-foreground font-display">InventoryOS</span>
+            </div>
 
             {/* Search Input */}
             <div className="flex-1 max-w-md relative group">
