@@ -103,6 +103,12 @@ active_decisions:
 - **Implications**: Changing the period triggers one bounded refresh. The `crm_events(workspaceId, occurredAt)` composite index is required. A future high-volume analytics phase should replace the all-time cap with materialized aggregates rather than increasing client limits.
 - **Status**: Active.
 
+## Decision: Snapshot the communication channel used for CRM interactions
+- Decision: Manual phone, WhatsApp, and e-mail interactions store a snapshot of the specific phone number or e-mail address used, including its label and whether it came from the contact profile or was entered for that interaction.
+- Reason: Contact channel records remain editable, while the interaction timeline is append-only. A snapshot preserves what was used at the time of the interaction.
+- Implications: The CRM requires a channel choice for manual phone, WhatsApp, and e-mail events, and allows a one-off value when the used channel is not saved on the contact. Older events remain valid without a channel snapshot.
+- Status: Active.
+
 ## FinOps Architecture Overview
 
 ### AI Cost Aggregation Flow
