@@ -58,6 +58,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { filterCompanySuggestions, normalizePhoneDigits } from "@/lib/crmContacts";
+import { normalizeEmailEntries, normalizePhoneEntries } from "@/lib/crmChannelNormalization";
 import CrmAudioCapture from "@/components/CrmAudioCapture";
 import { extractCrmInteractionFromAudio } from "@/lib/ai";
 import { getCrmAudioExtension, mergeCrmNotes, readBlobAsBase64, type CrmAudioAttachment } from "@/lib/crmAudio";
@@ -267,13 +268,17 @@ function channelLabel(channel?: string | null) {
 }
 
 function contactPhones(contact: Contact): PhoneEntry[] {
-  if (Array.isArray(contact.phoneNumbers) && contact.phoneNumbers.length) return contact.phoneNumbers;
-  return contact.phoneNumber ? [{ label: "Principal", value: contact.phoneNumber, hasWhatsapp: Boolean(contact.whatsappPhoneDigits?.includes(normalizePhoneDigits(contact.phoneNumber))) }] : [];
+  const source = Array.isArray(contact.phoneNumbers) && contact.phoneNumbers.length
+    ? contact.phoneNumbers
+    : contact.phoneNumber ? [{ label: "Principal", value: contact.phoneNumber }] : [];
+  return normalizePhoneEntries(source, contact.whatsappPhoneDigits).entries as PhoneEntry[];
 }
 
 function contactEmails(contact: Contact): EmailEntry[] {
-  if (Array.isArray(contact.emails) && contact.emails.length) return contact.emails;
-  return contact.email ? [{ label: "Principal", value: contact.email }] : [];
+  const source = Array.isArray(contact.emails) && contact.emails.length
+    ? contact.emails
+    : contact.email ? [{ label: "Principal", value: contact.email }] : [];
+  return normalizeEmailEntries(source).entries as EmailEntry[];
 }
 
 function safeStorageSegment(value: string) {
@@ -575,8 +580,13 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
         nextCompany,
       ].sort((left, right) => String(left.name || "").localeCompare(String(right.name || ""), "pt-BR")));
 
-      const phones = contactForm.phones.filter((phone) => phone.value.trim()).map((phone) => ({ ...phone, value: phone.value.trim(), digits: normalizePhoneDigits(phone.value) }));
-      const emails = contactForm.emails.filter((email) => email.value.trim()).map((email) => ({ ...email, value: email.value.trim() }));
+      const phones = normalizePhoneEntries(contactForm.phones).entries
+        .filter((phone) => phone.value.trim())
+        .map((phone) => {
+          const digits = normalizePhoneDigits(phone.value);
+          return { ...phone, value: phone.value.trim(), digits: digits.length >= 8 && digits.length <= 13 ? digits : "" };
+        });
+      const emails = normalizeEmailEntries(contactForm.emails).entries.filter((email) => email.value.trim());
       const phoneDigitsList = phones.map((phone) => phone.digits).filter(Boolean);
       const whatsappPhoneDigits = phones.filter((phone) => phone.hasWhatsapp).map((phone) => phone.digits).filter(Boolean);
 
