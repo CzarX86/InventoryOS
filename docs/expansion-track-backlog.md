@@ -9,7 +9,7 @@ Objetivo deste documento:
 - preservar a estrategia de `backend final cedo, rollout gradual`
 - servir como fila de trabalho para outros agentes de IA
 
-Data de referencia: `2026-03-23`
+Data de referencia: `2026-10-08`
 
 ## Regras globais do backlog
 
@@ -49,6 +49,27 @@ Data de referencia: `2026-03-23`
 - `P1`: essencial para a primeira release visivel
 - `P2`: importante para valor comercial e consolidacao
 - `P3`: evolucao posterior
+
+## Ideias adiadas — documentacao apenas
+
+### Diretorio pesquisavel de fornecedores
+
+- Registrado em: `2026-10-08`
+- Status: `deferred` — fora do escopo ativo; retomar somente apos nova repriorizacao explicita.
+- Implementacao atual: nenhuma. Nao criar collections, feature flags, telas, fluxos ou migracoes para este item.
+
+Escopo candidato quando a ideia for reaberta:
+
+- manter fornecedores pessoa fisica ou juridica em dominio separado do CRM de clientes
+- cadastrar categoria, localidade, status, observacoes e identificadores quando aplicavel
+- permitir varios contatos e canais rotulados, com um canal principal
+- relacionar itens ou servicos fornecidos a `catalog_items`, sem duplicar dados do catalogo
+- pesquisar pelo fornecedor ou pelo item (tipo, marca, modelo ou numero da peca)
+- armazenar telefones normalizados e exibi-los com mascara; manter cada e-mail em um canal separado
+- deixar cotacoes, pedidos de compra e avaliacao automatizada para uma etapa futura de RFQ
+
+Este registro captura a recomendacao de produto aprovada pelo usuario, mas nao
+inicia trabalho de engenharia nem cria uma data ou compromisso de entrega.
 
 ## Fase 0: Fundacao invisivel
 
@@ -166,7 +187,8 @@ Criterios de aceite:
 
 ### Story 0.2.3 - Criar modelos base de fornecedores
 
-- Prioridade: `P1`
+- Prioridade: `P3`
+- Status: `deferred` — nao iniciar ate uma repriorizacao explicita.
 - Branch sugerida: `codex/supplier-domain-foundation`
 
 Escopo:
