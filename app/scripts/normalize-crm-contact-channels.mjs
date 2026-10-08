@@ -10,6 +10,7 @@ const NORMALIZER_PATH = pathToFileURL(path.resolve("src/lib/crmChannelNormalizat
 const {
   canonicalPhoneKey,
   isValidEmailAddress,
+  normalizeCorruptedPhoneLabel,
   normalizeEmailEntries,
   normalizePhoneEntries,
   normalizePhoneForStorage,
@@ -20,6 +21,7 @@ const {
 
 const args = process.argv.slice(2);
 const applyChanges = args.includes("--apply");
+const labelsOnly = args.includes("--labels-only");
 const projectIndex = args.indexOf("--project");
 const projectId = projectIndex >= 0 ? args[projectIndex + 1] : "";
 
@@ -266,6 +268,81 @@ for (const document of rawChannels) {
   channelsByContact.set(data.contactId, list);
 }
 
+if (labelsOnly) {
+  const stats = {
+    contactsRead: contactDocuments.length,
+    channelDocumentsRead: rawChannels.length,
+    phoneEntriesRepaired: 0,
+    contactDocumentsUpdated: 0,
+    channelDocumentsUpdated: 0,
+    phoneEntriesSetToCellular: 0,
+    phoneEntriesSetToGenericTelephone: 0,
+    channelLabelsSetToCellular: 0,
+    channelLabelsSetToGenericTelephone: 0,
+    writes: 0,
+    mode: applyChanges ? "apply" : "dry-run",
+  };
+  const operations = [];
+  const backupDocuments = new Map();
+
+  const stageUpdate = (document, fields) => {
+    operations.push({
+      update: { name: document.name, fields: encodeFields(fields) },
+      updateMask: { fieldPaths: Object.keys(fields) },
+      currentDocument: { updateTime: document.updateTime },
+    });
+    backupDocuments.set(document.name, { name: document.name, updateTime: document.updateTime, fields: document.fields });
+  };
+
+  for (const { document, data: contact } of contactDocuments) {
+    const phoneEntries = Array.isArray(contact.phoneNumbers) ? contact.phoneNumbers : [];
+    if (!phoneEntries.length) continue;
+    let changed = false;
+    const repairedEntries = phoneEntries.map((entry) => {
+      const originalLabel = String(entry?.label ?? "");
+      const label = normalizeCorruptedPhoneLabel(originalLabel, entry?.value);
+      if (label === originalLabel) return entry;
+      changed = true;
+      stats.phoneEntriesRepaired += 1;
+      if (label === "Celular") stats.phoneEntriesSetToCellular += 1;
+      if (label === "Telefone") stats.phoneEntriesSetToGenericTelephone += 1;
+      return { ...entry, label };
+    });
+    if (changed) {
+      stageUpdate(document, { phoneNumbers: repairedEntries });
+      stats.contactDocumentsUpdated += 1;
+    }
+  }
+
+  for (const document of rawChannels) {
+    const channel = decodeFields(document.fields);
+    if (channel.channelType !== "phone" || ["deleted", "inactive", "merged"].includes(channel.status)) continue;
+    const originalLabel = String(channel.label ?? "");
+    const label = normalizeCorruptedPhoneLabel(originalLabel, channel.channelValue);
+    if (label === originalLabel) continue;
+    if (label === "Celular") stats.channelLabelsSetToCellular += 1;
+    if (label === "Telefone") stats.channelLabelsSetToGenericTelephone += 1;
+    stageUpdate(document, { label });
+    stats.channelDocumentsUpdated += 1;
+  }
+
+  stats.writes = operations.length;
+  console.log(JSON.stringify(stats, null, 2));
+  if (!applyChanges || !operations.length) process.exit(0);
+
+  const backupPath = path.join(os.tmpdir(), `inventoryos-crm-phone-label-backup-${new Date().toISOString().replaceAll(":", "-")}.json`);
+  await writeFile(backupPath, JSON.stringify({ projectId, createdAt: new Date().toISOString(), documents: [...backupDocuments.values()] }, null, 2), { mode: 0o600, flag: "wx" });
+  await chmod(backupPath, 0o600);
+  for (let offset = 0; offset < operations.length; offset += 450) {
+    await request(`${apiRoot}:commit`, {
+      method: "POST",
+      body: JSON.stringify({ writes: operations.slice(offset, offset + 450) }),
+    });
+  }
+  console.log(JSON.stringify({ applied: true, writes: operations.length, secureBackup: backupPath }, null, 2));
+  process.exit(0);
+}
+
 const stats = {
   contactsRead: contactDocuments.length,
   channelsRead: rawChannels.length,
@@ -281,6 +358,9 @@ const stats = {
   duplicateEmailsRemoved: 0,
   ambiguousPhoneFields: 0,
   ambiguousEmailFields: 0,
+  phoneLabelsRepaired: 0,
+  phoneLabelsSetToCellular: 0,
+  phoneLabelsSetToGenericTelephone: 0,
 };
 
 const operations = [];
@@ -301,7 +381,13 @@ for (const { document, data: contact } of contactDocuments) {
     const phoneEntries = normalized.entries.map((entry) => {
       const value = normalizePhoneForStorage(entry.value);
       const digits = phoneDigitsForStorage(value);
-      return { ...entry, value, digits };
+      const label = normalizeCorruptedPhoneLabel(entry.label, value);
+      if (label !== entry.label) {
+        stats.phoneLabelsRepaired += 1;
+        if (label === "Celular") stats.phoneLabelsSetToCellular += 1;
+        if (label === "Telefone") stats.phoneLabelsSetToGenericTelephone += 1;
+      }
+      return { ...entry, label, value, digits };
     });
     const sourceQuality = normalizePhoneEntries(primaryPhoneInput, contact.whatsappPhoneDigits || []);
     if (sourceQuality.ambiguousValues) stats.ambiguousPhoneFields += 1;

@@ -3,7 +3,7 @@ project: InventoryOS
 active_branch: codex/runtime-secret-readiness
 stack: Next.js 15, Firebase, Gemini/DeepSeek, TypeScript (Migration)
 release_channel: preview (expansion-track)
-last_updated: 2026-09-16
+last_updated: 2026-10-08
 ---
 
 # Agent Context Layer (Persistent)
@@ -14,6 +14,7 @@ InventoryOS is an operational platform currently focused on inventory and item m
 ## Project Goals
 - **Maintain Stability**: Ensure the production inventory system remains functional (login, inventory, audit, deploy).
 - **Expansion Track Implementation**: Evolve into an AI-driven platform with CRM modules, WhatsApp automation, and supplier management.
+- **Supplier directory**: The proposed searchable supplier registry is documentation only and outside the active implementation scope until explicitly reprioritized.
 - **AI-Centric Operation**: Position AI as the primary operator for data ingestion (WhatsApp) and action suggestions (Action Inbox).
 - **Financial Transparency (FinOps)**: Maintain real-time visibility into AI token usage, Cloud Function costs, and "free tier" run rates to prevent unexpected billing.
 - **Infrastructure Scaling**: Stabilize a hybrid infra (Firebase + VPS-hosted Evolution API).

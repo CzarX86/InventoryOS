@@ -23,7 +23,10 @@
 ## Employee home
 
 - Approved users land on the home dashboard before the inventory list.
-- The dashboard shows only personal CRM interactions attributed to the current user, grouped into the last seven days and today's activity list.
+- By default, the dashboard shows only personal CRM interactions attributed to the current user, grouped into the last seven days and today's activity list.
+- Administrators and the platform owner can select an approved teammate to inspect that person's CRM activity on the same dashboard. The selection is a read-only view, not impersonation: CRM creation actions are disabled and all writes remain attributed to the signed-in user.
+- Team activity and approved-member choices are returned by an administrator-only, workspace-scoped callable. The shared inventory count remains a workspace total and is not presented as an employee-specific metric.
+- The Home teammate picker is a labeled native select: the roster is a short fixed list, and native keyboard and mobile picker behavior is preferred over an editable search field. It keeps a visible focus state and exposes only the signed-in user plus approved workspace members returned by the callable.
 - When there is no activity, the empty state explains how to register an interaction and links to the CRM workflow.
 - Performance values are source-backed; the UI must not imply conversion, revenue, or quality metrics that are not captured by the CRM schema.
 

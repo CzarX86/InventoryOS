@@ -48,6 +48,35 @@ export function normalizePhoneForStorage(value: unknown = "") {
   return digits;
 }
 
+function inferBrazilianPhoneLabel(value: unknown) {
+  const original = String(value ?? "").trim();
+  const digits = normalizePhoneDigits(original);
+  if (!digits || (original.startsWith("+") && !digits.startsWith("55"))) return null;
+
+  const nationalDigits = digits.startsWith("55") && (digits.length === 12 || digits.length === 13)
+    ? digits.slice(2)
+    : digits;
+  if (nationalDigits.length === 11 && nationalDigits[2] === "9") return "Celular";
+  if (nationalDigits.length === 10 && "2345".includes(nationalDigits[2])) return "Telefone";
+  return null;
+}
+
+export function normalizeCorruptedPhoneLabel(label: unknown, phoneValue: unknown) {
+  const original = String(label ?? "");
+  const candidate = original.trim();
+  const labelDigits = normalizePhoneDigits(candidate);
+  const hasPhoneLikePrefix = /^[\d\s()./+.-]+(?:celular|elular)$/iu.test(candidate);
+  const isPhoneOnly = /^[\d\s()./+.-]+$/u.test(candidate);
+  if (labelDigits.length < 8 || labelDigits.length > 15 || (!hasPhoneLikePrefix && !isPhoneOnly)) {
+    return original;
+  }
+
+  const inferredLabel = inferBrazilianPhoneLabel(phoneValue);
+  if (inferredLabel) return inferredLabel;
+  if (hasPhoneLikePrefix) return "Celular";
+  return "Telefone";
+}
+
 export function phoneDigitsForStorage(value: unknown = "") {
   const storedValue = normalizePhoneForStorage(value);
   const digits = normalizePhoneDigits(storedValue);

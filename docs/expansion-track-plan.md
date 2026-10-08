@@ -265,11 +265,25 @@ O sistema novo deve ser desenhado como um conjunto de modulos coesos.
 ### 6.3 Modulos de fornecedores e procurement
 
 - `supplier_accounts`
+  - fornecedor pessoa fisica ou juridica, em dominio separado do CRM de clientes
 - `supplier_contacts`
+  - pessoas e canais de contato vinculados ao fornecedor
+- `supplier_catalog_items`
+  - vinculo entre fornecedor e item de catalogo existente, sem duplicar dados do item
 - `quote_requests`
 - `quote_responses`
 - `supplier_performance_profiles`
 - `procurement_opportunities`
+
+O diretorio pesquisavel de fornecedores e uma ideia futura documentada, ainda
+fora do escopo ativo. A proposta considera cadastro e consulta de pessoas
+fisicas e juridicas, multiplos contatos e canais rotulados, e vinculos a itens
+ou servicos fornecidos. O relacionamento com produtos deve apontar para
+`catalog_items`; nao deve copiar marca, modelo ou numero de peca. Busca por
+fornecedor e por item (tipo, marca, modelo ou numero da peca) e um criterio
+proposto. Cotacoes, pedidos de compra e avaliacao automatizada nao pertencem a
+esse primeiro diretorio. Nao criar colecoes, flags, telas ou fluxos de
+fornecedor ate essa ideia ser explicitamente repriorizada.
 
 ### 6.4 Modulos de IA e auditoria
 
@@ -584,6 +598,10 @@ Nao fazer fine-tuning de modelo no primeiro ciclo.
 ## 12. Fornecedores e automacao de cotacao
 
 Esse modulo e um dos maiores motores de adocao.
+
+O diretorio de fornecedores descrito na secao 6.3 permanece como proposta
+documental, sem compromisso de implementacao na fase ativa. Sua retomada exige
+uma nova decisao de escopo antes de qualquer schema, interface ou migracao.
 
 Fluxo desejado:
 
