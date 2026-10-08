@@ -29,6 +29,7 @@ describe("featureFlags helpers", () => {
       supplierRfq: false,
       semiAutonomousAi: false,
       crmPerformanceDashboard: true,
+      teamHomeView: true,
       crmImport: true,
       crmAiWorkflow: true,
     });
@@ -48,15 +49,16 @@ describe("featureFlags helpers", () => {
   });
 
   it("counts enabled flags and guards unknown names", () => {
-    expect(countEnabledFeatureFlags(DEFAULT_FEATURE_FLAGS)).toBe(4);
+    expect(countEnabledFeatureFlags(DEFAULT_FEATURE_FLAGS)).toBe(5);
     expect(countEnabledFeatureFlags({
       ...DEFAULT_FEATURE_FLAGS,
       contactReviewQueue: true,
       whatsappIngestion: true,
       supplierRfq: true,
-    })).toBe(6);
+    })).toBe(7);
     expect(isFeatureEnabled({ actionInbox: true }, "actionInbox")).toBe(true);
     expect(isFeatureEnabled({ crmPerformanceDashboard: false }, "crmPerformanceDashboard")).toBe(false);
+    expect(isFeatureEnabled({ teamHomeView: false }, "teamHomeView")).toBe(false);
     expect(isFeatureEnabled({ actionInbox: true }, "unknownFlag")).toBe(false);
   });
 });

@@ -10,6 +10,7 @@ jest.mock("@/hooks/useFeatureFlags", () => jest.fn(() => ({
     txtImport: false,
     supplierRfq: false,
     semiAutonomousAi: false,
+    teamHomeView: false,
   },
   enabledCount: 1,
   loading: false,
@@ -128,7 +129,7 @@ describe("AdminDashboard", () => {
 
     expect(await screen.findByText("Uso de IA e custos")).toBeInTheDocument();
     expect(screen.getByText("Módulos e automações")).toBeInTheDocument();
-    expect(screen.getByText(/1 de 10 recursos ativos/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 de 11 recursos ativos/i)).toBeInTheDocument();
     expect(screen.getByText("contactReviewQueue")).toBeInTheDocument();
     expect(screen.getAllByText("Disabled").length).toBeGreaterThan(0);
     expect(screen.getByText("Itens disponíveis")).toBeInTheDocument();

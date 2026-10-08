@@ -42,6 +42,8 @@ describe("functions featureFlags helpers", () => {
   });
 
   it("guards unknown flags", () => {
+    expect(isFeatureEnabled(DEFAULT_FEATURE_FLAGS, "teamHomeView")).toBe(true);
+    expect(isFeatureEnabled(normalizeFeatureFlags({ teamHomeView: false }), "teamHomeView")).toBe(false);
     expect(isFeatureEnabled({ actionInbox: true } as any, "actionInbox")).toBe(true);
     expect(isFeatureEnabled({ actionInbox: true } as any, "unknown" as any)).toBe(false);
   });

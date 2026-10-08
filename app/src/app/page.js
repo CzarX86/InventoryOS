@@ -89,6 +89,7 @@ export default function Dashboard() {
     syncError,
   } = useInventory(user, isApproved);
   const crmPerformanceEnabled = isAdmin && isFeatureEnabled(expansionFlags, "crmPerformanceDashboard");
+  const teamHomeViewEnabled = !user?.isLocalDev && (isAdmin || isHiddenOwner) && isFeatureEnabled(expansionFlags, "teamHomeView");
 
   const handleLogin = async () => {
     setLoginError(null);
@@ -469,7 +470,7 @@ export default function Dashboard() {
                 {activeTab === "CRM_PERFORMANCE" && crmPerformanceEnabled ? (
                   <CrmPerformanceDashboard user={user} />
                 ) : activeTab === "HOME" ? (
-                  <WorkspaceHome user={user} inventoryCount={stats.inStock} onOpenCrm={() => setActiveTab("CRM")} />
+                  <WorkspaceHome user={user} inventoryCount={stats.inStock} canViewTeam={teamHomeViewEnabled} onOpenCrm={() => setActiveTab("CRM")} />
                 ) : activeTab === "CRM_IMPORT" && isFeatureEnabled(expansionFlags, "crmImport") ? (
                   <CrmImportView user={user} onBack={() => setActiveTab("CRM")} />
                 ) : activeTab === "CRM" ? (

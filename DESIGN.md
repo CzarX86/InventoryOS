@@ -23,4 +23,5 @@ InventoryOS is an operational workspace for inventory, customer relationships, a
 - Every interaction has a channel, date, summary, and next-contact signal. Manual dates take precedence over AI suggestions.
 - Loading, empty, error, and disabled states are visible and do not use browser alerts.
 - The default authenticated landing surface is the employee home: recent personal CRM performance and today's activities are shown before the inventory list.
+- Administrators and the platform owner may select an approved teammate on Home to review their CRM activity. Make this state visibly read-only, disable interaction creation while another person is selected, and keep the shared inventory total clearly workspace-scoped.
 - Mobile navigation remains horizontally reachable, uses minimum 44px touch targets, and keeps labels visible rather than relying on icon-only controls.
