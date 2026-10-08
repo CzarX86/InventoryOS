@@ -17,6 +17,8 @@ InventoryOS is an operational workspace for inventory, customer relationships, a
 
 - The company identity is the JMR Automação Industrial gear-and-circuit logo, adapted for the light interface with cobalt `#2F5DCE`, slate `#64748B`, and navy `#172033`.
 - Use the transparent full lockup for larger brand surfaces, the JMR wordmark in the desktop navigation, and the standalone gear mark beside the InventoryOS name on mobile and in app icons.
+- Serve the transparent web logos as WebP at the largest display size multiplied by 3–4x; keep the original PNG masters under `docs/branding/source/`, outside the deployed `public/` directory.
+- Keep the existing PWA installation icons as PNG; they are already small and remain the compatibility baseline for install surfaces.
 - InventoryOS remains the product name in browser and install metadata.
 - Expansion modules use a two-layer presentation: a plain-language value overview first, then the operational console behind an explicit configuration/review action. This keeps technical integration details from becoming the first impression for customers.
 - Use Google profile avatars in account, access-management, and request-review surfaces when available; use readable initials as the fallback. Avatars should reinforce identity without becoming a decorative focal point.

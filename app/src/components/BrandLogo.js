@@ -2,21 +2,21 @@ import Image from "next/image";
 
 const assets = {
   wordmark: {
-    src: "/branding/jmr-wordmark.png",
-    width: 1698,
-    height: 698,
+    src: "/branding/jmr-wordmark.webp",
+    width: 504,
+    height: 207,
     alt: "JMR Automação Industrial",
   },
   lockup: {
-    src: "/branding/jmr-automacao-industrial.png",
-    width: 1698,
-    height: 788,
+    src: "/branding/jmr-automacao-industrial.webp",
+    width: 1536,
+    height: 713,
     alt: "JMR Automação Industrial",
   },
   mark: {
-    src: "/branding/jmr-symbol.png",
-    width: 1249,
-    height: 1255,
+    src: "/branding/jmr-symbol.webp",
+    width: 128,
+    height: 129,
     alt: "",
   },
 };
