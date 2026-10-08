@@ -282,6 +282,12 @@ Location: `system_usage/ai_usage_summary_{YYYYMM}`
 - **Implicacoes**: Nao criar collections, feature flags, interfaces, fluxos de cotacao ou migracoes para esse diretorio sem uma nova repriorizacao explicita. A proposta e mantida em `expansion-track-backlog.md`.
 - **Status**: Deferred.
 
+## Decision: Read-only team view on Home
+- **Decision**: Administrators and the platform owner can select an approved teammate on Home and inspect that person's recent CRM activity through the `getWorkspaceHomeSnapshot` callable. The selected-user view is read-only; interaction creation is disabled and writes are never impersonated.
+- **Reason**: Managers need the same operational overview employees use, while CRM history must remain correctly attributed to the authenticated user and must not reveal other workspaces.
+- **Implications**: The callable enforces admin/owner authorization, same-workspace approved membership, bounded event queries, hidden-owner exclusion, and the `teamHomeView` feature flag. Shared inventory counts remain workspace totals. Composite indexes cover selected-user actor attribution and legacy owner attribution.
+- **Status**: Active.
+
 ## Technical Reference
 - **Project Context**: [agent_context.md](file:///Users/juliocezar/Dev/personal/InventoryOS/docs/agent_context.md)
 - **Architecture Overview**: [architecture.md](file:///Users/juliocezar/Dev/personal/InventoryOS/docs/architecture.md)

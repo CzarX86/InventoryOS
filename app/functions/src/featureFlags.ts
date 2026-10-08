@@ -7,6 +7,7 @@ export const EXPANSION_FEATURE_FLAGS = [
   "supplierRfq",
   "semiAutonomousAi",
   "crmPerformanceDashboard",
+  "teamHomeView",
   "crmImport",
   "crmAiWorkflow",
 ];
@@ -20,6 +21,7 @@ export const DEFAULT_FEATURE_FLAGS = Object.freeze({
   supplierRfq: false,
   semiAutonomousAi: false,
   crmPerformanceDashboard: true,
+  teamHomeView: true,
   crmImport: true,
   crmAiWorkflow: true,
 });
