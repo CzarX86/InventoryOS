@@ -16,6 +16,7 @@ import {
   MapPin,
   PackageSearch,
   Phone,
+  Pencil,
   Plus,
   RotateCcw,
   Search,
@@ -168,6 +169,8 @@ type CrmAiAnalysis = {
 
 type EquipmentLink = {
   id: string;
+  sourceCollection: "interests" | "installed_base";
+  rawData: Record<string, unknown>;
   relationType?: string | null;
   equipmentType?: string | null;
   brand?: string | null;
@@ -189,6 +192,7 @@ type ContactFormState = {
   phones: PhoneEntry[];
   emails: EmailEntry[];
   notes: string;
+  nextContactAt: string;
 };
 
 type InteractionFormState = { channelType: string; occurredAt: string; nextContactAt: string; summary: string };
@@ -211,6 +215,7 @@ function createEmptyContactForm(): ContactFormState {
     phones: [{ label: "Celular", value: "", hasWhatsapp: false }],
     emails: [{ label: "Principal", value: "" }],
     notes: "",
+    nextContactAt: "",
   };
 }
 
@@ -230,6 +235,13 @@ function timestampToMillis(value: unknown) {
 function formatDate(value: unknown) {
   const millis = timestampToMillis(value);
   return millis ? new Date(millis).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "Ainda não registrado";
+}
+
+function toDateInputValue(value: unknown) {
+  const millis = timestampToMillis(value);
+  if (!millis) return "";
+  const date = new Date(millis);
+  return new Date(millis - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 }
 
 function formatAddress(address?: Partial<CompanyAddress> | null) {
@@ -320,6 +332,7 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [contactSearch, setContactSearch] = useState("");
   const [contactForm, setContactForm] = useState<ContactFormState>(createEmptyContactForm);
+  const [editingContactId, setEditingContactId] = useState<string | null>(null);
   const [interactionForm, setInteractionForm] = useState<InteractionFormState>(createEmptyInteraction);
   const [equipmentForm, setEquipmentForm] = useState<EquipmentFormState>(EMPTY_EQUIPMENT);
   const [events, setEvents] = useState<CrmEvent[]>([]);
@@ -327,6 +340,9 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
   const [savingContact, setSavingContact] = useState(false);
   const [savingInteraction, setSavingInteraction] = useState(false);
   const [savingEquipment, setSavingEquipment] = useState(false);
+  const [editingEquipmentId, setEditingEquipmentId] = useState<string | null>(null);
+  const [equipmentEditForm, setEquipmentEditForm] = useState<EquipmentFormState>(EMPTY_EQUIPMENT);
+  const [savingEquipmentEdit, setSavingEquipmentEdit] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [interactionOpen, setInteractionOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -400,11 +416,17 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
     const installedQuery = query(collection(db, "installed_base"), where("workspaceId", "==", workspaceId), where("contactId", "==", selectedContactId), limit(100));
     const unsubscribeEvents = onSnapshot(eventsQuery, (snapshot) => setEvents(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as CrmEvent)).sort((left, right) => timestampToMillis(right.occurredAt) - timestampToMillis(left.occurredAt))), () => setStatus({ tone: "error", text: "Não foi possível carregar o histórico do contato." }));
     const unsubscribeInterests = onSnapshot(interestsQuery, (snapshot) => {
-      const items = snapshot.docs.map((item) => ({ id: item.id, relationType: "interest", ...item.data() } as EquipmentLink));
+      const items = snapshot.docs.map((item) => {
+        const data = item.data();
+        return { ...data, id: item.id, sourceCollection: "interests", rawData: data, relationType: data.relationType || "interest" } as EquipmentLink;
+      });
       setEquipmentLinks((current) => [...items, ...current.filter((item) => item.relationType === "installed")]);
     });
     const unsubscribeInstalled = onSnapshot(installedQuery, (snapshot) => {
-      const items = snapshot.docs.map((item) => ({ id: item.id, relationType: "installed", ...item.data() } as EquipmentLink));
+      const items = snapshot.docs.map((item) => {
+        const data = item.data();
+        return { ...data, id: item.id, sourceCollection: "installed_base", rawData: data, relationType: data.relationType || "installed" } as EquipmentLink;
+      });
       setEquipmentLinks((current) => [...current.filter((item) => item.relationType === "interest"), ...items]);
     });
     return () => { unsubscribeEvents(); unsubscribeInterests(); unsubscribeInstalled(); };
@@ -420,7 +442,7 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
     setDetailTab("overview");
     setMobilePane("detail");
   };
-  const closeCreateDialog = () => { setCreateOpen(false); setFormError(null); setContactForm(createEmptyContactForm()); };
+  const closeCreateDialog = () => { setCreateOpen(false); setEditingContactId(null); setFormError(null); setContactForm(createEmptyContactForm()); };
 
   const handleDeleteContact = async () => {
     if (!isAdmin || !selectedContact) return;
@@ -484,6 +506,31 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
   const updatePhone = (index: number, patch: Partial<PhoneEntry>) => setContactForm((previous) => ({ ...previous, phones: previous.phones.map((phone, phoneIndex) => phoneIndex === index ? { ...phone, ...patch } : phone) }));
   const updateEmail = (index: number, patch: Partial<EmailEntry>) => setContactForm((previous) => ({ ...previous, emails: previous.emails.map((email, emailIndex) => emailIndex === index ? { ...email, ...patch } : email) }));
 
+  const startContactEdit = () => {
+    if (!selectedContact) return;
+    const phones = contactPhones(selectedContact);
+    const emails = contactEmails(selectedContact);
+    setEditingContactId(selectedContact.id);
+    setContactForm({
+      companyId: selectedCompany?.id || "",
+      companyName: selectedCompany?.name || "",
+      companySector: selectedCompany?.sector || "",
+      companyLocality: selectedCompany?.locality || selectedCompany?.address?.city || "",
+      companyAddress: { ...EMPTY_ADDRESS, ...(selectedCompany?.address || {}) },
+      name: selectedContact.displayName || selectedContact.name || "",
+      role: selectedContact.role || "",
+      sector: selectedContact.sector || "",
+      locality: selectedContact.locality || "",
+      phones: phones.length ? phones.map((phone) => ({ ...phone })) : [{ label: "Celular", value: "", hasWhatsapp: false }],
+      emails: emails.length ? emails.map((email) => ({ ...email })) : [{ label: "Principal", value: "" }],
+      notes: selectedContact.notes || "",
+      nextContactAt: toDateInputValue(selectedContact.nextContactAt),
+    });
+    setFormError(null);
+    setStatus(null);
+    setCreateOpen(true);
+  };
+
   const handleContactSubmit = async (event: FormEvent) => {
     event.preventDefault();
     const companyName = contactForm.companyName.trim();
@@ -532,6 +579,86 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
       const emails = contactForm.emails.filter((email) => email.value.trim()).map((email) => ({ ...email, value: email.value.trim() }));
       const phoneDigitsList = phones.map((phone) => phone.digits).filter(Boolean);
       const whatsappPhoneDigits = phones.filter((phone) => phone.hasWhatsapp).map((phone) => phone.digits).filter(Boolean);
+
+      if (editingContactId) {
+        const contactToEdit = contacts.find((contact) => contact.id === editingContactId);
+        if (!contactToEdit) throw new Error("Contato não encontrado.");
+
+        const companyRef = contactForm.companyId
+          ? doc(db, "accounts", contactForm.companyId)
+          : existingCompany
+            ? doc(db, "accounts", existingCompany.id)
+            : doc(collection(db, "accounts"));
+        const companyId = companyRef.id;
+        const companyData = {
+          name: companyName,
+          normalizedName,
+          sector: contactForm.companySector.trim() || null,
+          locality: contactForm.companyLocality.trim() || contactForm.companyAddress.city.trim() || null,
+          address: Object.values(contactForm.companyAddress).some(Boolean) ? contactForm.companyAddress : null,
+          updatedAt: serverTimestamp(),
+        };
+        const batch = writeBatch(db);
+        if (contactForm.companyId || existingCompany) {
+          batch.update(companyRef, companyData);
+        } else {
+          batch.set(companyRef, { type: "account", ...companyData, workspaceId, ownerId: user.uid, createdAt: serverTimestamp() });
+        }
+
+        const contactData: Record<string, unknown> = {
+          companyId,
+          name: contactName,
+          displayName: contactName,
+          role: contactForm.role.trim() || null,
+          sector: contactForm.sector.trim() || contactForm.companySector.trim() || null,
+          email: emails[0]?.value || null,
+          emails,
+          phoneNumber: phones[0]?.value || null,
+          phoneDigits: phoneDigitsList[0] || null,
+          phoneDigitsList,
+          phoneNumbers: phones,
+          whatsappPhoneDigits,
+          locality: contactForm.locality.trim() || contactForm.companyLocality.trim() || null,
+          notes: contactForm.notes.trim() || null,
+          updatedAt: serverTimestamp(),
+        };
+        if (contactForm.nextContactAt !== toDateInputValue(contactToEdit.nextContactAt)) {
+          const nextContactAt = parseOptionalDate(contactForm.nextContactAt);
+          contactData.nextContactAt = nextContactAt;
+          contactData.nextContactSource = nextContactAt ? "manual" : null;
+        }
+        batch.update(doc(db, "contacts", editingContactId), contactData);
+
+        const channels = await getDocs(query(
+          collection(db, "contact_channels"),
+          where("workspaceId", "==", workspaceId),
+          where("contactId", "==", editingContactId),
+        ));
+        channels.docs.forEach((channel) => batch.delete(channel.ref));
+        phones.forEach((phone, index) => batch.set(doc(collection(db, "contact_channels")), {
+          type: "contact_channel", accountId: companyId, companyId, contactId: editingContactId,
+          channelType: "phone", channelValue: phone.value, phoneDigits: phone.digits, hasWhatsapp: phone.hasWhatsapp,
+          label: phone.label || "Telefone", isPrimary: index === 0, status: "active", workspaceId, ownerId: user.uid,
+          createdAt: serverTimestamp(),
+        }));
+        emails.forEach((email, index) => batch.set(doc(collection(db, "contact_channels")), {
+          type: "contact_channel", accountId: companyId, companyId, contactId: editingContactId,
+          channelType: "email", channelValue: email.value, label: email.label || "E-mail",
+          isPrimary: index === 0, status: "active", workspaceId, ownerId: user.uid, createdAt: serverTimestamp(),
+        }));
+
+        await batch.commit();
+        setCompanies((current) => current.some((company) => company.id === companyId)
+          ? current.map((company) => company.id === companyId ? { id: companyId, ...companyData } : company)
+          : [...current, { id: companyId, ...companyData }]);
+        setContacts((current) => current.map((contact) => contact.id === editingContactId ? { ...contact, ...contactData } as Contact : contact));
+        setSelectedContactId(editingContactId);
+        setDetailTab("overview");
+        closeCreateDialog();
+        setStatus({ tone: "success", text: "Cadastro atualizado." });
+        return;
+      }
+
       const contactRef = await addDoc(collection(db, "contacts"), {
         type: "contact",
         companyId,
@@ -550,6 +677,8 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
         whatsappPhoneDigits,
         locality: contactForm.locality.trim() || contactForm.companyLocality.trim() || null,
         notes: contactForm.notes.trim() || null,
+        nextContactAt: parseOptionalDate(contactForm.nextContactAt),
+        nextContactSource: contactForm.nextContactAt ? "manual" : null,
         status: "active",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -560,7 +689,7 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
         ...emails.map((email, index) => addDoc(collection(db, "contact_channels"), { type: "contact_channel", accountId: companyId, companyId, contactId: contactRef.id, channelType: "email", channelValue: email.value, label: email.label || "E-mail", isPrimary: index === 0, status: "active", workspaceId, ownerId: user.uid, createdAt: serverTimestamp() })),
       ]);
 
-      const newContact = { id: contactRef.id, companyId, name: contactName, displayName: contactName, role: contactForm.role.trim() || null, sector: contactForm.sector.trim() || contactForm.companySector.trim() || null, email: emails[0]?.value || null, emails, phoneNumber: phones[0]?.value || null, phoneNumbers: phones, phoneDigitsList, whatsappPhoneDigits, locality: contactForm.locality.trim() || contactForm.companyLocality.trim() || null, notes: contactForm.notes.trim() || null } satisfies Contact;
+      const newContact = { id: contactRef.id, companyId, name: contactName, displayName: contactName, role: contactForm.role.trim() || null, sector: contactForm.sector.trim() || contactForm.companySector.trim() || null, email: emails[0]?.value || null, emails, phoneNumber: phones[0]?.value || null, phoneNumbers: phones, phoneDigitsList, whatsappPhoneDigits, locality: contactForm.locality.trim() || contactForm.companyLocality.trim() || null, notes: contactForm.notes.trim() || null, nextContactAt: parseOptionalDate(contactForm.nextContactAt), nextContactSource: contactForm.nextContactAt ? "manual" : null } satisfies Contact;
       setContacts((current) => [...current.filter((contact) => contact.id !== contactRef.id), newContact]);
       setSelectedContactId(contactRef.id);
       setDetailTab("overview");
@@ -693,14 +822,59 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
     }
   };
 
+  const handleEquipmentEditSubmit = async (event: FormEvent, link: EquipmentLink) => {
+    event.preventDefault();
+    if (!db || !user?.uid || !workspaceId || !selectedContact || (!equipmentEditForm.catalogItemId && !equipmentEditForm.model.trim() && !equipmentEditForm.brand.trim())) {
+      setStatus({ tone: "error", text: "Informe um equipamento do catálogo ou preencha marca e modelo." });
+      return;
+    }
+    setSavingEquipmentEdit(true);
+    setStatus(null);
+    try {
+      const selectedCatalogItem = catalogItems.find((item) => item.id === equipmentEditForm.catalogItemId);
+      const targetCollection = equipmentEditForm.relationType === "installed" ? "installed_base" : "interests";
+      const equipmentData = {
+        ...link.rawData,
+        type: targetCollection === "installed_base" ? "installed_base_item" : "interest",
+        relationType: equipmentEditForm.relationType,
+        contactId: selectedContact.id,
+        companyId: selectedContact.companyId || null,
+        workspaceId,
+        catalogItemId: selectedCatalogItem?.id || null,
+        equipmentType: equipmentEditForm.equipmentType.trim() || selectedCatalogItem?.itemType || null,
+        brand: equipmentEditForm.brand.trim() || selectedCatalogItem?.brand || null,
+        model: equipmentEditForm.model.trim() || selectedCatalogItem?.model || null,
+        status: selectedCatalogItem ? "confirmed" : "pending_catalog",
+        updatedAt: serverTimestamp(),
+      };
+      const batch = writeBatch(db);
+      const sourceRef = doc(db, link.sourceCollection, link.id);
+      if (targetCollection === link.sourceCollection) {
+        batch.update(sourceRef, equipmentData);
+      } else {
+        const targetRef = doc(collection(db, targetCollection));
+        batch.set(targetRef, { ...equipmentData, createdAt: link.rawData.createdAt || serverTimestamp() });
+        batch.delete(sourceRef);
+      }
+      await batch.commit();
+      setEditingEquipmentId(null);
+      setEquipmentEditForm(EMPTY_EQUIPMENT);
+      setStatus({ tone: "success", text: "Equipamento atualizado." });
+    } catch {
+      setStatus({ tone: "error", text: "Não foi possível atualizar o equipamento." });
+    } finally {
+      setSavingEquipmentEdit(false);
+    }
+  };
+
   return (
     <div className="min-h-full bg-background pb-20 text-foreground">
-      <div className="border-b border-border/70 bg-card px-4 py-7 md:px-8 md:py-8"><div className="mx-auto max-w-7xl"><div className="mb-3 flex items-center gap-2 text-xs font-medium text-primary"><Building2 size={15} /> CRM</div><div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"><div><h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Contatos e relacionamento</h1><p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">Organize empresas, contatos e o histórico de cada conversa em um fluxo contínuo.</p></div><div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto"><Button type="button" variant="outline" onClick={onOpenImport} disabled={!onOpenImport} className="h-10 w-full gap-2 sm:w-auto"><FileSpreadsheet size={16} /> Importar</Button>{isAdmin && <Button type="button" variant="outline" onClick={openRecycleBin} className="h-10 w-full gap-2 sm:w-auto"><Archive size={16} /> Lixeira</Button>}<Button type="button" onClick={() => { setFormError(null); setCreateOpen(true); }} className="h-10 w-full gap-2 sm:w-auto"><Plus size={16} /> Novo contato</Button></div></div></div></div>
+      <div className="border-b border-border/70 bg-card px-4 py-7 md:px-8 md:py-8"><div className="mx-auto max-w-7xl"><div className="mb-3 flex items-center gap-2 text-xs font-medium text-primary"><Building2 size={15} /> CRM</div><div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"><div><h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Contatos e relacionamento</h1><p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">Organize empresas, contatos e o histórico de cada conversa em um fluxo contínuo.</p></div><div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto"><Button type="button" variant="outline" onClick={onOpenImport} disabled={!onOpenImport} className="h-10 w-full gap-2 sm:w-auto"><FileSpreadsheet size={16} /> Importar</Button>{isAdmin && <Button type="button" variant="outline" onClick={openRecycleBin} className="h-10 w-full gap-2 sm:w-auto"><Archive size={16} /> Lixeira</Button>}<Button type="button" onClick={() => { setEditingContactId(null); setContactForm(createEmptyContactForm()); setFormError(null); setCreateOpen(true); }} className="h-10 w-full gap-2 sm:w-auto"><Plus size={16} /> Novo contato</Button></div></div></div></div>
 
       <div className="mx-auto grid max-w-7xl gap-5 px-4 py-5 md:px-8 xl:grid-cols-[minmax(300px,0.72fr)_minmax(0,1.6fr)]">
-        <section className={cn("min-w-0", mobilePane === "detail" && "hidden xl:block")}><div className="rounded-2xl border border-border/70 bg-card shadow-sm"><div className="border-b border-border/70 p-4"><div className="flex items-center justify-between gap-3"><div><h2 className="text-base font-semibold">Sua carteira</h2><p className="mt-1 text-xs text-muted-foreground">{contacts.length} {contacts.length === 1 ? "contato" : "contatos"}</p></div><UsersRound className="text-primary" size={18} /></div><div className="relative mt-4"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} /><Input value={contactSearch} onChange={(event) => setContactSearch(event.target.value)} className="h-10 pl-9 pr-9" placeholder="Buscar contato ou empresa" aria-label="Buscar contato ou empresa" />{contactSearch && <button type="button" onClick={() => setContactSearch("")} className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Limpar busca"><X size={14} /></button>}</div></div><div className="divide-y divide-border/60">{visibleContacts.length === 0 ? <div className="px-5 py-12 text-center"><UserRound className="mx-auto text-muted-foreground/50" size={28} /><p className="mt-3 text-sm font-medium">{contactSearch ? "Nenhum contato encontrado" : "Sua carteira está vazia"}</p><p className="mt-1 text-xs leading-relaxed text-muted-foreground">{contactSearch ? "Tente buscar por outro nome, empresa ou telefone." : "Cadastre um contato para começar a acompanhar os relacionamentos."}</p>{!contactSearch && <Button type="button" variant="outline" onClick={() => setCreateOpen(true)} className="mt-4 gap-2"><Plus size={14} /> Cadastrar contato</Button>}</div> : visibleContacts.map((contact) => { const state = followUpState(contact); const company = companies.find((item) => item.id === contact.companyId); return <button key={contact.id} type="button" onClick={() => selectContact(contact.id)} className={cn("flex min-h-[76px] w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/60 focus-visible:bg-muted focus-visible:outline-none", selectedContactId === contact.id && "bg-accent/60")} aria-current={selectedContactId === contact.id ? "true" : undefined}><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-semibold text-primary">{(contact.displayName || contact.name || "?").trim().charAt(0).toUpperCase()}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{contact.displayName || contact.name || "Contato sem nome"}</span><span className="mt-0.5 block truncate text-xs text-muted-foreground">{company?.name || "Empresa não vinculada"}{contact.role ? ` · ${contact.role}` : ""}</span><span className="mt-1 block text-[11px] text-muted-foreground">{state.label}</span></span><ChevronRight className="shrink-0 text-muted-foreground" size={16} /></button>; })}</div></div></section>
+        <section className={cn("min-w-0", mobilePane === "detail" && "hidden xl:block")}><div className="rounded-2xl border border-border/70 bg-card shadow-sm"><div className="border-b border-border/70 p-4"><div className="flex items-center justify-between gap-3"><div><h2 className="text-base font-semibold">Sua carteira</h2><p className="mt-1 text-xs text-muted-foreground">{contacts.length} {contacts.length === 1 ? "contato" : "contatos"}</p></div><UsersRound className="text-primary" size={18} /></div><div className="relative mt-4"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} /><Input value={contactSearch} onChange={(event) => setContactSearch(event.target.value)} className="h-10 pl-9 pr-9" placeholder="Buscar contato ou empresa" aria-label="Buscar contato ou empresa" />{contactSearch && <button type="button" onClick={() => setContactSearch("")} className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Limpar busca"><X size={14} /></button>}</div></div><div className="divide-y divide-border/60">{visibleContacts.length === 0 ? <div className="px-5 py-12 text-center"><UserRound className="mx-auto text-muted-foreground/50" size={28} /><p className="mt-3 text-sm font-medium">{contactSearch ? "Nenhum contato encontrado" : "Sua carteira está vazia"}</p><p className="mt-1 text-xs leading-relaxed text-muted-foreground">{contactSearch ? "Tente buscar por outro nome, empresa ou telefone." : "Cadastre um contato para começar a acompanhar os relacionamentos."}</p>{!contactSearch && <Button type="button" variant="outline" onClick={() => { setEditingContactId(null); setContactForm(createEmptyContactForm()); setCreateOpen(true); }} className="mt-4 gap-2"><Plus size={14} /> Cadastrar contato</Button>}</div> : visibleContacts.map((contact) => { const state = followUpState(contact); const company = companies.find((item) => item.id === contact.companyId); return <button key={contact.id} type="button" onClick={() => selectContact(contact.id)} className={cn("flex min-h-[76px] w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/60 focus-visible:bg-muted focus-visible:outline-none", selectedContactId === contact.id && "bg-accent/60")} aria-current={selectedContactId === contact.id ? "true" : undefined}><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-semibold text-primary">{(contact.displayName || contact.name || "?").trim().charAt(0).toUpperCase()}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{contact.displayName || contact.name || "Contato sem nome"}</span><span className="mt-0.5 block truncate text-xs text-muted-foreground">{company?.name || "Empresa não vinculada"}{contact.role ? ` · ${contact.role}` : ""}</span><span className="mt-1 block text-[11px] text-muted-foreground">{state.label}</span></span><ChevronRight className="shrink-0 text-muted-foreground" size={16} /></button>; })}</div></div></section>
 
-        <section className={cn("min-w-0", mobilePane === "list" && "hidden xl:block")}>{!selectedContact ? <div className="flex min-h-[360px] items-center justify-center rounded-2xl border border-dashed border-border bg-card p-8 text-center"><div><UserRound className="mx-auto text-muted-foreground/50" size={30} /><h2 className="mt-4 text-base font-semibold">Selecione um contato</h2><p className="mt-1 max-w-sm text-sm text-muted-foreground">Escolha uma pessoa na carteira para acessar dados, histórico e próximas ações.</p></div></div> : <div className="space-y-5 md:sticky md:top-24 md:self-start"><Button type="button" variant="ghost" onClick={() => setMobilePane("list")} className="h-10 gap-2 px-0 text-muted-foreground hover:bg-transparent hover:text-foreground xl:hidden"><ArrowLeft size={16} /> Voltar para contatos</Button><div className="rounded-2xl border border-border/70 bg-card shadow-sm"><div className="flex flex-col gap-4 border-b border-border/70 p-5 sm:flex-row sm:items-start sm:justify-between"><div className="flex min-w-0 items-start gap-3"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent text-lg font-semibold text-primary">{(selectedContact.displayName || selectedContact.name || "?").trim().charAt(0).toUpperCase()}</span><div className="min-w-0"><h2 className="truncate text-xl font-semibold">{selectedContact.displayName || selectedContact.name}</h2><p className="mt-1 truncate text-sm text-muted-foreground">{selectedCompany?.name || "Empresa não vinculada"}{selectedContact.role ? ` · ${selectedContact.role}` : ""}</p><div className="mt-3 flex flex-wrap gap-2"><Badge variant="outline" className={cn("rounded-full px-2.5 py-1 text-[11px] font-medium", followUpState(selectedContact).className)}>{followUpState(selectedContact).label}</Badge>{selectedContact.sector && <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-[11px] font-medium">{selectedContact.sector}</Badge>}</div></div></div><div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row"><Button type="button" variant="outline" onClick={() => { setInteractionForm(createEmptyInteraction()); setInteractionOpen(true); }} className="h-10 w-full gap-2 sm:w-auto"><Plus size={15} /> Registrar interação</Button>{isAdmin && <Button type="button" variant="outline" onClick={() => setDeleteOpen(true)} className="h-10 w-full gap-2 border-destructive/30 text-destructive hover:border-destructive/50 hover:bg-destructive/10 hover:text-destructive sm:w-auto"><Trash2 size={15} /> Excluir contato</Button>}</div></div><div className="flex overflow-x-auto border-b border-border/70 px-3" role="tablist" aria-label="Detalhes do contato">{[{ id: "overview", label: "Resumo" }, { id: "interactions", label: "Interações", count: events.length }, { id: "equipment", label: "Equipamentos", count: equipmentLinks.length }].map((tab) => <button key={tab.id} type="button" role="tab" aria-selected={detailTab === tab.id} onClick={() => setDetailTab(tab.id as typeof detailTab)} className={cn("min-h-12 shrink-0 border-b-2 px-3 text-sm font-medium transition-colors", detailTab === tab.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>{tab.label}{typeof tab.count === "number" && <span className="ml-1.5 text-xs text-muted-foreground">{tab.count}</span>}</button>)}</div><div className="p-5">{detailTab === "overview" && <div className="space-y-6"><div className="grid gap-4 sm:grid-cols-2"><InfoItem icon={Mail} label="E-mails" value={contactEmails(selectedContact).map((email) => email.value).join(" · ") || "Ainda não informado"} /><InfoItem icon={Phone} label="Telefones" value={contactPhones(selectedContact).map((phone) => phone.value).join(" · ") || "Ainda não informado"} /><InfoItem icon={MapPin} label="Localidade" value={selectedContact.locality || selectedCompany?.locality || "Ainda não informado"} /><InfoItem icon={Clock3} label="Último contato" value={formatDate(selectedContact.lastContactAt)} /></div><div className="rounded-xl border border-border/70 bg-muted/35 p-4"><div className="flex items-center gap-2 text-sm font-semibold"><Building2 size={16} className="text-primary" /> {selectedCompany?.name || "Empresa não vinculada"}</div><p className="mt-2 text-sm leading-relaxed text-muted-foreground">{formatAddress(selectedCompany?.address)}</p></div>{selectedContact.notes && <div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Observações</p><p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground/80">{selectedContact.notes}</p></div>}<div className="grid gap-3 border-t border-border/70 pt-5 sm:grid-cols-2"><div><p className="text-xs text-muted-foreground">Próximo contato</p><p className="mt-1 text-sm font-semibold">{formatDate(selectedContact.nextContactAt)}</p></div><div><p className="text-xs text-muted-foreground">Origem da data</p><p className="mt-1 text-sm font-semibold">{selectedContact.nextContactSource === "ai" ? "Sugestão da IA" : selectedContact.nextContactAt ? "Definida pela equipe" : "Ainda não definida"}</p></div></div></div>}{detailTab === "interactions" && <InteractionTimeline events={events} onRegister={() => setInteractionOpen(true)} />}{detailTab === "equipment" && <EquipmentPanel catalogItems={catalogItems} equipmentForm={equipmentForm} setEquipmentForm={setEquipmentForm} equipmentLinks={equipmentLinks} savingEquipment={savingEquipment} onSubmit={handleEquipmentSubmit} />}</div></div></div>}</section>
+        <section className={cn("min-w-0", mobilePane === "list" && "hidden xl:block")}>{!selectedContact ? <div className="flex min-h-[360px] items-center justify-center rounded-2xl border border-dashed border-border bg-card p-8 text-center"><div><UserRound className="mx-auto text-muted-foreground/50" size={30} /><h2 className="mt-4 text-base font-semibold">Selecione um contato</h2><p className="mt-1 max-w-sm text-sm text-muted-foreground">Escolha uma pessoa na carteira para acessar dados, histórico e próximas ações.</p></div></div> : <div className="space-y-5 md:sticky md:top-24 md:self-start"><Button type="button" variant="ghost" onClick={() => setMobilePane("list")} className="h-10 gap-2 px-0 text-muted-foreground hover:bg-transparent hover:text-foreground xl:hidden"><ArrowLeft size={16} /> Voltar para contatos</Button><div className="rounded-2xl border border-border/70 bg-card shadow-sm"><div className="flex flex-col gap-4 border-b border-border/70 p-5 sm:flex-row sm:items-start sm:justify-between"><div className="flex min-w-0 items-start gap-3"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent text-lg font-semibold text-primary">{(selectedContact.displayName || selectedContact.name || "?").trim().charAt(0).toUpperCase()}</span><div className="min-w-0"><h2 className="truncate text-xl font-semibold">{selectedContact.displayName || selectedContact.name}</h2><p className="mt-1 truncate text-sm text-muted-foreground">{selectedCompany?.name || "Empresa não vinculada"}{selectedContact.role ? ` · ${selectedContact.role}` : ""}</p><div className="mt-3 flex flex-wrap gap-2"><Badge variant="outline" className={cn("rounded-full px-2.5 py-1 text-[11px] font-medium", followUpState(selectedContact).className)}>{followUpState(selectedContact).label}</Badge>{selectedContact.sector && <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-[11px] font-medium">{selectedContact.sector}</Badge>}</div></div></div><div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row"><Button type="button" variant="outline" onClick={startContactEdit} className="h-10 w-full gap-2 sm:w-auto"><Pencil size={15} /> Editar cadastro</Button><Button type="button" onClick={() => { setInteractionForm(createEmptyInteraction()); setInteractionOpen(true); }} className="h-10 w-full gap-2 sm:w-auto"><Plus size={15} /> Registrar interação</Button>{isAdmin && <Button type="button" variant="outline" onClick={() => setDeleteOpen(true)} className="h-10 w-full gap-2 border-destructive/30 text-destructive hover:border-destructive/50 hover:bg-destructive/10 hover:text-destructive sm:w-auto"><Trash2 size={15} /> Excluir contato</Button>}</div></div><div className="flex overflow-x-auto border-b border-border/70 px-3" role="tablist" aria-label="Detalhes do contato">{[{ id: "overview", label: "Resumo" }, { id: "interactions", label: "Interações", count: events.length }, { id: "equipment", label: "Equipamentos", count: equipmentLinks.length }].map((tab) => <button key={tab.id} type="button" role="tab" aria-selected={detailTab === tab.id} onClick={() => setDetailTab(tab.id as typeof detailTab)} className={cn("min-h-12 shrink-0 border-b-2 px-3 text-sm font-medium transition-colors", detailTab === tab.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>{tab.label}{typeof tab.count === "number" && <span className="ml-1.5 text-xs text-muted-foreground">{tab.count}</span>}</button>)}</div><div className="p-5">{detailTab === "overview" && <div className="space-y-6"><div className="grid gap-4 sm:grid-cols-2"><InfoItem icon={Mail} label="E-mails" value={contactEmails(selectedContact).map((email) => email.value).join(" · ") || "Ainda não informado"} /><InfoItem icon={Phone} label="Telefones" value={contactPhones(selectedContact).map((phone) => phone.value).join(" · ") || "Ainda não informado"} /><InfoItem icon={MapPin} label="Localidade" value={selectedContact.locality || selectedCompany?.locality || "Ainda não informado"} /><InfoItem icon={Clock3} label="Último contato" value={formatDate(selectedContact.lastContactAt)} /></div><div className="rounded-xl border border-border/70 bg-muted/35 p-4"><div className="flex items-center gap-2 text-sm font-semibold"><Building2 size={16} className="text-primary" /> {selectedCompany?.name || "Empresa não vinculada"}</div><p className="mt-2 text-sm leading-relaxed text-muted-foreground">{formatAddress(selectedCompany?.address)}</p></div>{selectedContact.notes && <div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Observações</p><p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground/80">{selectedContact.notes}</p></div>}<div className="grid gap-3 border-t border-border/70 pt-5 sm:grid-cols-2"><div><p className="text-xs text-muted-foreground">Próximo contato</p><p className="mt-1 text-sm font-semibold">{formatDate(selectedContact.nextContactAt)}</p></div><div><p className="text-xs text-muted-foreground">Origem da data</p><p className="mt-1 text-sm font-semibold">{selectedContact.nextContactSource === "ai" ? "Sugestão da IA" : selectedContact.nextContactAt ? "Definida pela equipe" : "Ainda não definida"}</p></div></div></div>}{detailTab === "interactions" && <InteractionTimeline events={events} onRegister={() => setInteractionOpen(true)} />}{detailTab === "equipment" && <EquipmentPanel catalogItems={catalogItems} equipmentForm={equipmentForm} setEquipmentForm={setEquipmentForm} equipmentLinks={equipmentLinks} savingEquipment={savingEquipment} onSubmit={handleEquipmentSubmit} editingEquipmentId={editingEquipmentId} equipmentEditForm={equipmentEditForm} setEquipmentEditForm={setEquipmentEditForm} savingEquipmentEdit={savingEquipmentEdit} onStartEdit={(link) => { setEquipmentEditForm({ relationType: link.relationType === "installed" ? "installed" : "interest", catalogItemId: link.catalogItemId || "", equipmentType: link.equipmentType || "", brand: link.brand || "", model: link.model || "" }); setEditingEquipmentId(link.sourceCollection + ":" + link.id); setStatus(null); }} onCancelEdit={() => { setEditingEquipmentId(null); setEquipmentEditForm(EMPTY_EQUIPMENT); }} onEditSubmit={handleEquipmentEditSubmit} />}</div></div></div>}</section>
       </div>
 
       {status && <div role={status.tone === "error" ? "alert" : "status"} aria-live="polite" className={cn("fixed bottom-20 left-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-xl border px-4 py-3 text-sm shadow-lg md:bottom-6", status.tone === "error" ? "border-red-200 bg-red-50 text-red-800" : "border-emerald-200 bg-emerald-50 text-emerald-800")}>{status.text}</div>}
@@ -734,8 +908,8 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
         <DialogContent showCloseButton={false} className="max-h-[calc(100dvh-1rem)] max-w-3xl overflow-hidden p-0 sm:max-w-3xl">
           <form onSubmit={handleContactSubmit} noValidate className="flex max-h-[calc(100dvh-1rem)] flex-col">
             <DialogHeader className="border-b border-border/70 px-5 py-5 pr-14">
-              <DialogTitle className="text-xl">Novo contato</DialogTitle>
-              <DialogDescription>Cadastre a pessoa e a empresa. Depois de salvar, você já cai na tela do contato para registrar a primeira interação.</DialogDescription>
+              <DialogTitle className="text-xl">{editingContactId ? "Editar cadastro" : "Novo contato"}</DialogTitle>
+              <DialogDescription>{editingContactId ? "Atualize os dados salvos do contato e da empresa." : "Cadastre a pessoa e a empresa. Depois de salvar, você já cai na tela do contato para registrar a primeira interação."}</DialogDescription>
               <DialogClose asChild><Button type="button" variant="ghost" size="icon" className="absolute right-3 top-3 h-10 w-10" aria-label="Fechar cadastro"><X size={17} /></Button></DialogClose>
             </DialogHeader>
             <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
@@ -746,7 +920,7 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="relative md:col-span-2">
                       <Label htmlFor="companyName">Nome da empresa <span className="text-destructive">*</span></Label>
-                      <Input id="companyName" value={contactForm.companyName} onChange={(event) => setContactForm((previous) => ({ ...previous, companyId: "", companyName: event.target.value }))} className={fieldClassName()} placeholder="Digite pelo menos 2 letras para buscar" autoComplete="off" aria-invalid={Boolean(formError && !contactForm.companyName.trim())} />
+                      <Input id="companyName" value={contactForm.companyName} onChange={(event) => setContactForm((previous) => ({ ...previous, companyId: editingContactId ? previous.companyId : "", companyName: event.target.value }))} className={fieldClassName()} placeholder="Digite pelo menos 2 letras para buscar" autoComplete="off" aria-invalid={Boolean(formError && !contactForm.companyName.trim())} />
                       {companySuggestions.length > 0 && <div className="absolute inset-x-0 top-full z-30 mt-1 overflow-hidden rounded-xl border border-border bg-popover p-1 shadow-lg" role="listbox" aria-label="Empresas encontradas">{companySuggestions.map((company) => <button key={company.id} type="button" role="option" aria-selected={contactForm.companyId === company.id} onClick={() => selectCompany(company)} className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"><Building2 size={16} className="mt-0.5 shrink-0 text-primary" /><span className="min-w-0"><span className="block truncate text-sm font-medium">{company.name}</span><span className="block truncate text-xs text-muted-foreground">{company.sector || "Setor não informado"}{company.locality ? ` · ${company.locality}` : ""}</span></span></button>)}</div>}
                       {contactForm.companyName.trim().length >= 2 && companySuggestions.length === 0 && <p className="mt-2 text-xs text-muted-foreground">Nenhuma empresa encontrada. Continue para cadastrar uma nova.</p>}
                     </div>
@@ -771,10 +945,10 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
                   <SectionEyebrow icon={AtSign} label="E-mails" />
                   <div className="space-y-3">{contactForm.emails.map((email, index) => <div key={`email-${index}`} className="grid gap-2 sm:grid-cols-[120px_minmax(0,1fr)_auto]"><Input aria-label={`Rótulo do e-mail ${index + 1}`} value={email.label} onChange={(event) => updateEmail(index, { label: event.target.value })} className="h-10" placeholder="Principal" /><Input aria-label={`E-mail ${index + 1}`} type="email" value={email.value} onChange={(event) => updateEmail(index, { value: event.target.value })} className="h-10" placeholder="contato@empresa.com" />{contactForm.emails.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => setContactForm((previous) => ({ ...previous, emails: previous.emails.filter((_, emailIndex) => emailIndex !== index) }))} className="h-10 w-10 text-muted-foreground hover:text-destructive" aria-label={`Remover e-mail ${index + 1}`}><Trash2 size={15} /></Button>}</div>)}<Button type="button" variant="outline" onClick={() => setContactForm((previous) => ({ ...previous, emails: [...previous.emails, { label: "Outro", value: "" }] }))} className="gap-2"><Plus size={14} /> Adicionar e-mail</Button></div>
                 </section>
-                <section><SectionEyebrow icon={History} label="Contexto" /><Label htmlFor="contactNotes">Observações</Label><Textarea id="contactNotes" value={contactForm.notes} onChange={(event) => setContactForm((previous) => ({ ...previous, notes: event.target.value }))} className="mt-2 min-h-24 resize-none" placeholder="Contexto inicial, preferências ou próximos passos" /></section>
+                <section><SectionEyebrow icon={History} label="Contexto" /><Label htmlFor="contactNotes">Observações</Label><Textarea id="contactNotes" value={contactForm.notes} onChange={(event) => setContactForm((previous) => ({ ...previous, notes: event.target.value }))} className="mt-2 min-h-24 resize-none" placeholder="Contexto inicial, preferências ou próximos passos" /><div className="mt-4"><Label htmlFor="contactNextContactAt">Próximo contato</Label><Input id="contactNextContactAt" type="datetime-local" value={contactForm.nextContactAt} onChange={(event) => setContactForm((previous) => ({ ...previous, nextContactAt: event.target.value }))} className={fieldClassName()} /><p className="mt-1 text-xs text-muted-foreground">A data fica registrada no contato. O último contato continua sendo preenchido pelo histórico.</p></div></section>
               </div>
             </div>
-            <DialogFooter className="border-border/70 bg-card px-5 py-4"><Button type="button" variant="outline" onClick={closeCreateDialog} className="h-10">Cancelar</Button><Button type="submit" disabled={savingContact} className="h-10 min-w-36 gap-2">{savingContact ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} Criar contato</Button></DialogFooter>
+            <DialogFooter className="border-border/70 bg-card px-5 py-4"><Button type="button" variant="outline" onClick={closeCreateDialog} className="h-10">Cancelar</Button><Button type="submit" disabled={savingContact} className="h-10 min-w-36 gap-2">{savingContact ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} {editingContactId ? "Salvar alterações" : "Criar contato"}</Button></DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
@@ -801,6 +975,121 @@ function InteractionTimeline({ events, onRegister }: { events: CrmEvent[]; onReg
   })}<Button type="button" variant="outline" onClick={onRegister} className="gap-2"><Plus size={14} /> Registrar outra interação</Button></div>;
 }
 
-function EquipmentPanel({ catalogItems, equipmentForm, setEquipmentForm, equipmentLinks, savingEquipment, onSubmit }: { catalogItems: CatalogItem[]; equipmentForm: EquipmentFormState; setEquipmentForm: React.Dispatch<React.SetStateAction<EquipmentFormState>>; equipmentLinks: EquipmentLink[]; savingEquipment: boolean; onSubmit: (event: FormEvent) => void }) {
-  return <div className="space-y-5"><div><h3 className="text-sm font-semibold">Interesses e equipamentos instalados</h3><p className="mt-1 text-xs text-muted-foreground">Vincule o que esse contato compra, usa ou está avaliando.</p></div><form onSubmit={onSubmit} noValidate className="space-y-4 rounded-xl border border-border/70 bg-muted/25 p-4"><div><Label htmlFor="equipmentRelation">Relação</Label><select id="equipmentRelation" value={equipmentForm.relationType} onChange={(event) => setEquipmentForm((previous) => ({ ...previous, relationType: event.target.value }))} className={`${fieldClassName()} w-full px-3`}><option value="interest">Interesse comercial</option><option value="installed">Equipamento instalado</option></select></div><div><Label htmlFor="catalogItem">Item do catálogo</Label><select id="catalogItem" value={equipmentForm.catalogItemId} onChange={(event) => { const item = catalogItems.find((catalog) => catalog.id === event.target.value); setEquipmentForm((previous) => ({ ...previous, catalogItemId: event.target.value, equipmentType: item?.itemType || previous.equipmentType, brand: item?.brand || previous.brand, model: item?.model || previous.model })); }} className={`${fieldClassName()} w-full px-3`}><option value="">Não encontrado no catálogo</option>{catalogItems.map((item) => <option key={item.id} value={item.id}>{[item.itemType, item.brand, item.model].filter(Boolean).join(" · ") || item.id}</option>)}</select></div><div className="grid gap-3 sm:grid-cols-3"><div><Label htmlFor="equipmentType">Tipo</Label><Input id="equipmentType" value={equipmentForm.equipmentType} onChange={(event) => setEquipmentForm((previous) => ({ ...previous, equipmentType: event.target.value }))} className={fieldClassName()} placeholder="Sensor" /></div><div><Label htmlFor="equipmentBrand">Marca</Label><Input id="equipmentBrand" value={equipmentForm.brand} onChange={(event) => setEquipmentForm((previous) => ({ ...previous, brand: event.target.value }))} className={fieldClassName()} placeholder="Marca" /></div><div><Label htmlFor="equipmentModel">Modelo</Label><Input id="equipmentModel" value={equipmentForm.model} onChange={(event) => setEquipmentForm((previous) => ({ ...previous, model: event.target.value }))} className={fieldClassName()} placeholder="Modelo" /></div></div><Button type="submit" disabled={savingEquipment} variant="outline" className="w-full gap-2">{savingEquipment ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} Vincular equipamento</Button></form>{equipmentLinks.length > 0 ? <div className="space-y-2">{equipmentLinks.map((link) => <div key={link.id} className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-card px-4 py-3"><div className="min-w-0"><p className="truncate text-sm font-medium">{[link.equipmentType, link.brand, link.model].filter(Boolean).join(" · ") || "Equipamento sem descrição"}</p><p className="mt-1 text-xs text-muted-foreground">{link.relationType === "installed" ? "Instalado" : "Interesse"}{link.status === "pending_catalog" ? " · Pendente de catálogo" : ""}</p></div><PackageSearch size={16} className="shrink-0 text-muted-foreground" /></div>)}</div> : <p className="rounded-xl border border-dashed border-border p-5 text-center text-xs text-muted-foreground">Nenhum equipamento vinculado ainda.</p>}</div>;
+function EquipmentPanel({
+  catalogItems,
+  equipmentForm,
+  setEquipmentForm,
+  equipmentLinks,
+  savingEquipment,
+  onSubmit,
+  editingEquipmentId,
+  equipmentEditForm,
+  setEquipmentEditForm,
+  savingEquipmentEdit,
+  onStartEdit,
+  onCancelEdit,
+  onEditSubmit,
+}: {
+  catalogItems: CatalogItem[];
+  equipmentForm: EquipmentFormState;
+  setEquipmentForm: React.Dispatch<React.SetStateAction<EquipmentFormState>>;
+  equipmentLinks: EquipmentLink[];
+  savingEquipment: boolean;
+  onSubmit: (event: FormEvent) => void;
+  editingEquipmentId: string | null;
+  equipmentEditForm: EquipmentFormState;
+  setEquipmentEditForm: React.Dispatch<React.SetStateAction<EquipmentFormState>>;
+  savingEquipmentEdit: boolean;
+  onStartEdit: (link: EquipmentLink) => void;
+  onCancelEdit: () => void;
+  onEditSubmit: (event: FormEvent, link: EquipmentLink) => void;
+}) {
+  return (
+    <div className="space-y-5">
+      <div>
+        <h3 className="text-sm font-semibold">Interesses e equipamentos instalados</h3>
+        <p className="mt-1 text-xs text-muted-foreground">Vincule o que esse contato compra, usa ou está avaliando.</p>
+      </div>
+      <form onSubmit={onSubmit} noValidate className="space-y-4 rounded-xl border border-border/70 bg-muted/25 p-4">
+        <div>
+          <Label htmlFor="equipmentRelation">Relação</Label>
+          <select id="equipmentRelation" value={equipmentForm.relationType} onChange={(event) => setEquipmentForm((previous) => ({ ...previous, relationType: event.target.value }))} className={"w-full px-3 " + fieldClassName()}>
+            <option value="interest">Interesse comercial</option>
+            <option value="installed">Equipamento instalado</option>
+          </select>
+        </div>
+        <div>
+          <Label htmlFor="catalogItem">Item do catálogo</Label>
+          <select id="catalogItem" value={equipmentForm.catalogItemId} onChange={(event) => {
+            const item = catalogItems.find((catalog) => catalog.id === event.target.value);
+            setEquipmentForm((previous) => ({ ...previous, catalogItemId: event.target.value, equipmentType: item?.itemType || previous.equipmentType, brand: item?.brand || previous.brand, model: item?.model || previous.model }));
+          }} className={"w-full px-3 " + fieldClassName()}>
+            <option value="">Não encontrado no catálogo</option>
+            {catalogItems.map((item) => <option key={item.id} value={item.id}>{[item.itemType, item.brand, item.model].filter(Boolean).join(" · ") || item.id}</option>)}
+          </select>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div><Label htmlFor="equipmentType">Tipo</Label><Input id="equipmentType" value={equipmentForm.equipmentType} onChange={(event) => setEquipmentForm((previous) => ({ ...previous, equipmentType: event.target.value }))} className={fieldClassName()} placeholder="Sensor" /></div>
+          <div><Label htmlFor="equipmentBrand">Marca</Label><Input id="equipmentBrand" value={equipmentForm.brand} onChange={(event) => setEquipmentForm((previous) => ({ ...previous, brand: event.target.value }))} className={fieldClassName()} placeholder="Marca" /></div>
+          <div><Label htmlFor="equipmentModel">Modelo</Label><Input id="equipmentModel" value={equipmentForm.model} onChange={(event) => setEquipmentForm((previous) => ({ ...previous, model: event.target.value }))} className={fieldClassName()} placeholder="Modelo" /></div>
+        </div>
+        <Button type="submit" disabled={savingEquipment} variant="outline" className="w-full gap-2">
+          {savingEquipment ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} Vincular equipamento
+        </Button>
+      </form>
+      {equipmentLinks.length > 0 ? (
+        <div className="space-y-2">
+          {equipmentLinks.map((link) => {
+            const isEditing = editingEquipmentId === link.sourceCollection + ":" + link.id;
+            if (isEditing) {
+              const relationId = "editEquipmentRelation-" + link.id;
+              const catalogId = "editCatalogItem-" + link.id;
+              return (
+                <form key={link.sourceCollection + ":" + link.id} onSubmit={(event) => onEditSubmit(event, link)} noValidate className="space-y-4 rounded-xl border border-primary/30 bg-card p-4">
+                  <div>
+                    <Label htmlFor={relationId}>Relação</Label>
+                    <select id={relationId} value={equipmentEditForm.relationType} onChange={(event) => setEquipmentEditForm((previous) => ({ ...previous, relationType: event.target.value }))} className={"w-full px-3 " + fieldClassName()}>
+                      <option value="interest">Interesse comercial</option>
+                      <option value="installed">Equipamento instalado</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label htmlFor={catalogId}>Item do catálogo</Label>
+                    <select id={catalogId} value={equipmentEditForm.catalogItemId} onChange={(event) => {
+                      const item = catalogItems.find((catalog) => catalog.id === event.target.value);
+                      setEquipmentEditForm((previous) => ({ ...previous, catalogItemId: event.target.value, equipmentType: item?.itemType || previous.equipmentType, brand: item?.brand || previous.brand, model: item?.model || previous.model }));
+                    }} className={"w-full px-3 " + fieldClassName()}>
+                      <option value="">Não encontrado no catálogo</option>
+                      {catalogItems.map((item) => <option key={item.id} value={item.id}>{[item.itemType, item.brand, item.model].filter(Boolean).join(" · ") || item.id}</option>)}
+                    </select>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div><Label htmlFor={"editEquipmentType-" + link.id}>Tipo</Label><Input id={"editEquipmentType-" + link.id} value={equipmentEditForm.equipmentType} onChange={(event) => setEquipmentEditForm((previous) => ({ ...previous, equipmentType: event.target.value }))} className={fieldClassName()} placeholder="Sensor" /></div>
+                    <div><Label htmlFor={"editEquipmentBrand-" + link.id}>Marca</Label><Input id={"editEquipmentBrand-" + link.id} value={equipmentEditForm.brand} onChange={(event) => setEquipmentEditForm((previous) => ({ ...previous, brand: event.target.value }))} className={fieldClassName()} placeholder="Marca" /></div>
+                    <div><Label htmlFor={"editEquipmentModel-" + link.id}>Modelo</Label><Input id={"editEquipmentModel-" + link.id} value={equipmentEditForm.model} onChange={(event) => setEquipmentEditForm((previous) => ({ ...previous, model: event.target.value }))} className={fieldClassName()} placeholder="Modelo" /></div>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="outline" onClick={onCancelEdit} disabled={savingEquipmentEdit}>Cancelar</Button>
+                    <Button type="submit" disabled={savingEquipmentEdit} className="gap-2">{savingEquipmentEdit ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} Salvar alterações</Button>
+                  </div>
+                </form>
+              );
+            }
+            return (
+              <div key={link.sourceCollection + ":" + link.id} className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-card px-4 py-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{[link.equipmentType, link.brand, link.model].filter(Boolean).join(" · ") || "Equipamento sem descrição"}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{link.relationType === "installed" ? "Instalado" : "Interesse"}{link.status === "pending_catalog" ? " · Pendente de catálogo" : ""}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => onStartEdit(link)} className="gap-2"><Pencil size={14} /> Editar</Button>
+                  <PackageSearch size={16} className="text-muted-foreground" />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : <p className="rounded-xl border border-dashed border-border p-5 text-center text-xs text-muted-foreground">Nenhum equipamento vinculado ainda.</p>}
+    </div>
+  );
 }

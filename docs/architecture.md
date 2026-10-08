@@ -119,6 +119,8 @@ CRM deletion is soft-delete by default. `deleteCrmContact` is an administrator-o
 
 Approved team members can update operational contact/company fields, but cannot change workspace, ownership, lifecycle/deletion metadata or communication-channel administration. `crm_events` is append-only: corrections are represented by a new event instead of editing or erasing history. The Performance screen and future mass-report/export collections are administrator-only; report files must be generated server-side and never exposed as unrestricted client exports.
 
+Company and contact profile fields remain editable after creation. Editing `nextContactAt` marks its source as manual so later AI enrichment preserves the user's value; `lastContactAt` remains derived from the interaction history. Historical `crm_events` stay immutable. Equipment links can be corrected after creation, including moving a relationship between `interests` and `installed_base` while retaining the record's other metadata.
+
 ## Integration Points
 - **Gemini API**: Used for complex extraction, summaries, and multimodal reasoning.
 - **DeepSeek API**: Proposed backend logic for high-volume, low-cost extraction.
