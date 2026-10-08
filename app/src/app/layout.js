@@ -56,6 +56,7 @@ export default function RootLayout({ children }) {
         <TooltipProvider>
           <ServiceWorkerUpdater />
           <NotificationPrompt />
+          <PWAInstallPrompt />
           {children}
         </TooltipProvider>
       </body>

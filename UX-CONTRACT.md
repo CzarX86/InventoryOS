@@ -55,6 +55,13 @@
 - The document remains scrollable on narrow screens; the shell must not lock the body or rely on `100vh` for content height.
 - The PWA shell reserves the device top and bottom safe areas so the top bar and mobile navigation remain clear of the iOS status area, Dynamic Island, and home indicator.
 
+## PWA installation and startup
+
+- The install notice is registered in the root layout so the browser's install event can be captured before authentication finishes.
+- Show an install button only when the browser provides its native install prompt. On iOS Safari, show the manual “Adicionar à Tela de Início” steps; on Safari for macOS Sonoma 14 or later, show “Arquivo > Adicionar ao Dock”; on other Mac browsers, point to their app-install menu and Safari's Add to Dock option.
+- Do not show a nonfunctional install button in browsers without a native prompt, or continuously animate install progress.
+- Startup must not wait on a timed splash screen or download the full brand lockup. Keep the app-owned authentication loading indicator as the initial loading state.
+
 ## Safety and feedback
 
 - Client reads and writes are constrained by Firebase claims and workspace membership; admin mutations use callable functions.
