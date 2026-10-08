@@ -60,6 +60,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { filterCompanySuggestions, normalizePhoneDigits } from "@/lib/crmContacts";
 import { normalizeEmailEntries, normalizePhoneEntries } from "@/lib/crmChannelNormalization";
+import { getCrmSaveErrorMessage } from "@/lib/crmSaveErrors";
 import CrmAudioCapture from "@/components/CrmAudioCapture";
 import { extractCrmInteractionFromAudio } from "@/lib/ai";
 import { getCrmAudioExtension, mergeCrmNotes, readBlobAsBase64, type CrmAudioAttachment } from "@/lib/crmAudio";
@@ -741,8 +742,8 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
       setMobilePane("detail");
       closeCreateDialog();
       setStatus({ tone: "success", text: "Contato criado. Você já pode registrar a primeira interação." });
-    } catch {
-      setFormError("Não foi possível salvar o contato. Tente novamente.");
+    } catch (error) {
+      setFormError(getCrmSaveErrorMessage(error));
     } finally {
       setSavingContact(false);
     }
