@@ -23,12 +23,63 @@ export type NormalizedEntries<T> = {
   duplicatesRemoved: number;
 };
 
-const PHONE_PATTERN = /(?<![\p{L}\p{N}])(?:\+?55[ .-]*)?(?:\(\d{2}\)|\d{2})?[ .-]*\d{4,5}[ .-]?\d{4}(?![\p{L}\p{N}])/gu;
+const PHONE_PATTERN = /(?<![\p{L}\p{N}])(?:\+?55[\s./-]*)?(?:\(\d{2}\)|\d{2})?[\s./-]*\d{4,5}[\s./-]?\d{4}(?![\p{L}\p{N}])/gu;
 const PHONE_DIGIT_LENGTHS = new Set([8, 9, 10, 11, 12, 13]);
 const EMAIL_PART_PATTERN = /^[^\s@,;|<>]+@[^\s@,;|<>]+\.[^\s@,;|<>]+$/u;
 
 export function normalizePhoneDigits(value: unknown = "") {
   return String(value ?? "").replace(/\D/g, "");
+}
+
+export function normalizePhoneForStorage(value: unknown = "") {
+  const original = String(value ?? "").trim();
+  if (!original || !/^\+?[\d\s()./-]+$/u.test(original)) return original;
+
+  const digits = normalizePhoneDigits(original);
+  if (original.startsWith("+")) {
+    if (digits.startsWith("55") && digits.length !== 12 && digits.length !== 13) return original;
+    return digits.length >= 7 && digits.length <= 15 ? `+${digits}` : original;
+  }
+
+  const parsed = parsePhoneChannelValue(original);
+  if (parsed.ambiguous || parsed.values.length !== 1 || !PHONE_DIGIT_LENGTHS.has(digits.length)) return original;
+  if (digits.length === 10 || digits.length === 11) return `+55${digits}`;
+  if ((digits.length === 12 || digits.length === 13) && digits.startsWith("55")) return `+${digits}`;
+  return digits;
+}
+
+export function phoneDigitsForStorage(value: unknown = "") {
+  const storedValue = normalizePhoneForStorage(value);
+  const digits = normalizePhoneDigits(storedValue);
+  if (storedValue.startsWith("+")) return digits.length >= 7 && digits.length <= 15 ? digits : "";
+  return digits.length === 8 || digits.length === 9 ? digits : "";
+}
+
+export function formatPhoneForDisplay(value: unknown = "") {
+  const original = String(value ?? "").trim();
+  const digits = normalizePhoneDigits(original);
+  if (!digits) return original;
+
+  let nationalDigits = digits;
+  if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) {
+    nationalDigits = digits.slice(2);
+  } else if (original.startsWith("+")) {
+    return original;
+  }
+
+  if (nationalDigits.length === 11) {
+    return `(${nationalDigits.slice(0, 2)}) ${nationalDigits.slice(2, 7)}-${nationalDigits.slice(7)}`;
+  }
+  if (nationalDigits.length === 10) {
+    return `(${nationalDigits.slice(0, 2)}) ${nationalDigits.slice(2, 6)}-${nationalDigits.slice(6)}`;
+  }
+  if (nationalDigits.length === 9) {
+    return `${nationalDigits.slice(0, 5)}-${nationalDigits.slice(5)}`;
+  }
+  if (nationalDigits.length === 8) {
+    return `${nationalDigits.slice(0, 4)}-${nationalDigits.slice(4)}`;
+  }
+  return original;
 }
 
 export function canonicalPhoneKey(value: unknown = "") {

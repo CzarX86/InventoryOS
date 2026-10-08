@@ -77,6 +77,33 @@ export function normalizePhone(value: unknown) {
   return normalizeText(value).replace(/\D/g, "");
 }
 
+export function normalizePhoneForStorage(value: unknown) {
+  const original = normalizeText(value);
+  if (!original || !/^\+?[\d\s()./-]+$/u.test(original)) return original;
+
+  const digits = normalizePhone(original);
+  if (original.startsWith("+")) {
+    if (digits.startsWith("55") && digits.length !== 12 && digits.length !== 13) return original;
+    return digits.length >= 7 && digits.length <= 15 ? `+${digits}` : original;
+  }
+  if (digits.length === 10 || digits.length === 11) return `+55${digits}`;
+  if ((digits.length === 12 || digits.length === 13) && digits.startsWith("55")) return `+${digits}`;
+  if (digits.length === 8 || digits.length === 9) return digits;
+  return original;
+}
+
+export function normalizePhoneKey(value: unknown) {
+  const digits = normalizePhone(value);
+  return digits.startsWith("55") && (digits.length === 12 || digits.length === 13)
+    ? digits.slice(2)
+    : digits;
+}
+
+function getPhoneDigits(value: unknown) {
+  const stored = normalizePhoneForStorage(value);
+  return /^\+?\d{7,15}$/u.test(stored) ? normalizePhone(stored) : "";
+}
+
 export function normalizeBoolean(value: unknown) {
   const normalized = normalizeText(value).toLowerCase();
   return ["1", "true", "sim", "yes", "y", "x", "com whatsapp", "whatsapp"].includes(normalized);
@@ -187,7 +214,7 @@ export function countDuplicateCandidates(rows: CrmImportRow[]) {
   const seen = new Set<string>();
   let duplicates = 0;
   rows.forEach((row) => {
-    const identity = normalizeEmail(row.email) || normalizePhone(row.phone) || `${normalizeText(row.companyName).toLowerCase()}::${normalizeText(row.contactName).toLowerCase()}`;
+    const identity = normalizeEmail(row.email) || normalizePhoneKey(row.phone) || `${normalizeText(row.companyName).toLowerCase()}::${normalizeText(row.contactName).toLowerCase()}`;
     if (seen.has(identity)) duplicates += 1;
     else seen.add(identity);
   });
@@ -206,9 +233,9 @@ async function countExistingMatches(rows: CrmImportRow[], workspaceId: string) {
   contactsSnapshot.docs.forEach((item) => {
     const data = item.data();
     [data.email, ...(Array.isArray(data.emails) ? data.emails.map((entry: any) => entry?.value) : [])].map(normalizeEmail).filter(Boolean).forEach((value) => emails.add(value));
-    [data.phoneDigits, ...(Array.isArray(data.phoneDigitsList) ? data.phoneDigitsList : []), ...(Array.isArray(data.phoneNumbers) ? data.phoneNumbers.map((entry: any) => entry?.value || entry?.number) : [])].map(normalizePhone).filter(Boolean).forEach((value) => phones.add(value));
+    [data.phoneNumber, data.phoneDigits, ...(Array.isArray(data.phoneDigitsList) ? data.phoneDigitsList : []), ...(Array.isArray(data.phoneNumbers) ? data.phoneNumbers.map((entry: any) => entry?.value || entry?.number) : [])].map(normalizePhoneKey).filter(Boolean).forEach((value) => phones.add(value));
   });
-  return rows.filter((row) => companyNames.has(normalizeText(row.companyName).toLowerCase()) || emails.has(normalizeEmail(row.email)) || phones.has(normalizePhone(row.phone))).length;
+  return rows.filter((row) => companyNames.has(normalizeText(row.companyName).toLowerCase()) || emails.has(normalizeEmail(row.email)) || phones.has(normalizePhoneKey(row.phone))).length;
 }
 
 function requireApproved(request: any) {
@@ -299,7 +326,7 @@ export async function importCrmRows(rows: CrmImportRow[], workspaceId: string, o
     const emails = Array.isArray(data.emails) ? data.emails : [];
     const phones = Array.isArray(data.phoneNumbers) ? data.phoneNumbers : [];
     [data.email, ...emails.map((item: any) => item?.value)].map(normalizeEmail).filter(Boolean).forEach((value) => contactsByEmail.set(value, { id: doc.id, data }));
-    [data.phoneDigits, ...(Array.isArray(data.phoneDigitsList) ? data.phoneDigitsList : []), ...phones.map((item: any) => normalizePhone(item?.value || item?.number))].map(normalizePhone).filter(Boolean).forEach((value) => contactsByPhone.set(value, { id: doc.id, data }));
+    [data.phoneNumber, data.phoneDigits, ...(Array.isArray(data.phoneDigitsList) ? data.phoneDigitsList : []), ...phones.map((item: any) => item?.value || item?.number)].map(normalizePhoneKey).filter(Boolean).forEach((value) => contactsByPhone.set(value, { id: doc.id, data }));
   });
 
   let created = 0;
@@ -316,16 +343,32 @@ export async function importCrmRows(rows: CrmImportRow[], workspaceId: string, o
       batch.set(accountRef, accountPatch, { merge: true });
       if (!account) { account = { id: accountRef.id, data: accountPatch }; accounts.set(accountKey, account); created += 1; }
       const emailKey = normalizeEmail(row.email);
-      const phoneKey = normalizePhone(row.phone);
+      const phoneKey = normalizePhoneKey(row.phone);
+      const phoneValue = row.phone ? normalizePhoneForStorage(row.phone) : "";
       const contact = (emailKey ? contactsByEmail.get(emailKey) : undefined) || (phoneKey ? contactsByPhone.get(phoneKey) : undefined);
       const contactRef = contact ? db.collection("contacts").doc(contact.id) : db.collection("contacts").doc();
-      const oldPhones = Array.isArray(contact?.data?.phoneNumbers) ? contact.data.phoneNumbers : [];
+      const oldPhoneSource = Array.isArray(contact?.data?.phoneNumbers) && contact.data.phoneNumbers.length
+        ? contact.data.phoneNumbers
+        : contact?.data?.phoneNumber ? [{ label: "Principal", value: contact.data.phoneNumber }] : [];
+      const oldPhones = oldPhoneSource.map((entry: any) => {
+        const value = normalizePhoneForStorage(entry?.value || entry?.number || entry);
+        return typeof entry === "string" ? { label: "Telefone", value } : { ...entry, value, digits: getPhoneDigits(value) };
+      });
       const oldEmails = Array.isArray(contact?.data?.emails) ? contact.data.emails : [];
-      const phoneEntry = phoneKey ? { label: "Importado", value: row.phone, digits: phoneKey, hasWhatsapp: row.hasWhatsapp } : null;
+      const phoneEntry = phoneKey ? { label: "Importado", value: phoneValue, digits: getPhoneDigits(phoneValue), hasWhatsapp: row.hasWhatsapp } : null;
       const emailEntry = emailKey ? { label: "Importado", value: row.email } : null;
-      const phones = phoneEntry ? mergeUniqueValues(oldPhones, [phoneEntry], (value) => normalizePhone(value?.value || value?.number)) : oldPhones;
+      const phones = phoneEntry ? mergeUniqueValues(oldPhones, [phoneEntry], (value) => normalizePhoneKey(value?.value || value?.number)) : oldPhones;
       const emails = emailEntry ? mergeUniqueValues(oldEmails, [emailEntry], (value) => normalizeEmail(value?.value)) : oldEmails;
-      const contactPatch = { type: "contact", companyId: accountRef.id, accountId: workspaceId, workspaceId, ownerId: contact?.data?.ownerId || ownerId, name: row.contactName, displayName: row.contactName, role: row.role || contact?.data?.role || null, sector: row.sector || contact?.data?.sector || null, locality: row.locality || contact?.data?.locality || null, email: row.email || contact?.data?.email || null, emails, phoneNumber: row.phone || contact?.data?.phoneNumber || null, phoneDigits: phoneKey || contact?.data?.phoneDigits || null, phoneDigitsList: Array.from(new Set([...(contact?.data?.phoneDigitsList || []), ...(phoneKey ? [phoneKey] : [])])), phoneNumbers: phones, whatsappPhoneDigits: Array.from(new Set([...(contact?.data?.whatsappPhoneDigits || []), ...(row.hasWhatsapp && phoneKey ? [phoneKey] : [])])), notes: row.notes || contact?.data?.notes || null, lastContactAt: row.lastContactAt ? new Date(row.lastContactAt) : contact?.data?.lastContactAt || null, nextContactAt: row.nextContactAt ? new Date(row.nextContactAt) : contact?.data?.nextContactAt || null, nextContactSource: row.nextContactAt ? "import" : contact?.data?.nextContactSource || null, source: "crm_import", sourceImportJobId: jobId, updatedAt: FieldValue.serverTimestamp(), ...(contact ? {} : { createdAt: FieldValue.serverTimestamp() }) };
+      const phoneDigitsList = Array.from(new Set([
+        ...phones.map((entry: any) => getPhoneDigits(entry?.value || entry?.number)).filter(Boolean),
+        ...(contact?.data?.phoneDigitsList || []).map(getPhoneDigits).filter(Boolean),
+      ]));
+      const whatsappPhoneDigits = Array.from(new Set([
+        ...phones.filter((entry: any) => entry?.hasWhatsapp).map((entry: any) => getPhoneDigits(entry?.value || entry?.number)).filter(Boolean),
+        ...(contact?.data?.whatsappPhoneDigits || []).map(getPhoneDigits).filter(Boolean),
+        ...(row.hasWhatsapp && phoneEntry?.digits ? [phoneEntry.digits] : []),
+      ]));
+      const contactPatch = { type: "contact", companyId: accountRef.id, accountId: workspaceId, workspaceId, ownerId: contact?.data?.ownerId || ownerId, name: row.contactName, displayName: row.contactName, role: row.role || contact?.data?.role || null, sector: row.sector || contact?.data?.sector || null, locality: row.locality || contact?.data?.locality || null, email: row.email || contact?.data?.email || null, emails, phoneNumber: phones[0]?.value || null, phoneDigits: getPhoneDigits(phones[0]?.value) || null, phoneDigitsList, phoneNumbers: phones, whatsappPhoneDigits, notes: row.notes || contact?.data?.notes || null, lastContactAt: row.lastContactAt ? new Date(row.lastContactAt) : contact?.data?.lastContactAt || null, nextContactAt: row.nextContactAt ? new Date(row.nextContactAt) : contact?.data?.nextContactAt || null, nextContactSource: row.nextContactAt ? "import" : contact?.data?.nextContactSource || null, source: "crm_import", sourceImportJobId: jobId, updatedAt: FieldValue.serverTimestamp(), ...(contact ? {} : { createdAt: FieldValue.serverTimestamp() }) };
       batch.set(contactRef, contactPatch, { merge: true });
       if (!contact) { created += 1; } else { updated += 1; }
       if (emailKey) contactsByEmail.set(emailKey, { id: contactRef.id, data: contactPatch });

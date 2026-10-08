@@ -58,8 +58,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { filterCompanySuggestions, normalizePhoneDigits } from "@/lib/crmContacts";
-import { normalizeEmailEntries, normalizePhoneEntries } from "@/lib/crmChannelNormalization";
+import { CrmContactChannelLabelControl } from "@/components/CrmContactChannelLabelControl";
+import { filterCompanySuggestions } from "@/lib/crmContacts";
+import { formatPhoneForDisplay, normalizeEmailEntries, normalizePhoneEntries, normalizePhoneForStorage, phoneDigitsForStorage } from "@/lib/crmChannelNormalization";
 import { getCrmSaveErrorMessage } from "@/lib/crmSaveErrors";
 import CrmAudioCapture from "@/components/CrmAudioCapture";
 import { extractCrmInteractionFromAudio } from "@/lib/ai";
@@ -109,10 +110,6 @@ type ContactChannelSnapshot = {
   value: string;
   source: "contact" | "manual";
 };
-
-const PHONE_LABEL_OPTIONS = ["Celular", "Comercial", "Residencial", "WhatsApp"];
-const EMAIL_LABEL_OPTIONS = ["Principal", "Comercial", "Financeiro", "Pessoal"];
-const CUSTOM_LABEL_OPTION = "__custom_label__";
 
 type Company = {
   id: string;
@@ -300,7 +297,10 @@ function contactPhones(contact: Contact): PhoneEntry[] {
   const source = Array.isArray(contact.phoneNumbers) && contact.phoneNumbers.length
     ? contact.phoneNumbers
     : contact.phoneNumber ? [{ label: "Principal", value: contact.phoneNumber }] : [];
-  return normalizePhoneEntries(source, contact.whatsappPhoneDigits).entries as PhoneEntry[];
+  return normalizePhoneEntries(source, contact.whatsappPhoneDigits).entries.map((phone) => ({
+    ...phone,
+    value: formatPhoneForDisplay(phone.value),
+  })) as PhoneEntry[];
 }
 
 function contactEmails(contact: Contact): EmailEntry[] {
@@ -619,8 +619,9 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
       const phones = normalizePhoneEntries(contactForm.phones).entries
         .filter((phone) => phone.value.trim())
         .map((phone) => {
-          const digits = normalizePhoneDigits(phone.value);
-          return { ...phone, value: phone.value.trim(), digits: digits.length >= 8 && digits.length <= 13 ? digits : "" };
+          const value = normalizePhoneForStorage(phone.value);
+          const digits = phoneDigitsForStorage(value);
+          return { ...phone, value, digits };
         });
       const emails = normalizeEmailEntries(contactForm.emails).entries.filter((email) => email.value.trim());
       const phoneDigitsList = phones.map((phone) => phone.digits).filter(Boolean);
@@ -660,7 +661,7 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
           email: emails[0]?.value || null,
           emails,
           phoneNumber: phones[0]?.value || null,
-          phoneDigits: phoneDigitsList[0] || null,
+          phoneDigits: phones[0]?.digits || null,
           phoneDigitsList,
           phoneNumbers: phones,
           whatsappPhoneDigits,
@@ -717,7 +718,7 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
         email: emails[0]?.value || null,
         emails,
         phoneNumber: phones[0]?.value || null,
-        phoneDigits: phoneDigitsList[0] || null,
+        phoneDigits: phones[0]?.digits || null,
         phoneDigitsList,
         phoneNumbers: phones,
         whatsappPhoneDigits,
@@ -758,14 +759,15 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
       const channelType = interactionForm.channelType === "email" ? "email" : "phone";
       const savedChannels = interactionContactChannels(selectedContact, interactionForm.channelType);
       if (interactionForm.contactChannelSelection === "other") {
-        const value = interactionForm.otherContactChannelValue.trim();
+        const rawValue = interactionForm.otherContactChannelValue.trim();
+        const value = channelType === "phone" ? normalizePhoneForStorage(rawValue) : rawValue;
         if (!value) { setStatus({ tone: "error", text: "Informe o telefone ou e-mail usado nesta interação." }); return; }
         contactChannel = { type: channelType, label: "Outro", value, source: "manual" };
       } else {
         const savedIndex = Number(interactionForm.contactChannelSelection.replace("saved:", ""));
         const savedChannel = interactionForm.contactChannelSelection.startsWith("saved:") && Number.isInteger(savedIndex) ? savedChannels[savedIndex] : null;
         if (!savedChannel?.value.trim()) { setStatus({ tone: "error", text: "Selecione o telefone ou e-mail usado nesta interação." }); return; }
-        contactChannel = { type: channelType, label: savedChannel.label || (channelType === "email" ? "E-mail" : "Telefone"), value: savedChannel.value, source: "contact" };
+        contactChannel = { type: channelType, label: savedChannel.label || (channelType === "email" ? "E-mail" : "Telefone"), value: channelType === "phone" ? normalizePhoneForStorage(savedChannel.value) : savedChannel.value, source: "contact" };
       }
     }
     const occurredAt = new Date(interactionForm.occurredAt);
@@ -811,8 +813,10 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
       if (locality) contactUpdate.locality = locality;
       if (email) contactUpdate.email = email;
       if (phoneNumber) {
-        contactUpdate.phoneNumber = phoneNumber;
-        contactUpdate.phoneDigits = normalizePhoneDigits(phoneNumber) || null;
+        const normalizedPhone = normalizePhoneForStorage(phoneNumber);
+        const phoneDigits = phoneDigitsForStorage(normalizedPhone);
+        contactUpdate.phoneNumber = normalizedPhone;
+        contactUpdate.phoneDigits = phoneDigits || null;
       }
       const notes = valueOrNull(extracted.notesAppend);
       if (notes) contactUpdate.notes = mergeCrmNotes(selectedContact.notes, notes);
@@ -1004,8 +1008,8 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
                   <SectionEyebrow icon={Phone} label="Telefones" />
                   <div className="space-y-3">
                     {contactForm.phones.map((phone, index) => <div key={"phone-" + index} className="grid gap-2 sm:grid-cols-[minmax(150px,0.8fr)_minmax(0,1.6fr)_auto_auto]">
-                      <ContactChannelLabelControl kind="phone" index={index} label={phone.label} onChange={(label) => updatePhone(index, { label })} />
-                      <Input aria-label={"Telefone " + (index + 1)} type="tel" value={phone.value} onChange={(event) => updatePhone(index, { value: event.target.value })} className="h-10" placeholder="(00) 00000-0000" />
+                      <CrmContactChannelLabelControl kind="phone" index={index} label={phone.label} onChange={(label) => updatePhone(index, { label })} />
+                      <Input aria-label={"Telefone " + (index + 1)} type="tel" value={phone.value} onChange={(event) => updatePhone(index, { value: event.target.value })} onBlur={(event) => updatePhone(index, { value: formatPhoneForDisplay(event.currentTarget.value) })} className="h-10" placeholder="(00) 00000-0000" />
                       <label className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-border px-3 text-xs text-muted-foreground hover:bg-muted"><input type="checkbox" checked={phone.hasWhatsapp} onChange={(event) => updatePhone(index, { hasWhatsapp: event.target.checked })} className="h-4 w-4 accent-primary" /> WhatsApp</label>
                       {contactForm.phones.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => setContactForm((previous) => ({ ...previous, phones: previous.phones.filter((_, phoneIndex) => phoneIndex !== index) }))} className="h-10 w-10 text-muted-foreground hover:text-destructive" aria-label={"Remover telefone " + (index + 1)}><Trash2 size={15} /></Button>}
                     </div>)}
@@ -1016,7 +1020,7 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
                   <SectionEyebrow icon={AtSign} label="E-mails" />
                   <div className="space-y-3">
                     {contactForm.emails.map((email, index) => <div key={"email-" + index} className="grid gap-2 sm:grid-cols-[minmax(150px,0.8fr)_minmax(0,2fr)_auto]">
-                      <ContactChannelLabelControl kind="email" index={index} label={email.label} onChange={(label) => updateEmail(index, { label })} />
+                      <CrmContactChannelLabelControl kind="email" index={index} label={email.label} onChange={(label) => updateEmail(index, { label })} />
                       <Input aria-label={"E-mail " + (index + 1)} type="email" value={email.value} onChange={(event) => updateEmail(index, { value: event.target.value })} className="h-10" placeholder="contato@empresa.com" />
                       {contactForm.emails.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => setContactForm((previous) => ({ ...previous, emails: previous.emails.filter((_, emailIndex) => emailIndex !== index) }))} className="h-10 w-10 text-muted-foreground hover:text-destructive" aria-label={"Remover e-mail " + (index + 1)}><Trash2 size={15} /></Button>}
                     </div>)}
@@ -1123,6 +1127,11 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
                     type={interactionForm.channelType === "email" ? "email" : "tel"}
                     value={interactionForm.otherContactChannelValue}
                     onChange={(event) => setInteractionForm((previous) => ({ ...previous, otherContactChannelValue: event.target.value }))}
+                    onBlur={(event) => {
+                      if (interactionForm.channelType !== "email") {
+                        setInteractionForm((previous) => ({ ...previous, otherContactChannelValue: formatPhoneForDisplay(event.currentTarget.value) }));
+                      }
+                    }}
                     className={fieldClassName()}
                     placeholder={interactionForm.channelType === "email" ? "contato@empresa.com" : "(00) 00000-0000"}
                     required
@@ -1186,22 +1195,6 @@ function SectionEyebrow({ icon: Icon, label }: { icon: typeof Building2; label: 
   return <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground"><Icon size={14} className="text-primary" /> {label}</div>;
 }
 
-function ContactChannelLabelControl({ kind, index, label, onChange }: { kind: "phone" | "email"; index: number; label: string; onChange: (value: string) => void }) {
-  const options = kind === "phone" ? PHONE_LABEL_OPTIONS : EMAIL_LABEL_OPTIONS;
-  const isStandard = options.includes(label);
-  const fieldName = kind === "phone" ? "telefone" : "e-mail";
-  return <div className="grid gap-2">
-    <div className="relative">
-      <select aria-label={"Rótulo do " + fieldName + " " + (index + 1)} value={isStandard ? label : CUSTOM_LABEL_OPTION} onChange={(event) => onChange(event.target.value === CUSTOM_LABEL_OPTION ? "" : event.target.value)} className="h-10 w-full appearance-none rounded-lg border border-border/80 bg-background px-3 pr-9 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        {options.map((option) => <option key={option} value={option}>{option}</option>)}
-        <option value={CUSTOM_LABEL_OPTION}>Personalizado</option>
-      </select>
-      <ChevronDown aria-hidden="true" size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-    </div>
-    {!isStandard && <Input aria-label={"Rótulo personalizado do " + fieldName + " " + (index + 1)} value={label} onChange={(event) => onChange(event.target.value)} className="h-10" placeholder="Digite um rótulo" />}
-  </div>;
-}
-
 function InfoItem({ icon: Icon, label, value }: { icon: typeof Mail; label: string; value: string }) {
   return <div className="min-w-0"><div className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><Icon size={14} className="text-primary" /> {label}</div><p className="mt-1 break-words text-sm font-medium text-foreground">{value}</p></div>;
 }
@@ -1211,7 +1204,10 @@ function InteractionTimeline({ events, onRegister }: { events: CrmEvent[]; onReg
   return <div className="space-y-5">{events.map((event) => {
     const suggestions = event.aiAnalysis;
     const suggestionCount = (suggestions?.opportunities?.length || 0) + (suggestions?.tasks?.length || 0) + (suggestions?.equipmentLinks?.length || 0);
-    return <div key={event.id} className="relative border-l-2 border-primary/20 pl-5"><span className="absolute -left-[7px] top-1 h-3 w-3 rounded-full border-2 border-card bg-primary" /><div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className="rounded-full px-2 py-0.5 text-[11px] font-medium">{channelLabel(event.channelType)}</Badge>{event.source === "manual_audio" && <Badge variant="secondary" className="gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"><AudioLines size={11} /> Áudio</Badge>}<span className="text-xs text-muted-foreground">{formatDate(event.occurredAt)}</span></div>{event.contactChannel && <p className="mt-2 break-words text-xs text-muted-foreground"><span className="font-medium text-foreground/80">{event.contactChannel.label || (event.contactChannel.type === "email" ? "E-mail" : "Telefone")}:</span> {event.contactChannel.value}{event.contactChannel.source === "manual" ? " · informado nesta interação" : ""}</p>}<p className="mt-2 text-sm leading-relaxed">{event.summary}</p>{event.audioUrl && <audio controls src={event.audioUrl} className="mt-3 h-9 w-full max-w-md" aria-label={event.audioName ? `Áudio ${event.audioName}` : "Áudio da interação"} />}{event.transcript && <details className="mt-3 rounded-lg border border-border/70 bg-muted/20 px-3 py-2"><summary className="cursor-pointer text-xs font-medium text-primary">Ver transcrição</summary><p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">{event.transcript}</p></details>}{suggestionCount > 0 && <details className="mt-3 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2"><summary className="cursor-pointer text-xs font-medium text-primary">Sugestões da IA ({suggestionCount})</summary><div className="mt-2 space-y-1 text-xs text-muted-foreground">{suggestions?.opportunities?.map((item, index) => <p key={`opportunity-${index}`}><strong className="font-medium text-foreground">Oportunidade:</strong> {item.title || item.summary || "Sem título"}</p>)}{suggestions?.tasks?.map((item, index) => <p key={`task-${index}`}><strong className="font-medium text-foreground">Tarefa:</strong> {item.title || item.summary || "Sem título"}</p>)}{suggestions?.equipmentLinks?.map((item, index) => <p key={`equipment-${index}`}><strong className="font-medium text-foreground">Equipamento:</strong> {[item.equipmentType, item.brand, item.model].filter(Boolean).join(" · ") || item.summary || "Sem descrição"}</p>)}</div></details>}{Boolean(event.nextContactAt) && <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"><CalendarClock size={13} /> Próximo contato: {formatDate(event.nextContactAt)}{event.source === "whatsapp" ? " · WhatsApp" : ""}</p>}</div>;
+    const displayedContactChannel = event.contactChannel?.type === "phone"
+      ? formatPhoneForDisplay(event.contactChannel.value)
+      : event.contactChannel?.value;
+    return <div key={event.id} className="relative border-l-2 border-primary/20 pl-5"><span className="absolute -left-[7px] top-1 h-3 w-3 rounded-full border-2 border-card bg-primary" /><div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className="rounded-full px-2 py-0.5 text-[11px] font-medium">{channelLabel(event.channelType)}</Badge>{event.source === "manual_audio" && <Badge variant="secondary" className="gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"><AudioLines size={11} /> Áudio</Badge>}<span className="text-xs text-muted-foreground">{formatDate(event.occurredAt)}</span></div>{event.contactChannel && <p className="mt-2 break-words text-xs text-muted-foreground"><span className="font-medium text-foreground/80">{event.contactChannel.label || (event.contactChannel.type === "email" ? "E-mail" : "Telefone")}:</span> {displayedContactChannel}{event.contactChannel.source === "manual" ? " · informado nesta interação" : ""}</p>}<p className="mt-2 text-sm leading-relaxed">{event.summary}</p>{event.audioUrl && <audio controls src={event.audioUrl} className="mt-3 h-9 w-full max-w-md" aria-label={event.audioName ? `Áudio ${event.audioName}` : "Áudio da interação"} />}{event.transcript && <details className="mt-3 rounded-lg border border-border/70 bg-muted/20 px-3 py-2"><summary className="cursor-pointer text-xs font-medium text-primary">Ver transcrição</summary><p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">{event.transcript}</p></details>}{suggestionCount > 0 && <details className="mt-3 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2"><summary className="cursor-pointer text-xs font-medium text-primary">Sugestões da IA ({suggestionCount})</summary><div className="mt-2 space-y-1 text-xs text-muted-foreground">{suggestions?.opportunities?.map((item, index) => <p key={`opportunity-${index}`}><strong className="font-medium text-foreground">Oportunidade:</strong> {item.title || item.summary || "Sem título"}</p>)}{suggestions?.tasks?.map((item, index) => <p key={`task-${index}`}><strong className="font-medium text-foreground">Tarefa:</strong> {item.title || item.summary || "Sem título"}</p>)}{suggestions?.equipmentLinks?.map((item, index) => <p key={`equipment-${index}`}><strong className="font-medium text-foreground">Equipamento:</strong> {[item.equipmentType, item.brand, item.model].filter(Boolean).join(" · ") || item.summary || "Sem descrição"}</p>)}</div></details>}{Boolean(event.nextContactAt) && <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"><CalendarClock size={13} /> Próximo contato: {formatDate(event.nextContactAt)}{event.source === "whatsapp" ? " · WhatsApp" : ""}</p>}</div>;
   })}<Button type="button" variant="outline" onClick={onRegister} className="gap-2"><Plus size={14} /> Registrar outra interação</Button></div>;
 }
 

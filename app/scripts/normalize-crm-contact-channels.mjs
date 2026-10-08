@@ -11,8 +11,9 @@ const {
   canonicalPhoneKey,
   isValidEmailAddress,
   normalizeEmailEntries,
-  normalizePhoneDigits,
   normalizePhoneEntries,
+  normalizePhoneForStorage,
+  phoneDigitsForStorage,
   parseEmailChannelValue,
   parsePhoneChannelValue,
 } = await import(NORMALIZER_PATH);
@@ -201,7 +202,7 @@ function channelWrites({ contactDocument, contact, documents, entries, type, wri
         status: "active",
       };
       if (type === "phone") {
-        channelFields.phoneDigits = normalizePhoneDigits(entry.value) || null;
+        channelFields.phoneDigits = entry.digits || null;
         channelFields.hasWhatsapp = Boolean(entry.hasWhatsapp);
       }
       if (Object.entries(channelFields).some(([key, value]) => stableJson(data[key]) !== stableJson(value))) {
@@ -223,7 +224,7 @@ function channelWrites({ contactDocument, contact, documents, entries, type, wri
       contactId: documentId(contactDocument),
       channelType: type,
       channelValue: entry.value,
-      ...(type === "phone" ? { phoneDigits: normalizePhoneDigits(entry.value) || null, hasWhatsapp: Boolean(entry.hasWhatsapp) } : {}),
+      ...(type === "phone" ? { phoneDigits: entry.digits || null, hasWhatsapp: Boolean(entry.hasWhatsapp) } : {}),
       label: entry.label || (type === "phone" ? "Telefone" : "E-mail"),
       isPrimary: index === 0,
       status: "active",
@@ -298,8 +299,9 @@ for (const { document, data: contact } of contactDocuments) {
   if (phoneInput.some((entry) => String(typeof entry === "string" ? entry : entry?.value || "").trim())) {
     const normalized = normalizePhoneEntries(phoneInput, contact.whatsappPhoneDigits || []);
     const phoneEntries = normalized.entries.map((entry) => {
-      const digits = normalizePhoneDigits(entry.value);
-      return { ...entry, digits: digits.length >= 8 && digits.length <= 13 ? digits : "" };
+      const value = normalizePhoneForStorage(entry.value);
+      const digits = phoneDigitsForStorage(value);
+      return { ...entry, value, digits };
     });
     const sourceQuality = normalizePhoneEntries(primaryPhoneInput, contact.whatsappPhoneDigits || []);
     if (sourceQuality.ambiguousValues) stats.ambiguousPhoneFields += 1;
@@ -310,14 +312,18 @@ for (const { document, data: contact } of contactDocuments) {
 
     const digits = phoneEntries.map((entry) => entry.digits).filter(Boolean);
     const priorDigits = Array.isArray(contact.phoneDigitsList) ? contact.phoneDigitsList : contact.phoneDigits ? [contact.phoneDigits] : [];
-    const phoneDigitsList = [...new Set([...digits, ...priorDigits.map(normalizePhoneDigits).filter(Boolean)])];
+    const phoneDigitsList = [...new Set([
+      ...digits,
+      ...priorDigits.map(phoneDigitsForStorage).filter(Boolean),
+    ])];
     const whatsappDigits = [...new Set([
-      ...phoneEntries.filter((entry) => entry.hasWhatsapp).map((entry) => canonicalPhoneKey(entry.value)),
-      ...(Array.isArray(contact.whatsappPhoneDigits) ? contact.whatsappPhoneDigits : []).map(canonicalPhoneKey),
+      ...phoneEntries.filter((entry) => entry.hasWhatsapp).map((entry) => entry.digits),
+      ...(Array.isArray(contact.whatsappPhoneDigits) ? contact.whatsappPhoneDigits : [])
+        .map(phoneDigitsForStorage),
     ].filter(Boolean))];
     fieldsToUpdate.phoneNumbers = phoneEntries.map(({ label, value, hasWhatsapp }) => ({ label, value, hasWhatsapp }));
     fieldsToUpdate.phoneNumber = phoneEntries[0]?.value || null;
-    fieldsToUpdate.phoneDigits = digits[0] || contact.phoneDigits || null;
+    fieldsToUpdate.phoneDigits = phoneEntries[0]?.digits || null;
     fieldsToUpdate.phoneDigitsList = phoneDigitsList;
     fieldsToUpdate.whatsappPhoneDigits = whatsappDigits;
     if (contact.status !== "deleted") {
