@@ -1,6 +1,10 @@
 /* global jest, describe, it, expect */
 const buildModule = (responseByModel) => {
   jest.resetModules();
+  jest.doMock("firebase/functions", () => ({
+    httpsCallable: jest.fn(),
+  }));
+  jest.doMock("./firebase", () => ({ functions: undefined }));
   jest.doMock("@google/generative-ai", () => ({
     GoogleGenerativeAI: jest.fn().mockImplementation(() => ({
       getGenerativeModel: jest.fn(({ model }) => ({
