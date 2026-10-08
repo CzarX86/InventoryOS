@@ -276,6 +276,12 @@ Location: `system_usage/ai_usage_summary_{YYYYMM}`
 - **Implications**: The CRM editor and import path canonicalize valid phone values on save, suggest common labels through the same free-text field, and display Brazilian mobiles as `(DD) 9XXXX-XXXX` and landlines as `(DD) XXXX-XXXX`. The one-time Firestore migration is dry-run by default, targets production only when `--apply` is explicit, and writes a secure backup before changing documents. Historical `crm_events` remain immutable; legacy phone snapshots are formatted for display without rewriting the audit history.
 - **Status**: Active.
 
+## Decisao: Adiar o diretorio de fornecedores
+- **Decisao**: Manter o cadastro e a consulta de fornecedores somente como ideia documentada, fora do escopo ativo. A proposta futura contempla pessoas fisicas e juridicas, contatos/canais e vinculos a itens existentes no catalogo.
+- **Motivo**: O usuario decidiu nao implementar o diretorio agora e talvez retomar a ideia mais adiante.
+- **Implicacoes**: Nao criar collections, feature flags, interfaces, fluxos de cotacao ou migracoes para esse diretorio sem uma nova repriorizacao explicita. A proposta e mantida em `expansion-track-backlog.md`.
+- **Status**: Deferred.
+
 ## Technical Reference
 - **Project Context**: [agent_context.md](file:///Users/juliocezar/Dev/personal/InventoryOS/docs/agent_context.md)
 - **Architecture Overview**: [architecture.md](file:///Users/juliocezar/Dev/personal/InventoryOS/docs/architecture.md)
