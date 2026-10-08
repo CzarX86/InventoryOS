@@ -15,6 +15,7 @@
 - Administrators find “Excluir contato” in the selected contact header, beside the interaction action; it opens the reversible lixeira confirmation instead of deleting data immediately.
 - Company autocomplete is intentionally progressive: it stays empty on focus and only searches the workspace-backed company list after at least two typed characters.
 - Contact creation supports company, sector, locality, full company address, multiple labeled e-mails, and multiple labeled phones. WhatsApp is a checkbox on each phone; the backend derives normalized phone matching and the UI never asks for a WhatsApp remote ID.
+- The contact summary shows only the primary e-mail and phone. A `+N` control reveals the remaining labeled channels in a hover popover; the same details are available by keyboard activation and touch.
 - An interaction creates an immutable timeline event and updates last/next contact fields.
 - Equipment can be linked as commercial interest or installed base using catalog type/brand/model or a pending free-text description.
 - WhatsApp batches link automatically by WhatsApp remote ID, the primary normalized phone, or any additional phone stored on the contact when a matching CRM contact exists.
