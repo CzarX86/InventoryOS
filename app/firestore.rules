@@ -41,6 +41,49 @@ service cloud.firestore {
         request.resource.data.ownerId == resource.data.ownerId;
     }
 
+    // Operational users may keep CRM data current, but ownership, workspace,
+    // lifecycle and deletion metadata remain server/admin controlled.
+    function canUpdateAccountOperationalFields() {
+      return canWriteSharedResource() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "name",
+          "kind",
+          "segment",
+          "tags",
+          "notes",
+          "sector",
+          "locality",
+          "address",
+          "primaryContactId",
+          "updatedAt"
+        ]);
+    }
+
+    function canUpdateContactOperationalFields() {
+      return canWriteSharedResource() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "name",
+          "displayName",
+          "role",
+          "sector",
+          "email",
+          "emails",
+          "phoneNumber",
+          "phoneDigits",
+          "phoneDigitsList",
+          "phoneNumbers",
+          "whatsappPhoneDigits",
+          "whatsappRemoteJid",
+          "locality",
+          "notes",
+          "lastContactAt",
+          "nextContactAt",
+          "nextContactSource",
+          "followUpStatus",
+          "updatedAt"
+        ]);
+    }
+
     function canEscalateOwnError() {
       return isApprovedMember() &&
         resource.data.userId == request.auth.uid &&
@@ -229,55 +272,65 @@ service cloud.firestore {
     match /accounts/{accountId} {
       allow create: if canCreateSharedResource();
       allow read: if canReadSharedResource();
-      allow update, delete: if canWriteSharedResource() || isAdmin();
+      allow update: if canUpdateAccountOperationalFields() || isAdmin();
+      allow delete: if false;
     }
 
     match /contacts/{contactId} {
       allow create: if canCreateSharedResource();
       allow read: if canReadSharedResource();
-      allow update, delete: if canWriteSharedResource() || isAdmin();
+      allow update: if canUpdateContactOperationalFields() || isAdmin();
+      allow delete: if false;
     }
 
     match /contact_channels/{channelId} {
       allow create: if canCreateSharedResource();
       allow read: if canReadSharedResource();
-      allow update, delete: if canWriteSharedResource() || isAdmin();
+      allow update: if isAdmin();
+      allow delete: if false;
     }
 
     match /conversations/{conversationId} {
       allow create: if canCreateSharedResource();
       allow read: if canReadSharedResource();
-      allow update, delete: if canWriteSharedResource() || isAdmin();
+      allow update: if canWriteSharedResource() || isAdmin();
+      allow delete: if false;
     }
 
     match /messages/{messageId} {
       allow create: if canCreateSharedResource();
       allow read: if canReadSharedResource();
-      allow update, delete: if canWriteSharedResource() || isAdmin();
+      allow update: if canWriteSharedResource() || isAdmin();
+      allow delete: if false;
     }
 
     match /opportunities/{opportunityId} {
       allow create: if canCreateSharedResource();
       allow read: if canReadSharedResource();
-      allow update, delete: if canWriteSharedResource() || isAdmin();
+      allow update: if canWriteSharedResource() || isAdmin();
+      allow delete: if false;
     }
 
     match /contracts/{contractId} {
       allow create: if canCreateSharedResource();
       allow read: if canReadSharedResource();
-      allow update, delete: if canWriteSharedResource() || isAdmin();
+      allow update: if canWriteSharedResource() || isAdmin();
+      allow delete: if false;
     }
 
     match /crm_events/{eventId} {
       allow create: if canCreateSharedResource();
       allow read: if canReadSharedResource();
-      allow update, delete: if canWriteSharedResource() || isAdmin();
+      // Interaction history is append-only. Corrections happen through a new
+      // event so the audit trail cannot be silently rewritten.
+      allow update, delete: if false;
     }
 
     match /tasks/{taskId} {
       allow create: if canCreateSharedResource();
       allow read: if canReadSharedResource();
-      allow update, delete: if canWriteSharedResource() || isAdmin();
+      allow update: if canWriteSharedResource() || isAdmin();
+      allow delete: if false;
     }
 
     match /crm_review_items/{reviewId} {
@@ -290,7 +343,8 @@ service cloud.firestore {
     match /interests/{interestId} {
       allow create: if canCreateSharedResource();
       allow read: if canReadSharedResource();
-      allow update, delete: if canWriteSharedResource() || isAdmin();
+      allow update: if canWriteSharedResource() || isAdmin();
+      allow delete: if false;
     }
 
     match /catalog_items/{itemId} {
@@ -308,7 +362,8 @@ service cloud.firestore {
     match /installed_base/{itemId} {
       allow create: if canCreateSharedResource();
       allow read: if canReadSharedResource();
-      allow update, delete: if canWriteSharedResource() || isAdmin();
+      allow update: if canWriteSharedResource() || isAdmin();
+      allow delete: if false;
     }
 
     match /maintenance_rules/{ruleId} {
@@ -363,6 +418,20 @@ service cloud.firestore {
       allow create: if canCreateSharedResource();
       allow read: if canReadSharedResource();
       allow update, delete: if canWriteSharedResource() || isAdmin();
+    }
+
+    // Contact deletion is a reversible, server-owned operation. The callable
+    // writes these records with Admin SDK so clients cannot forge a restore
+    // point or bypass the audit trail.
+    match /crm_deleted_records/{deletionId} {
+      allow read: if isAdmin() && sameWorkspace(resource.data);
+      allow write: if false;
+    }
+
+    // Future mass reports/exports are server-generated and administrator-only.
+    match /crm_report_exports/{reportId} {
+      allow read: if isAdmin() && sameWorkspace(resource.data);
+      allow write: if false;
     }
   }
 }

@@ -34,6 +34,14 @@
       ]
     },
     {
+      "collectionGroup": "crm_events",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "workspaceId", "order": "ASCENDING" },
+        { "fieldPath": "occurredAt", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "interests",
       "queryScope": "COLLECTION",
       "fields": [

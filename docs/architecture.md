@@ -97,7 +97,11 @@ The CRM uses `accounts` as companies and `contacts` as people. Each record carri
 
 ### CRM Performance Dashboard
 
-The administrative CRM performance surface reads workspace-scoped `crm_events`, `contacts`, `accounts`, and approved access summaries. The employee comparison is attributed by `actorUserId` (falling back to `ownerId` only when it is not a system actor), while automated/system activity is retained in an explicit `Sem atribuição` row instead of being assigned to a person.
+The administrative CRM performance surface uses the `getCrmPerformanceSnapshot` callable to read workspace-scoped `crm_events`, `contacts`, `accounts`, and approved access summaries in one request. Event queries are bounded to the selected period plus the comparable previous period (or the existing 2,000-event safety cap for all-time views), avoiding several client-side realtime listeners. The employee comparison is attributed by `actorUserId` (falling back to `ownerId` only when it is not a system actor), while automated/system activity is retained in an explicit `Sem atribuição` row instead of being assigned to a person.
+
+### Bounded operational reads
+
+Large operational collections are never loaded wholesale by the browser. The inventory hook listens to the first 100 records and loads subsequent pages with a cursor; total, in-stock and sold counters use Firestore aggregation counts. The employee Home queries only the current seven-day window, while CRM reference lists use bounded one-shot reads and keep realtime listeners only for the selected contact's history and equipment. Central de ações reads up to 100 records per queue when opened. The WhatsApp review queue shows up to 100 contacts and 100 groups and batches opportunity/task signals in `in` queries of 30 JIDs, avoiding per-row listeners; expanded message history remains limited to 10 messages.
 
 The initial KPI contract is:
 
@@ -108,6 +112,14 @@ The initial KPI contract is:
 - `Follow-ups vencidos`: active contacts whose current `nextContactAt` is before the dashboard reference time.
 
 The dashboard intentionally does not infer call duration, connection rate, outcome, conversion, or revenue attribution because those fields are not present in the CRM v1 records. `crmPerformanceDashboard` controls the admin navigation entry and can be disabled through `system/feature_flags`.
+
+### CRM governance, deletion and reporting
+
+CRM deletion is soft-delete by default. `deleteCrmContact` is an administrator-only callable that stores a 90-day recovery snapshot in `crm_deleted_records`, marks the contact as `status: deleted`, and records the action in `system_audit_logs`. The contact and its interaction history remain recoverable; `restoreCrmContact` reverses the lifecycle marker without rewriting the timeline. Direct client deletes are denied by Firestore Rules.
+
+Approved team members can update operational contact/company fields, but cannot change workspace, ownership, lifecycle/deletion metadata or communication-channel administration. `crm_events` is append-only: corrections are represented by a new event instead of editing or erasing history. The Performance screen and future mass-report/export collections are administrator-only; report files must be generated server-side and never exposed as unrestricted client exports.
+
+Company and contact profile fields remain editable after creation. Editing `nextContactAt` marks its source as manual so later AI enrichment preserves the user's value; `lastContactAt` remains derived from the interaction history. Historical `crm_events` stay immutable. Equipment links can be corrected after creation, including moving a relationship between `interests` and `installed_base` while retaining the record's other metadata.
 
 ## Integration Points
 - **Gemini API**: Used for complex extraction, summaries, and multimodal reasoning.

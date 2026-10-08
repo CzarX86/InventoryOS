@@ -139,6 +139,10 @@ function getContactKey(event: CrmPerformanceEvent) {
   return event.contactId?.trim() || event.remoteJid?.trim() || null;
 }
 
+function isActiveContact(contact: CrmPerformanceContact) {
+  return contact.status !== "inactive" && contact.status !== "deleted";
+}
+
 function createEmployeeMetric(employee: CrmPerformanceEmployee): InternalEmployeeMetric {
   return {
     uid: employee.uid,
@@ -208,7 +212,7 @@ function buildTrend(events: CrmPerformanceEvent[], range: TimeRange, periodDays:
 function buildOverdueContacts(contacts: CrmPerformanceContact[], now: number): OverdueContact[] {
   return contacts
     .map((contact) => ({ ...contact, overdueSince: timestampToMillis(contact.nextContactAt) }))
-    .filter((contact) => contact.overdueSince > 0 && contact.overdueSince < now && contact.status !== "inactive")
+    .filter((contact) => contact.overdueSince > 0 && contact.overdueSince < now && isActiveContact(contact))
     .sort((left, right) => left.overdueSince - right.overdueSince);
 }
 
@@ -252,7 +256,7 @@ export function aggregateCrmPerformance({ now, periodDays, events, contacts, emp
       || left.name.localeCompare(right.name, "pt-BR")
     ));
   const attributedInteractions = currentEvents.filter((event) => getActorId(event, hiddenActors) !== "unassigned").length;
-  const activeContactIds = new Set(contacts.filter((contact) => contact.status !== "inactive").map((contact) => contact.id));
+  const activeContactIds = new Set(contacts.filter(isActiveContact).map((contact) => contact.id));
   const contactsReachedInActiveBase = new Set(
     currentEvents
       .map((event) => event.contactId?.trim() || null)
@@ -273,7 +277,7 @@ export function aggregateCrmPerformance({ now, periodDays, events, contacts, emp
     employeeMetrics,
     attributedInteractions,
     attributionRate: summary.totalInteractions ? Math.round((attributedInteractions / summary.totalInteractions) * 1000) / 10 : 0,
-    activeContacts: contacts.filter((contact) => contact.status !== "inactive").length,
+    activeContacts: contacts.filter(isActiveContact).length,
     contactsReachedInActiveBase,
     overdueContacts: buildOverdueContacts(contacts, now),
     trend: buildTrend(events, currentRange, periodDays),

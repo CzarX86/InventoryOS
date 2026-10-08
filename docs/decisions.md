@@ -91,6 +91,18 @@ active_decisions:
 - **Implications**: Automated WhatsApp activity is visible but does not inflate an employee's ranking. Adding conversion or quality KPIs requires new captured fields and tests before the dashboard contract is expanded.
 - **Status**: Active.
 
+## Decision: Reversible CRM deletion and administrator-only reporting
+- **Decision**: Contacts use a server-owned soft-delete/recycle-bin flow. Only approved administrators can move a contact to the lixeira or restore it; operational users retain access to normal CRM work but cannot directly delete records, rewrite `crm_events`, or change ownership/workspace/lifecycle metadata. Mass performance/report exports remain administrator-only and are generated through server-owned paths.
+- **Reason**: A test contact must be removable without making accidental or irreversible data loss easy. Customer relationship history is critical business data and should remain auditable and recoverable while teams collaborate on day-to-day fields.
+- **Implications**: `deleteCrmContact` snapshots the contact for 90 days in `crm_deleted_records`, marks the contact as deleted, writes `system_audit_logs`, and leaves related interactions available for restoration. Hard deletion and long-term backup retention require a separate retention/DSAR process; this flow is not a substitute for scheduled Firestore/GCP backups.
+- **Status**: Active.
+
+## Decision: Bounded server snapshot for CRM performance
+- **Decision**: The Performance screen loads through the administrator-only `getCrmPerformanceSnapshot` callable instead of opening separate client-side realtime listeners for events, contacts, companies and users. For 7/30/90-day views, the backend requests only the selected period and its comparable previous period; all-time views retain a bounded 2,000-event safety cap.
+- **Reason**: The previous implementation delayed first render while downloading and subscribing to up to 3,500 documents across four independent streams. Performance analytics do not need realtime updates at event granularity, and a single server snapshot reduces latency, browser listeners and read amplification.
+- **Implications**: Changing the period triggers one bounded refresh. The `crm_events(workspaceId, occurredAt)` composite index is required. A future high-volume analytics phase should replace the all-time cap with materialized aggregates rather than increasing client limits.
+- **Status**: Active.
+
 ## FinOps Architecture Overview
 
 ### AI Cost Aggregation Flow
@@ -244,6 +256,12 @@ Location: `system_usage/ai_usage_summary_{YYYYMM}`
 - **Implications**: Firebase Functions and provider secrets must be configured for production AI. Official invoice reconciliation is optional and requires BigQuery Billing Export configuration. Direct client fallback is retained only for existing test/local compatibility when Functions are unavailable.
 - **Follow-up implementation**: `reconcileAiBillingExport` now performs the optional BigQuery reconciliation when `BILLING_EXPORT_PROJECT_ID`, `BILLING_EXPORT_DATASET` and `BILLING_EXPORT_TABLE` are configured; the Admin UI keeps official cost distinct from token-ledger cost.
 - **Follow-up implementation**: Optional provider secrets are not bound to callable Functions unless configured, so the absence of `DEEPSEEK_API_KEY` does not block a Gemini-only deployment.
+- **Status**: Active.
+
+## Decision: Bounded client collection reads
+- **Decision**: Operational list screens must use a bounded read strategy: paginated inventory reads, period-scoped activity queries, one-shot reads for non-live queues, and batched CRM insight lookups instead of one listener per row.
+- **Reason**: Unbounded Firestore listeners increase initial latency, repeated document reads and mobile data usage. N+1 listeners also make screen cost grow with the number of WhatsApp contacts displayed.
+- **Implications**: Inventory exposes a “carregar mais” path and uses aggregation counts for global KPIs. Home reads only the current seven-day window. CRM, Central de ações and the WhatsApp review list refresh when the screen is opened; contact detail/history remains realtime only while selected. Queue screens disclose when their 100-record safety window is reached.
 - **Status**: Active.
 
 ## Technical Reference

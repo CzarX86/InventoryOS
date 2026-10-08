@@ -1188,6 +1188,8 @@ export {
   confirmCrmImport,
   cleanupCrmImportFiles,
 } from "./crmImport";
+export { deleteCrmContact, listDeletedCrmContacts, restoreCrmContact } from "./crmGovernance";
+export { getCrmPerformanceSnapshot } from "./crmPerformance";
 
 
 // FinOps - real-time token usage plus optional official Billing Export reconciliation.

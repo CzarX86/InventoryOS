@@ -17,8 +17,17 @@ jest.mock("firebase/firestore", () => ({
     callback({ docs: mockDocs });
     return jest.fn(); // unsubscribe
   }),
+  getCountFromServer: jest.fn(() => Promise.resolve({ data: () => ({ count: 2 }) })),
+  getDocs: jest.fn(() => Promise.resolve({ docs: [] })),
   query: jest.fn(),
-  orderBy: jest.fn()
+  orderBy: jest.fn(),
+  limit: jest.fn(),
+  startAfter: jest.fn(),
+  where: jest.fn(),
+  doc: jest.fn(),
+  updateDoc: jest.fn(),
+  deleteDoc: jest.fn(),
+  serverTimestamp: jest.fn(),
 }));
 
 describe("useInventory", () => {

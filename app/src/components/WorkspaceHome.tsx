@@ -126,7 +126,12 @@ export default function WorkspaceHome({ user, inventoryCount = 0, onOpenCrm }: {
     if (!db || !workspaceId) {
       return undefined;
     }
-    const eventsQuery = query(collection(db, "crm_events"), where("workspaceId", "==", workspaceId), limit(500));
+    const eventsQuery = query(
+      collection(db, "crm_events"),
+      where("workspaceId", "==", workspaceId),
+      where("occurredAt", ">=", new Date(startOfDay(Date.now()) - (6 * DAY_IN_MS))),
+      limit(200),
+    );
     const unsubscribe = onSnapshot(eventsQuery, (snapshot) => {
       setEvents(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as HomeEvent)));
       setLoading(false);

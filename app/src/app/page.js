@@ -74,7 +74,20 @@ export default function Dashboard() {
 
   const { user, loading: authLoading, isAdmin, isApproved, isHiddenOwner, accessStatus, login, logout } = useAuth();
   const { flags: expansionFlags } = useFeatureFlags(isApproved ? user : null);
-  const { loading: invLoading, searchQuery, setSearchQuery, filteredItems, items, deleteItem, syncError } = useInventory(user, isApproved);
+  const {
+    loading: invLoading,
+    loadingMore: invLoadingMore,
+    hasMore: hasMoreInventory,
+    loadMore: loadMoreInventory,
+    refreshInventoryStats,
+    inventoryStats,
+    searchQuery,
+    setSearchQuery,
+    filteredItems,
+    items,
+    deleteItem,
+    syncError,
+  } = useInventory(user, isApproved);
   const crmPerformanceEnabled = isAdmin && isFeatureEnabled(expansionFlags, "crmPerformanceDashboard");
 
   const handleLogin = async () => {
@@ -126,11 +139,7 @@ export default function Dashboard() {
     { id: "SETTINGS", label: "Config.", icon: Settings },
   ];
 
-  const stats = {
-    total: items.length,
-    inStock: items.filter(i => i.status === "IN STOCK").length,
-    sold: items.filter(i => i.status === "SOLD").length,
-  };
+  const stats = inventoryStats;
 
   if (authLoading) {
     return (
@@ -381,7 +390,7 @@ export default function Dashboard() {
         <div className="flex-1 flex flex-col min-w-0 bg-background relative">
           
           {/* Top Bar / Header */}
-          <header className="sticky top-0 flex items-center min-h-16 gap-3 px-4 md:px-8 border-b border-border/70 shrink-0 bg-card/95 backdrop-blur-sm z-30">
+          <header className="app-top-safe-area app-topbar sticky top-0 flex items-center gap-3 px-4 md:px-8 border-b border-border/70 shrink-0 bg-card/95 backdrop-blur-sm z-30">
             {/* Mobile Brand indicator */}
             <span className="md:hidden text-base font-semibold tracking-tight text-foreground bg-secondary px-2.5 py-1 rounded-lg font-display">InventoryOS</span>
 
@@ -466,7 +475,7 @@ export default function Dashboard() {
                 ) : activeTab === "CRM" ? (
                   <CrmView user={user} onOpenImport={() => setActiveTab("CRM_IMPORT")} />
                 ) : activeTab === "ADMIN" && isAdmin ? (
-                  <AdminDashboard items={items} user={user} />
+                  <AdminDashboard items={items} inventorySummary={stats} user={user} />
                 ) : activeTab === "WHATSAPP" ? (
                   <WhatsappView user={user} />
                 ) : activeTab === "ACTIONS" ? (
@@ -487,6 +496,9 @@ export default function Dashboard() {
                     onDelete={handleDelete}
                     onView={setSelectedItem}
                     onShare={handleShare}
+                    hasMore={hasMoreInventory}
+                    loadingMore={invLoadingMore}
+                    onLoadMore={loadMoreInventory}
                   />
                 )}
               </motion.div>
@@ -599,7 +611,7 @@ export default function Dashboard() {
       <AddItemModal
         isOpen={isModalOpen}
         onClose={() => { setIsModalOpen(false); setItemToEdit(null); }}
-        onAdded={() => {}}
+        onAdded={refreshInventoryStats}
         editItem={itemToEdit}
       />
       
@@ -612,7 +624,7 @@ export default function Dashboard() {
   );
 }
 
-function InventoryContent({ items, filteredItems, stats, loading, searchQuery, activeMenuId, setActiveMenuId, onEdit, onDelete, onView = () => {}, onShare = () => {} }) {
+function InventoryContent({ items, filteredItems, stats, loading, searchQuery, activeMenuId, setActiveMenuId, onEdit, onDelete, onView = () => {}, onShare = () => {}, hasMore = false, loadingMore = false, onLoadMore = () => {} }) {
   const [selectedBrandKey, setSelectedBrandKey] = useState(null);
 
   const availableBrands = useMemo(() => {
@@ -726,6 +738,15 @@ function InventoryContent({ items, filteredItems, stats, loading, searchQuery, a
                 onShare={onShare}
               />
             ))}
+          </div>
+        )}
+        {hasMore && (
+          <div className="flex flex-col items-center gap-2 py-6">
+            <Button variant="outline" size="sm" onClick={onLoadMore} disabled={loadingMore} className="rounded-lg">
+              {loadingMore && <Loader2 size={14} className="mr-2 animate-spin" />}
+              {loadingMore ? "Carregando…" : "Carregar mais itens"}
+            </Button>
+            {searchQuery && <p className="text-xs text-muted-foreground">A busca considera os itens já carregados. Carregue mais para ampliar os resultados.</p>}
           </div>
         )}
       </div>

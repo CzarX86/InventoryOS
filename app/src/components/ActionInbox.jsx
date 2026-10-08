@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { collection, deleteDoc, doc, limit, onSnapshot, query, updateDoc, where } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDocs, limit, query, updateDoc, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import {
   AlertCircle,
@@ -49,6 +49,7 @@ export default function ActionInbox({ onOpenCrm, user }) {
   const [error, setError] = useState("");
   const [pendingDelete, setPendingDelete] = useState(null);
   const [feedback, setFeedback] = useState("");
+  const [limitReached, setLimitReached] = useState(false);
   const workspaceId = user?.workspaceId || user?.defaultAccountId || null;
 
   useEffect(() => {
@@ -57,49 +58,26 @@ export default function ActionInbox({ onOpenCrm, user }) {
       return undefined;
     }
 
-    let opportunitiesLoaded = false;
-    let tasksLoaded = false;
-    let reviewsLoaded = false;
-    const finishLoading = () => {
-      if (opportunitiesLoaded && tasksLoaded && reviewsLoaded) setLoading(false);
-    };
-
     const oppsQuery = query(collection(db, "opportunities"), where("workspaceId", "==", workspaceId), limit(100));
     const tasksQuery = query(collection(db, "tasks"), where("workspaceId", "==", workspaceId), limit(100));
     const reviewsQuery = query(collection(db, "crm_review_items"), where("workspaceId", "==", workspaceId), limit(100));
-    const unsubOpps = onSnapshot(oppsQuery, (snap) => {
-      setOpportunities(snap.docs.map((item) => ({ id: item.id, ...item.data(), kind: "opportunity" })));
-      opportunitiesLoaded = true;
-      finishLoading();
-    }, () => {
-      setError("Não foi possível carregar as oportunidades agora.");
-      opportunitiesLoaded = true;
-      finishLoading();
-    });
-    const unsubTasks = onSnapshot(tasksQuery, (snap) => {
-      setTasks(snap.docs.map((item) => ({ id: item.id, ...item.data(), kind: "task" })));
-      tasksLoaded = true;
-      finishLoading();
-    }, () => {
-      setError("Não foi possível carregar todas as tarefas agora.");
-      tasksLoaded = true;
-      finishLoading();
-    });
-    const unsubReviews = onSnapshot(reviewsQuery, (snap) => {
-      setReviews(snap.docs.map((item) => ({ id: item.id, ...item.data(), kind: "review" })));
-      reviewsLoaded = true;
-      finishLoading();
-    }, () => {
-      setError("Não foi possível carregar as sugestões para revisão.");
-      reviewsLoaded = true;
-      finishLoading();
-    });
+    let cancelled = false;
+    void Promise.all([getDocs(oppsQuery), getDocs(tasksQuery), getDocs(reviewsQuery)])
+      .then(([opportunitiesSnapshot, tasksSnapshot, reviewsSnapshot]) => {
+        if (cancelled) return;
+        setOpportunities(opportunitiesSnapshot.docs.map((item) => ({ id: item.id, ...item.data(), kind: "opportunity" })));
+        setTasks(tasksSnapshot.docs.map((item) => ({ id: item.id, ...item.data(), kind: "task" })));
+        setReviews(reviewsSnapshot.docs.map((item) => ({ id: item.id, ...item.data(), kind: "review" })));
+        setLimitReached([opportunitiesSnapshot, tasksSnapshot, reviewsSnapshot].some((snapshot) => snapshot.size >= 100));
+      })
+      .catch(() => {
+        if (!cancelled) setError("Não foi possível carregar a Central de ações agora.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
-    return () => {
-      unsubOpps();
-      unsubTasks();
-      unsubReviews();
-    };
+    return () => { cancelled = true; };
   }, [workspaceId]);
 
   const handleUpdate = async (item, nextStatus) => {
@@ -108,6 +86,11 @@ export default function ActionInbox({ onOpenCrm, user }) {
       await updateDoc(doc(db, collectionName, item.id), item.kind === "opportunity"
         ? { stage: nextStatus, updatedAt: new Date() }
         : { status: nextStatus, updatedAt: new Date() });
+      if (item.kind === "opportunity") {
+        setOpportunities((current) => current.map((entry) => entry.id === item.id ? { ...entry, stage: nextStatus } : entry));
+      } else {
+        setTasks((current) => current.map((entry) => entry.id === item.id ? { ...entry, status: nextStatus } : entry));
+      }
       setFeedback(item.kind === "opportunity" ? "Oportunidade concluída." : "Tarefa resolvida.");
       window.setTimeout(() => setFeedback(""), 3000);
     } catch (updateError) {
@@ -120,6 +103,11 @@ export default function ActionInbox({ onOpenCrm, user }) {
     if (!pendingDelete) return;
     try {
       await deleteDoc(doc(db, pendingDelete.kind === "opportunity" ? "opportunities" : "tasks", pendingDelete.id));
+      if (pendingDelete.kind === "opportunity") {
+        setOpportunities((current) => current.filter((item) => item.id !== pendingDelete.id));
+      } else {
+        setTasks((current) => current.filter((item) => item.id !== pendingDelete.id));
+      }
       setFeedback("Registro removido.");
       window.setTimeout(() => setFeedback(""), 3000);
     } catch (deleteError) {
@@ -138,6 +126,7 @@ export default function ActionInbox({ onOpenCrm, user }) {
     try {
       const callable = httpsCallable(functions, decision === "approve" ? "approveCrmReviewItem" : "rejectCrmReviewItem");
       await callable({ reviewId: review.id });
+      setReviews((current) => current.filter((item) => item.id !== review.id));
       setFeedback(decision === "approve" ? "Sugestão aprovada e enviada ao CRM." : "Sugestão descartada.");
       window.setTimeout(() => setFeedback(""), 3000);
     } catch (reviewError) {
@@ -193,6 +182,7 @@ export default function ActionInbox({ onOpenCrm, user }) {
 
         {error && <Alert variant="destructive" className="mb-5"><AlertCircle /><AlertTitle>Não foi possível atualizar a central</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
         {feedback && <Alert className="mb-5 border-emerald-200 bg-emerald-50 text-emerald-950"><CheckCircle2 /><AlertDescription>{feedback}</AlertDescription></Alert>}
+        {limitReached && <p className="mb-5 text-xs text-muted-foreground">Exibindo até 100 registros por fila.</p>}
 
         {reviews.filter((item) => item.status === "pending").length > 0 && <ReviewQueue reviews={reviews.filter((item) => item.status === "pending")} onReview={handleReview} />}
 
