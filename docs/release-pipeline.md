@@ -18,6 +18,10 @@ A configuração dos projetos está em [app/.firebaserc](../app/.firebaserc).
 5. Teste manualmente a URL de staging exibida no resumo do workflow.
 6. Quando validado, execute `Deploy Production` manualmente via GitHub Actions e aprove o environment `production` quando solicitado.
 
+### Identificador de versão
+
+Os workflows de staging e produção montam `NEXT_PUBLIC_APP_VERSION` como a versão de `app/package.json` seguida do SHA curto do commit (`<versão>+<sha>`). Assim, publicar o mesmo commit nos dois ambientes gera o mesmo `version.json`, independentemente do contador de execuções de cada workflow.
+
 ## Workflows
 
 | Workflow | Trigger | Ambiente |
