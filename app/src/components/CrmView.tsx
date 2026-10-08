@@ -7,6 +7,7 @@ import {
   Building2,
   CalendarClock,
   Check,
+  ChevronDown,
   ChevronRight,
   Clock3,
   FileSpreadsheet,
@@ -1048,29 +1049,32 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <Label htmlFor="interactionChannel">Canal</Label>
-                <select
-                  id="interactionChannel"
-                  value={interactionForm.channelType}
-                  onChange={(event) => {
-                    const channelType = event.target.value;
-                    const savedChannels = interactionContactChannels(selectedContact, channelType);
-                    setInteractionForm((previous) => ({
-                      ...previous,
-                      channelType,
-                      contactChannelSelection: ["phone", "whatsapp", "email"].includes(channelType)
-                        ? (savedChannels.some((channel) => channel.value.trim()) ? "" : "other")
-                        : "",
-                      otherContactChannelValue: "",
-                    }));
-                  }}
-                  className={fieldClassName() + " w-full px-3"}
-                >
-                  <option value="phone">Ligação</option>
-                  <option value="whatsapp">WhatsApp</option>
-                  <option value="email">E-mail</option>
-                  <option value="meeting">Reunião</option>
-                  <option value="other">Outro</option>
-                </select>
+                <div className="relative mt-2">
+                  <select
+                    id="interactionChannel"
+                    value={interactionForm.channelType}
+                    onChange={(event) => {
+                      const channelType = event.target.value;
+                      const savedChannels = interactionContactChannels(selectedContact, channelType);
+                      setInteractionForm((previous) => ({
+                        ...previous,
+                        channelType,
+                        contactChannelSelection: ["phone", "whatsapp", "email"].includes(channelType)
+                          ? (savedChannels.some((channel) => channel.value.trim()) ? "" : "other")
+                          : "",
+                        otherContactChannelValue: "",
+                      }));
+                    }}
+                    className="h-10 w-full appearance-none rounded-lg border border-border/80 bg-background px-3 pr-9 text-sm text-foreground"
+                  >
+                    <option value="phone">Ligação</option>
+                    <option value="whatsapp">WhatsApp</option>
+                    <option value="email">E-mail</option>
+                    <option value="meeting">Reunião</option>
+                    <option value="other">Outro</option>
+                  </select>
+                  <ChevronDown aria-hidden="true" size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                </div>
               </div>
               <div>
                 <Label htmlFor="interactionDate">Quando</Label>
@@ -1089,26 +1093,29 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
                 <Label htmlFor="interactionContactChannel">
                   {interactionForm.channelType === "email" ? "E-mail usado" : "Telefone usado"}
                 </Label>
-                <select
-                  id="interactionContactChannel"
-                  value={interactionForm.contactChannelSelection}
-                  onChange={(event) => setInteractionForm((previous) => ({
-                    ...previous,
-                    contactChannelSelection: event.target.value,
-                    otherContactChannelValue: "",
-                  }))}
-                  className="mt-2 h-10 w-full rounded-lg border border-border/80 bg-background px-3 text-sm text-foreground"
-                  required
-                >
-                  <option value="">Selecione um {interactionForm.channelType === "email" ? "e-mail" : "telefone"}</option>
-                  {interactionContactChannels(selectedContact, interactionForm.channelType)
-                    .map((channel, index) => (
-                      <option key={channel.label + "-" + channel.value + "-" + index} value={"saved:" + index}>
-                        {channel.label || (interactionForm.channelType === "email" ? "E-mail" : "Telefone")} · {channel.value}
-                      </option>
-                    ))}
-                  <option value="other">Outro (informar manualmente)</option>
-                </select>
+                <div className="relative mt-2">
+                  <select
+                    id="interactionContactChannel"
+                    value={interactionForm.contactChannelSelection}
+                    onChange={(event) => setInteractionForm((previous) => ({
+                      ...previous,
+                      contactChannelSelection: event.target.value,
+                      otherContactChannelValue: "",
+                    }))}
+                    className="h-10 w-full appearance-none rounded-lg border border-border/80 bg-background px-3 pr-9 text-sm text-foreground"
+                    required
+                  >
+                    <option value="">Selecione um {interactionForm.channelType === "email" ? "e-mail" : "telefone"}</option>
+                    {interactionContactChannels(selectedContact, interactionForm.channelType)
+                      .map((channel, index) => (
+                        <option key={channel.label + "-" + channel.value + "-" + index} value={"saved:" + index}>
+                          {channel.label || (interactionForm.channelType === "email" ? "E-mail" : "Telefone")} · {channel.value}
+                        </option>
+                      ))}
+                    <option value="other">Outro (informar manualmente)</option>
+                  </select>
+                  <ChevronDown aria-hidden="true" size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                </div>
                 {interactionForm.contactChannelSelection === "other" && (
                   <Input
                     aria-label={interactionForm.channelType === "email" ? "E-mail usado nesta interação" : "Telefone usado nesta interação"}
@@ -1183,10 +1190,13 @@ function ContactChannelLabelControl({ kind, index, label, onChange }: { kind: "p
   const isStandard = options.includes(label);
   const fieldName = kind === "phone" ? "telefone" : "e-mail";
   return <div className="grid gap-2">
-    <select aria-label={"Rótulo do " + fieldName + " " + (index + 1)} value={isStandard ? label : CUSTOM_LABEL_OPTION} onChange={(event) => onChange(event.target.value === CUSTOM_LABEL_OPTION ? "" : event.target.value)} className="h-10 w-full rounded-lg border border-border/80 bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-      {options.map((option) => <option key={option} value={option}>{option}</option>)}
-      <option value={CUSTOM_LABEL_OPTION}>Personalizado</option>
-    </select>
+    <div className="relative">
+      <select aria-label={"Rótulo do " + fieldName + " " + (index + 1)} value={isStandard ? label : CUSTOM_LABEL_OPTION} onChange={(event) => onChange(event.target.value === CUSTOM_LABEL_OPTION ? "" : event.target.value)} className="h-10 w-full appearance-none rounded-lg border border-border/80 bg-background px-3 pr-9 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        {options.map((option) => <option key={option} value={option}>{option}</option>)}
+        <option value={CUSTOM_LABEL_OPTION}>Personalizado</option>
+      </select>
+      <ChevronDown aria-hidden="true" size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+    </div>
     {!isStandard && <Input aria-label={"Rótulo personalizado do " + fieldName + " " + (index + 1)} value={label} onChange={(event) => onChange(event.target.value)} className="h-10" placeholder="Digite um rótulo" />}
   </div>;
 }
