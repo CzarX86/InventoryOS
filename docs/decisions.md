@@ -271,9 +271,9 @@ Location: `system_usage/ai_usage_summary_{YYYYMM}`
 - **Status**: Active.
 
 ## Decision: Conservative CRM channel normalization
-- **Decision**: Store each contact phone number and e-mail address as its own CRM channel entry and keep the contact's embedded arrays aligned with `contact_channels`. Split only recognizable values and retain unparseable text for manual editing.
+- **Decision**: Store each contact phone number and e-mail address as its own CRM channel entry and keep the contact's embedded arrays aligned with `contact_channels`. Split only recognizable values and retain unparseable text for manual editing. Store Brazilian numbers with a known DDD in E.164 form (`+55` plus the national number); keep digits-only matching fields separately and apply national masks only in the UI.
 - **Reason**: Legacy data and pasted multi-value inputs can place several values in one field. Separating them supports editing, search, WhatsApp matching and future data correction without silently losing ambiguous content.
-- **Implications**: The CRM editor normalizes values on load and save. The one-time Firestore migration is dry-run by default, targets production only when `--apply` is explicit, and writes a secure backup before changing documents.
+- **Implications**: The CRM editor and import path canonicalize valid phone values on save, suggest common labels through the same free-text field, and display Brazilian mobiles as `(DD) 9XXXX-XXXX` and landlines as `(DD) XXXX-XXXX`. The one-time Firestore migration is dry-run by default, targets production only when `--apply` is explicit, and writes a secure backup before changing documents. Historical `crm_events` remain immutable; legacy phone snapshots are formatted for display without rewriting the audit history.
 - **Status**: Active.
 
 ## Technical Reference

@@ -1,4 +1,4 @@
-import { countDuplicateCandidates, normalizeImportDate, normalizeImportRows, parseCrmWorkbook } from "./crmImport";
+import { countDuplicateCandidates, normalizeImportDate, normalizeImportRows, normalizePhoneForStorage, normalizePhoneKey, parseCrmWorkbook } from "./crmImport";
 
 describe("CRM import normalization", () => {
   it("accepts the reference CRM headers and normalizes contact fields", () => {
@@ -41,6 +41,12 @@ describe("CRM import normalization", () => {
 
   it("supports Excel serial dates", () => {
     expect(normalizeImportDate(45918)).toBe("2025-09-18T00:00:00.000Z");
+  });
+
+  it("stores imported Brazilian numbers canonically and matches country-code variants", () => {
+    expect(normalizePhoneForStorage("(47) 3301.8038")).toBe("+554733018038");
+    expect(normalizePhoneForStorage("+55 (31) 98744-5452")).toBe("+5531987445452");
+    expect(normalizePhoneKey("+55 (31) 98744-5452")).toBe(normalizePhoneKey("31 98744-5452"));
   });
 
   it("counts repeated contact identities while preserving source row numbers", () => {
