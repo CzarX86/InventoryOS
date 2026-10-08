@@ -1,4 +1,9 @@
-import { formatPhoneForDisplay, normalizePhoneForStorage, phoneDigitsForStorage } from "./crmChannelNormalization";
+import {
+  formatPhoneForDisplay,
+  normalizeCorruptedPhoneLabel,
+  normalizePhoneForStorage,
+  phoneDigitsForStorage,
+} from "./crmChannelNormalization";
 
 describe("CRM phone storage and display", () => {
   it("stores recognized Brazilian numbers in E.164 without display punctuation", () => {
@@ -31,5 +36,12 @@ describe("CRM phone storage and display", () => {
   it("does not guess a Brazilian mask for unsupported international numbers", () => {
     expect(formatPhoneForDisplay("+14155552671")).toBe("+14155552671");
     expect(formatPhoneForDisplay("+55 (47) 3301")).toBe("+55 (47) 3301");
+  });
+
+  it("repairs phone-shaped labels from the number and preserves legitimate custom labels", () => {
+    expect(normalizeCorruptedPhoneLabel("24 2447.5118elular", "(24) 2447-5069")).toBe("Telefone");
+    expect(normalizeCorruptedPhoneLabel("31 98744.5452", "+5531987445452")).toBe("Celular");
+    expect(normalizeCorruptedPhoneLabel("Consultório", "+5531987445452")).toBe("Consultório");
+    expect(normalizeCorruptedPhoneLabel("1234", "+5531987445452")).toBe("1234");
   });
 });
