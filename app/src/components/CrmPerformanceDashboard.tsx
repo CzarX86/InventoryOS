@@ -152,21 +152,23 @@ export default function CrmPerformanceDashboard({ user }: { user: CrmPerformance
   const [companies, setCompanies] = useState<Company[]>([]);
   const [employees, setEmployees] = useState<CrmPerformanceEmployee[]>([]);
   const [periodDays, setPeriodDays] = useState<PeriodDays>(30);
-  const [loading, setLoading] = useState(Boolean(workspaceId));
-  const [error, setError] = useState<string | null>(null);
-  const [employeeError, setEmployeeError] = useState(false);
-  const [eventLimitReached, setEventLimitReached] = useState(false);
+  const queryKey = workspaceId ? `${workspaceId}:${periodDays ?? "all"}:${user?.uid || ""}` : null;
+  const [snapshotState, setSnapshotState] = useState<{
+    queryKey: string;
+    status: "success" | "error";
+    error?: string;
+    eventLimitReached?: boolean;
+  } | null>(null);
+  const snapshotStatus = !queryKey ? "idle" : snapshotState?.queryKey === queryKey ? snapshotState.status : "loading";
+  const loading = snapshotStatus === "loading";
+  const error = snapshotStatus === "error" ? snapshotState?.error || null : null;
+  const employeeError = snapshotStatus === "error";
+  const eventLimitReached = snapshotStatus === "success" && snapshotState?.eventLimitReached === true;
   const [metricsNow] = useState(() => Date.now());
 
   useEffect(() => {
-    if (!workspaceId) {
-      setLoading(false);
-      return undefined;
-    }
+    if (!workspaceId || !queryKey) return undefined;
     let active = true;
-    setLoading(true);
-    setError(null);
-    setEmployeeError(false);
     void getCrmPerformanceSnapshot(periodDays)
       .then((snapshot) => {
         if (!active) return;
@@ -174,20 +176,16 @@ export default function CrmPerformanceDashboard({ user }: { user: CrmPerformance
         setContacts(snapshot.contacts);
         setCompanies(snapshot.companies);
         setEmployees(mergeEmployees(user, snapshot.employees));
-        setEventLimitReached(snapshot.eventLimitReached);
+        setSnapshotState({ queryKey, status: "success", eventLimitReached: snapshot.eventLimitReached });
       })
       .catch(() => {
         if (!active) return;
-        setError("Não foi possível carregar a performance do CRM.");
-        setEmployeeError(true);
         setEmployees(mergeEmployees(user, []));
+        setSnapshotState({ queryKey, status: "error", error: "Não foi possível carregar a performance do CRM." });
       })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
 
     return () => { active = false; };
-  }, [periodDays, user, workspaceId]);
+  }, [periodDays, queryKey, user, workspaceId]);
 
   const metrics = useMemo(() => aggregateCrmPerformance({
     now: metricsNow,
@@ -204,7 +202,7 @@ export default function CrmPerformanceDashboard({ user }: { user: CrmPerformance
   const trendMax = Math.max(...metrics.trend.map((point) => point.interactions), 1);
   const hasData = metrics.totalInteractions > 0;
 
-  if (loading) {
+  if (loading && workspaceId) {
     return (
       <div className="flex min-h-[520px] items-center justify-center gap-3 bg-[#0e0e0e] text-[#acabaa]/60">
         <Loader2 size={18} className="animate-spin text-[#97a5ff]" />
