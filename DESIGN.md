@@ -12,6 +12,12 @@ InventoryOS is an operational workspace for inventory, customer relationships, a
 - New UI uses the existing `shadcn/ui` primitives with medium corner radii, sentence-case copy, readable 14–16px body text, and monospace only for IDs or technical values.
 - Avoid glow, blur-heavy decoration, all-caps system labels, black full-bleed surfaces, and sci-fi display typography. Visual emphasis comes from hierarchy, whitespace, status color, and a quiet blue active rail.
 - Prefer progressive disclosure: summary and next action first, details and secondary actions in the selected record.
+
+## Brand assets
+
+- The company identity is the JMR Automação Industrial gear-and-circuit logo, adapted for the light interface with cobalt `#2F5DCE`, slate `#64748B`, and navy `#172033`.
+- Use the transparent full lockup for larger brand surfaces, the JMR wordmark in the desktop navigation, and the standalone gear mark beside the InventoryOS name on mobile and in app icons.
+- InventoryOS remains the product name in browser and install metadata.
 - Expansion modules use a two-layer presentation: a plain-language value overview first, then the operational console behind an explicit configuration/review action. This keeps technical integration details from becoming the first impression for customers.
 - Use Google profile avatars in account, access-management, and request-review surfaces when available; use readable initials as the fallback. Avatars should reinforce identity without becoming a decorative focal point.
 
