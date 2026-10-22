@@ -6,6 +6,7 @@ import { db, storage } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import useAIExtraction from "@/hooks/useAIExtraction";
+import { mapAiSuggestionsToFormFields } from "@/lib/aiSuggestionMapping";
 import { logAIUsage } from "@/lib/usage";
 import useAuth from "@/hooks/useAuth";
 import ErrorNotice from "@/components/ErrorNotice";
@@ -119,18 +120,7 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
       setSupportError(null);
       setFormData(prev => ({
         ...prev,
-        ...Object.keys(suggestions).reduce((acc, key) => {
-          let normalizedKey = key.toLowerCase();
-          if (normalizedKey.includes("spec") || normalizedKey.includes("technical")) normalizedKey = "specifications";
-          if (normalizedKey.includes("brand") || normalizedKey.includes("manufacturer")) normalizedKey = "brand";
-          
-          const validFields = ["type", "brand", "model", "partNumber", "specifications"];
-          
-          if (validFields.includes(normalizedKey) && suggestions[key] !== null) {
-            acc[normalizedKey] = suggestions[key].toString().toUpperCase();
-          }
-          return acc;
-        }, {}),
+        ...mapAiSuggestionsToFormFields(suggestions),
       }));
     }
   }, [suggestions]);
