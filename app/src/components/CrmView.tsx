@@ -63,6 +63,12 @@ import { CrmContactChannelLabelControl } from "@/components/CrmContactChannelLab
 import { filterCompanySuggestions } from "@/lib/crmContacts";
 import { formatPhoneForDisplay, normalizeEmailEntries, normalizePhoneEntries, normalizePhoneForStorage, phoneDigitsForStorage } from "@/lib/crmChannelNormalization";
 import { getCrmSaveErrorMessage } from "@/lib/crmSaveErrors";
+import {
+  appliedContactUpdates,
+  describeAiStatus,
+  formatAudioSize,
+  formatConfidence,
+} from "@/lib/crmTimeline";
 import CrmAudioCapture from "@/components/CrmAudioCapture";
 import { extractCrmInteractionFromAudio } from "@/lib/ai";
 import { getCrmAudioExtension, mergeCrmNotes, readBlobAsBase64, type CrmAudioAttachment } from "@/lib/crmAudio";
@@ -158,6 +164,9 @@ type CrmEvent = {
   transcript?: string | null;
   audioUrl?: string | null;
   audioName?: string | null;
+  audioMimeType?: string | null;
+  audioSizeBytes?: number | null;
+  aiStatus?: string | null;
   aiAnalysis?: CrmAiAnalysis | null;
 };
 
@@ -379,6 +388,7 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
   const [equipmentForm, setEquipmentForm] = useState<EquipmentFormState>(EMPTY_EQUIPMENT);
   const [events, setEvents] = useState<CrmEvent[]>([]);
   const [equipmentLinks, setEquipmentLinks] = useState<EquipmentLink[]>([]);
+
   const [savingContact, setSavingContact] = useState(false);
   const [savingInteraction, setSavingInteraction] = useState(false);
   const [savingEquipment, setSavingEquipment] = useState(false);
@@ -429,22 +439,21 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
     const companyQuery = query(collection(db, "accounts"), where("workspaceId", "==", workspaceId), limit(200));
     const contactQuery = query(collection(db, "contacts"), where("workspaceId", "==", workspaceId), limit(500));
     const catalogQuery = query(collection(db, "catalog_items"), where("workspaceId", "==", workspaceId), limit(300));
-    let cancelled = false;
-    void Promise.all([getDocs(companyQuery), getDocs(contactQuery), getDocs(catalogQuery)])
-      .then(([companiesSnapshot, contactsSnapshot, catalogSnapshot]) => {
-        if (cancelled) return;
-        setCompanies(companiesSnapshot.docs.map((item) => ({ id: item.id, ...item.data() } as Company)).sort((left, right) => String(left.name || "").localeCompare(String(right.name || ""), "pt-BR")));
-        const nextContacts = contactsSnapshot.docs
-          .map((item) => ({ id: item.id, ...item.data() } as Contact))
-          .filter((contact) => contact.status !== "deleted");
-        setContacts(nextContacts);
-        setSelectedContactId((current) => current && nextContacts.some((contact) => contact.id === current) ? current : nextContacts[0]?.id || null);
-        setCatalogItems(catalogSnapshot.docs.map((item) => ({ id: item.id, ...item.data() } as CatalogItem)));
-      })
-      .catch(() => {
-        if (!cancelled) setStatus({ tone: "error", text: "Não foi possível carregar os dados do CRM." });
-      });
-    return () => { cancelled = true; };
+    const onListError = () => setStatus({ tone: "error", text: "Não foi possível carregar os dados do CRM." });
+    const unsubscribeCompanies = onSnapshot(companyQuery, (snapshot) => {
+      setCompanies(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as Company)).sort((left, right) => String(left.name || "").localeCompare(String(right.name || ""), "pt-BR")));
+    }, onListError);
+    const unsubscribeContacts = onSnapshot(contactQuery, (snapshot) => {
+      const nextContacts = snapshot.docs
+        .map((item) => ({ id: item.id, ...item.data() } as Contact))
+        .filter((contact) => contact.status !== "deleted");
+      setContacts(nextContacts);
+      setSelectedContactId((current) => current && nextContacts.some((contact) => contact.id === current) ? current : nextContacts[0]?.id || null);
+    }, onListError);
+    const unsubscribeCatalog = onSnapshot(catalogQuery, (snapshot) => {
+      setCatalogItems(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as CatalogItem)));
+    }, onListError);
+    return () => { unsubscribeCompanies(); unsubscribeContacts(); unsubscribeCatalog(); };
   }, [workspaceId]);
 
   useEffect(() => {
@@ -803,7 +812,7 @@ export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenI
       const nextContactAt = manualNextContactAt && !Number.isNaN(manualNextContactAt.getTime()) ? manualNextContactAt : aiNextContactAt || new Date(occurredAt.getTime() + (10 * 24 * 60 * 60 * 1000));
       const summary = interactionForm.summary.trim() || valueOrNull(audioAnalysis?.summary) || "Mensagem de áudio registrada.";
       const extracted = audioAnalysis?.contactUpdates || {};
-      const contactUpdate: Record<string, unknown> = { lastContactAt: occurredAt, nextContactAt, nextContactSource: manualNextContactAt ? "manual" : aiNextContactAt ? "ai" : "manual", followUpStatus: "green", updatedAt: serverTimestamp() };
+      const contactUpdate: Record<string, unknown> = { lastContactAt: occurredAt, nextContactAt, nextContactSource: manualNextContactAt ? "manual" : aiNextContactAt ? "ai" : "manual", updatedAt: serverTimestamp() };
       const role = valueOrNull(extracted.role);
       const sector = valueOrNull(extracted.sector);
       const locality = valueOrNull(extracted.locality);
@@ -1281,7 +1290,11 @@ function InteractionTimeline({ events, onRegister }: { events: CrmEvent[]; onReg
     const displayedContactChannel = event.contactChannel?.type === "phone"
       ? formatPhoneForDisplay(event.contactChannel.value)
       : event.contactChannel?.value;
-    return <div key={event.id} className="relative border-l-2 border-primary/20 pl-5"><span className="absolute -left-[7px] top-1 h-3 w-3 rounded-full border-2 border-card bg-primary" /><div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className="rounded-full px-2 py-0.5 text-[11px] font-medium">{channelLabel(event.channelType)}</Badge>{event.source === "manual_audio" && <Badge variant="secondary" className="gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"><AudioLines size={11} /> Áudio</Badge>}<span className="text-xs text-muted-foreground">{formatDate(event.occurredAt)}</span></div>{event.contactChannel && <p className="mt-2 break-words text-xs text-muted-foreground"><span className="font-medium text-foreground/80">{event.contactChannel.label || (event.contactChannel.type === "email" ? "E-mail" : "Telefone")}:</span> {displayedContactChannel}{event.contactChannel.source === "manual" ? " · informado nesta interação" : ""}</p>}<p className="mt-2 text-sm leading-relaxed">{event.summary}</p>{event.audioUrl && <audio controls src={event.audioUrl} className="mt-3 h-9 w-full max-w-md" aria-label={event.audioName ? `Áudio ${event.audioName}` : "Áudio da interação"} />}{event.transcript && <details className="mt-3 rounded-lg border border-border/70 bg-muted/20 px-3 py-2"><summary className="cursor-pointer text-xs font-medium text-primary">Ver transcrição</summary><p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">{event.transcript}</p></details>}{suggestionCount > 0 && <details className="mt-3 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2"><summary className="cursor-pointer text-xs font-medium text-primary">Sugestões da IA ({suggestionCount})</summary><div className="mt-2 space-y-1 text-xs text-muted-foreground">{suggestions?.opportunities?.map((item, index) => <p key={`opportunity-${index}`}><strong className="font-medium text-foreground">Oportunidade:</strong> {item.title || item.summary || "Sem título"}</p>)}{suggestions?.tasks?.map((item, index) => <p key={`task-${index}`}><strong className="font-medium text-foreground">Tarefa:</strong> {item.title || item.summary || "Sem título"}</p>)}{suggestions?.equipmentLinks?.map((item, index) => <p key={`equipment-${index}`}><strong className="font-medium text-foreground">Equipamento:</strong> {[item.equipmentType, item.brand, item.model].filter(Boolean).join(" · ") || item.summary || "Sem descrição"}</p>)}</div></details>}{Boolean(event.nextContactAt) && <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"><CalendarClock size={13} /> Próximo contato: {formatDate(event.nextContactAt)}{event.source === "whatsapp" ? " · WhatsApp" : ""}</p>}</div>;
+    const aiStatusLabel = describeAiStatus(event.aiStatus);
+    const aiConfidence = formatConfidence(suggestions?.confidence);
+    const aiUpdates = appliedContactUpdates(suggestions?.contactUpdates);
+    const audioSize = formatAudioSize(event.audioSizeBytes);
+    return <div key={event.id} className="relative border-l-2 border-primary/20 pl-5"><span className="absolute -left-[7px] top-1 h-3 w-3 rounded-full border-2 border-card bg-primary" /><div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className="rounded-full px-2 py-0.5 text-[11px] font-medium">{channelLabel(event.channelType)}</Badge>{event.source === "manual_audio" && <Badge variant="secondary" className="gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"><AudioLines size={11} /> Áudio</Badge>}<span className="text-xs text-muted-foreground">{formatDate(event.occurredAt)}</span></div>{event.contactChannel && <p className="mt-2 break-words text-xs text-muted-foreground"><span className="font-medium text-foreground/80">{event.contactChannel.label || (event.contactChannel.type === "email" ? "E-mail" : "Telefone")}:</span> {displayedContactChannel}{event.contactChannel.source === "manual" ? " · informado nesta interação" : ""}</p>}<p className="mt-2 text-sm leading-relaxed">{event.summary}</p>{event.audioUrl && <audio controls src={event.audioUrl} className="mt-3 h-9 w-full max-w-md" aria-label={event.audioName ? `Áudio ${event.audioName}` : "Áudio da interação"} />}{(event.audioMimeType || audioSize) && <p className="mt-1 text-xs text-muted-foreground">{[event.audioMimeType, audioSize].filter(Boolean).join(" · ")}</p>}{event.transcript && <details className="mt-3 rounded-lg border border-border/70 bg-muted/20 px-3 py-2"><summary className="cursor-pointer text-xs font-medium text-primary">Ver transcrição</summary><p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">{event.transcript}</p></details>}{(aiStatusLabel || suggestions?.aiModel || aiConfidence || aiUpdates.length > 0) && <div className="mt-3 rounded-lg border border-border/70 bg-muted/20 px-3 py-2"><div className="flex flex-wrap items-center gap-2">{aiStatusLabel && <Badge variant="secondary" className="rounded-full px-2 py-0.5 text-[11px] font-medium">{aiStatusLabel}</Badge>}{suggestions?.aiModel && <span className="text-xs text-muted-foreground">Modelo: {suggestions.aiModel}</span>}{aiConfidence && <span className="text-xs text-muted-foreground">Confiança: {aiConfidence}</span>}</div>{aiUpdates.length > 0 && <ul className="mt-2 space-y-1 text-xs text-muted-foreground">{aiUpdates.map((update) => <li key={update.field}><strong className="font-medium text-foreground">{update.label} aplicado:</strong> {update.value}</li>)}</ul>}</div>}{suggestionCount > 0 && <details className="mt-3 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2"><summary className="cursor-pointer text-xs font-medium text-primary">Sugestões da IA ({suggestionCount})</summary><div className="mt-2 space-y-1 text-xs text-muted-foreground">{suggestions?.opportunities?.map((item, index) => <p key={`opportunity-${index}`}><strong className="font-medium text-foreground">Oportunidade:</strong> {item.title || item.summary || "Sem título"}</p>)}{suggestions?.tasks?.map((item, index) => <p key={`task-${index}`}><strong className="font-medium text-foreground">Tarefa:</strong> {item.title || item.summary || "Sem título"}</p>)}{suggestions?.equipmentLinks?.map((item, index) => <p key={`equipment-${index}`}><strong className="font-medium text-foreground">Equipamento:</strong> {[item.equipmentType, item.brand, item.model].filter(Boolean).join(" · ") || item.summary || "Sem descrição"}</p>)}</div></details>}{Boolean(event.nextContactAt) && <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"><CalendarClock size={13} /> Próximo contato: {formatDate(event.nextContactAt)}{event.source === "whatsapp" ? " · WhatsApp" : ""}</p>}</div>;
   })}<Button type="button" variant="outline" onClick={onRegister} className="gap-2"><Plus size={14} /> Registrar outra interação</Button></div>;
 }
 

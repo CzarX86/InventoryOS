@@ -54,6 +54,8 @@ type HomeMetrics = {
   todayEvents: HomeEvent[];
   contactsReached: number;
   scheduledFollowUps: number;
+  overdueFollowUps: number;
+  overdueEvents: HomeEvent[];
   dailyCounts: Array<{ label: string; count: number }>;
 };
 
@@ -89,6 +91,12 @@ export function buildHomeMetrics(events: HomeEvent[], now = Date.now()): HomeMet
     const nextContactAt = timestampToMillis(event.nextContactAt);
     return nextContactAt >= today && nextContactAt < today + DAY_IN_MS;
   }).length;
+  const overdueEvents = currentEvents
+    .filter((event) => {
+      const nextContactAt = timestampToMillis(event.nextContactAt);
+      return nextContactAt > 0 && nextContactAt < today;
+    })
+    .sort((left, right) => timestampToMillis(left.nextContactAt) - timestampToMillis(right.nextContactAt));
   const todayEvents = currentEvents
     .filter((event) => timestampToMillis(event.occurredAt) >= today)
     .sort((left, right) => timestampToMillis(right.occurredAt) - timestampToMillis(left.occurredAt));
@@ -104,7 +112,7 @@ export function buildHomeMetrics(events: HomeEvent[], now = Date.now()): HomeMet
     };
   });
 
-  return { todayEvents, contactsReached: contactIds.size, scheduledFollowUps, dailyCounts };
+  return { todayEvents, contactsReached: contactIds.size, scheduledFollowUps, overdueFollowUps: overdueEvents.length, overdueEvents, dailyCounts };
 }
 
 function getFirstName(user: HomeUser | null) {
@@ -117,6 +125,12 @@ function formatTime(value: unknown) {
   return new Date(timestamp).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
+function formatShortDate(value: unknown) {
+  const timestamp = timestampToMillis(value);
+  if (!timestamp) return "data não informada";
+  return new Date(timestamp).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+}
+
 function formatToday() {
   return new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "numeric", month: "long" }).format(new Date());
 }
@@ -127,10 +141,11 @@ function channelMeta(channel: string | null | undefined) {
   return { label: channel === "email" ? "E-mail" : channel === "meeting" ? "Reunião" : "Outro", icon: CalendarCheck2, tone: "text-primary bg-accent border-primary/15" };
 }
 
-export default function WorkspaceHome({ user, inventoryCount = 0, onOpenCrm, canViewTeam = false }: {
+export default function WorkspaceHome({ user, inventoryCount = 0, onOpenCrm, onOpenContact, canViewTeam = false }: {
   user: HomeUser | null;
   inventoryCount?: number;
   onOpenCrm: () => void;
+  onOpenContact?: (contactId: string) => void;
   canViewTeam?: boolean;
 }) {
   const workspaceId = user?.workspaceId || user?.defaultAccountId || null;
@@ -307,6 +322,34 @@ export default function WorkspaceHome({ user, inventoryCount = 0, onOpenCrm, can
           <MiniStat label={viewingAnotherUser ? "Itens no inventário da equipe" : "Itens no inventário"} value={inventoryCount} icon={CheckCircle2} />
         </div>
 
+        {!loading && !error && metrics.overdueFollowUps > 0 && (
+          <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-amber-950">{metrics.overdueFollowUps} follow-up{metrics.overdueFollowUps === 1 ? " vencido" : "s vencidos"}</p>
+                <p className="mt-1 text-xs leading-relaxed text-amber-900/80">Esses contatos passaram da data prevista de retorno. Retome a conversa para não perder o ritmo.</p>
+              </div>
+              <Button onClick={onOpenCrm} variant="outline" size="sm" className="w-full shrink-0 rounded-lg border-amber-300 bg-white/70 text-amber-900 hover:bg-white sm:w-auto">Abrir CRM</Button>
+            </div>
+            <div className="mt-3 space-y-2">
+              {metrics.overdueEvents.slice(0, 3).map((event) => (
+                <div key={event.id} className="flex items-center justify-between gap-3 rounded-xl border border-amber-200/70 bg-white/60 px-3 py-2">
+                  <p className="min-w-0 truncate text-sm font-medium text-amber-950">{event.summary || "Interação sem resumo"}</p>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="text-xs text-amber-800">previsto em {formatShortDate(event.nextContactAt)}</span>
+                    {event.contactId && onOpenContact && (
+                      <button type="button" onClick={() => onOpenContact(event.contactId as string)} className="rounded-lg px-2 py-1 text-xs font-medium text-amber-900 underline underline-offset-2 hover:bg-amber-100">
+                        Ver contato
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {metrics.overdueFollowUps > 3 && <p className="pt-1 text-center text-xs font-medium text-amber-800">+ {metrics.overdueFollowUps - 3} follow-ups vencidos no CRM</p>}
+            </div>
+          </div>
+        )}
+
         <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
           <Card className="rounded-2xl border-border/70 bg-card shadow-sm">
             <CardHeader className="flex-row items-start justify-between gap-4 space-y-0 p-5 pb-3 sm:p-6 sm:pb-4">
@@ -379,9 +422,11 @@ export default function WorkspaceHome({ user, inventoryCount = 0, onOpenCrm, can
                         <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${meta.tone}`}><Icon size={15} /></span>
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-medium text-foreground">{event.summary || "Interação sem resumo"}</p>
-                          <p className="mt-1 flex items-center gap-2 text-xs text-muted-foreground"><span>{meta.label}</span><span>·</span><span>{formatTime(event.occurredAt)}</span></p>
+                          <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><span>{meta.label}</span><span>·</span><span>{formatTime(event.occurredAt)}</span>{event.contactId && onOpenContact && (<><span>·</span><button type="button" onClick={() => onOpenContact(event.contactId as string)} className="font-medium text-primary underline underline-offset-2 hover:text-primary/80">Ver contato</button></>)}</p>
                         </div>
-                        <ChevronRight size={15} className="mt-2 shrink-0 text-muted-foreground/60" />
+                        <button type="button" onClick={onOpenCrm} aria-label={`Abrir "${event.summary || "interação"}" no CRM`} className="mt-1 shrink-0 rounded-lg p-1.5 text-muted-foreground/60 transition-colors hover:bg-accent hover:text-foreground">
+                          <ChevronRight size={15} />
+                        </button>
                       </div>
                     );
                   })}

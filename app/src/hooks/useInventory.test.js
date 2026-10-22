@@ -11,8 +11,8 @@ jest.mock("firebase/firestore", () => ({
   onSnapshot: jest.fn((query, callback) => {
     // Determine which test is running or just provide common mock data
     const mockDocs = [
-      { id: '1', data: () => ({ partNumber: 'ABC-123', model: 'PowerFlex', brand: 'Allen-Bradley', type: 'Inverter' }) },
-      { id: '2', data: () => ({ partNumber: 'XYZ-456', model: 'Sinamics', brand: 'Siemens', type: 'Inverter' }) }
+      { id: '1', data: () => ({ partNumber: 'ABC-123', model: 'PowerFlex', brand: 'Allen-Bradley', type: 'Inverter', status: 'IN STOCK', specifications: 'MOTOR 220V TRIFASICO' }) },
+      { id: '2', data: () => ({ partNumber: 'XYZ-456', model: 'Sinamics', brand: 'Siemens', type: 'Inverter', status: 'REPAIR', specifications: 'TELA TOUCH 24V' }) }
     ];
     callback({ docs: mockDocs });
     return jest.fn(); // unsubscribe
@@ -61,5 +61,27 @@ describe("useInventory", () => {
   it("should return all items when search query is empty", () => {
     const { result } = renderHook(() => useInventory(initialItems));
     expect(result.current.filteredItems).toHaveLength(2);
+  });
+
+  it("should filter items by specifications", () => {
+    const { result } = renderHook(() => useInventory(initialItems));
+
+    act(() => {
+      result.current.setSearchQuery("220v");
+    });
+
+    expect(result.current.filteredItems).toHaveLength(1);
+    expect(result.current.filteredItems[0].partNumber).toBe("ABC-123");
+  });
+
+  it("should filter items by status", () => {
+    const { result } = renderHook(() => useInventory(initialItems));
+
+    act(() => {
+      result.current.setSearchQuery("repair");
+    });
+
+    expect(result.current.filteredItems).toHaveLength(1);
+    expect(result.current.filteredItems[0].partNumber).toBe("XYZ-456");
   });
 });

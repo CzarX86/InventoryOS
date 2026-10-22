@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { X, Edit2, Mic, Package, Hash, Tag, Activity, Calendar, Server, Share2, CornerRightDown } from "lucide-react";
+import { X, Edit2, Mic, Package, Hash, Tag, Activity, Calendar, Server, Share2, CornerRightDown, ExternalLink } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getBrandLogo } from "@/lib/utils";
 import {
@@ -31,6 +31,19 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
   const [isImagePreviewOpen, setIsImagePreviewOpen] = useState(false);
 
   if (!item) return null;
+
+  const enrichment = item.metadata?.catalogEnrichment || {};
+  const hasCatalogEnrichment = Boolean(
+    enrichment.status || enrichment.productId || enrichment.reason ||
+    enrichment.confidence != null || enrichment.matchedBy || enrichment.sourceUrl ||
+    item.catalogProductName || item.catalogDescription ||
+    item.catalogProductUrl || item.catalogDatasheetUrl || item.catalogManualUrl
+  );
+  const enrichmentLinks = [
+    { label: "CATALOG_PRODUCT_URL", url: item.catalogProductUrl },
+    { label: "CATALOG_DATASHEET_URL", url: item.catalogDatasheetUrl },
+    { label: "CATALOG_MANUAL_URL", url: item.catalogManualUrl },
+  ].filter((link) => Boolean(link.url));
 
   const handleShare = async (platform = "native") => {
     const text = `Equipamento: ${item.model}\nMarca: ${item.brand}\nPN: ${item.partNumber}\n\nEspecificações:\n${item.specifications}`;
@@ -162,27 +175,78 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
               </div>
             </div>
 
-            {item.metadata?.catalogEnrichment?.status && (
-              <div className="mb-12 flex flex-wrap items-center gap-3 border border-foreground/10 bg-[#131313] p-5">
-                <span className="text-[10px] font-display uppercase tracking-[0.2em] text-muted-foreground/60">CATALOG_ENRICHMENT</span>
-                <Badge variant="outline" className="rounded-none border-primary/20 bg-primary/5 text-[10px] font-mono uppercase tracking-widest text-primary">
-                  {item.metadata.catalogEnrichment.status}
-                </Badge>
-                {item.metadata.catalogEnrichment.matchedBy && (
-                  <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/50">
-                    MATCH: {item.metadata.catalogEnrichment.matchedBy}
-                  </span>
-                )}
-                {item.metadata.catalogEnrichment.sourceUrl && (
-                  <a
-                    href={item.metadata.catalogEnrichment.sourceUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[10px] font-mono uppercase tracking-widest text-primary underline underline-offset-4"
-                  >
-                    OPEN_ICECAT_SOURCE
-                  </a>
-                )}
+            {hasCatalogEnrichment && (
+              <div className="mb-12">
+                <div className="flex items-center gap-2 mb-6 opacity-40">
+                  <Package size={14} className="text-primary/60" />
+                  <h4 className="text-[11px] font-display font-normal uppercase tracking-[0.2em]">CATALOG_ENRICHMENT.DB</h4>
+                </div>
+                <div className="border border-foreground/10 bg-[#131313] p-8">
+                  <div className="flex flex-wrap items-center gap-3 pb-6 border-b border-foreground/5">
+                    {enrichment.status && (
+                      <Badge variant="outline" className="rounded-none border-primary/20 bg-primary/5 text-[10px] font-mono uppercase tracking-widest text-primary">
+                        {enrichment.status}
+                      </Badge>
+                    )}
+                    {enrichment.matchedBy && (
+                      <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/50">
+                        MATCH: {enrichment.matchedBy}
+                      </span>
+                    )}
+                    {enrichment.confidence != null && (
+                      <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/50">
+                        CONFIDENCE: {Math.round(Number(enrichment.confidence) * 100)}%
+                      </span>
+                    )}
+                  </div>
+                  <DetailField icon={Tag} label="CATALOG_PRODUCT_NAME" value={item.catalogProductName} />
+                  {item.catalogDescription && (
+                    <div className="py-5 border-b border-foreground/5 last:border-0">
+                      <div className="flex items-center gap-2 mb-2 opacity-40">
+                        <Tag size={12} className="text-primary/60" />
+                        <span className="text-[11px] font-display font-normal uppercase tracking-[0.2em]">CATALOG_DESCRIPTION</span>
+                      </div>
+                      <p className="text-sm text-foreground/70 leading-relaxed">
+                        {item.catalogDescription}
+                      </p>
+                    </div>
+                  )}
+                  <DetailField icon={Hash} label="CATALOG_PRODUCT_ID" value={enrichment.productId} mono />
+                  <DetailField icon={Activity} label="ENRICHMENT_REASON" value={enrichment.reason} mono />
+                  {enrichmentLinks.length > 0 && (
+                    <div className="py-5 border-b border-foreground/5 last:border-0">
+                      <div className="flex items-center gap-2 mb-3 opacity-40">
+                        <ExternalLink size={12} className="text-primary/60" />
+                        <span className="text-[11px] font-display font-normal uppercase tracking-[0.2em]">CATALOG_SOURCES</span>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        {enrichmentLinks.map((link) => (
+                          <a
+                            key={link.label}
+                            href={link.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs font-mono uppercase tracking-widest text-primary underline underline-offset-4"
+                          >
+                            {link.label}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {enrichment.sourceUrl && (
+                    <div className="pt-5">
+                      <a
+                        href={enrichment.sourceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] font-mono uppercase tracking-widest text-primary underline underline-offset-4"
+                      >
+                        OPEN_ICECAT_SOURCE
+                      </a>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
