@@ -113,6 +113,13 @@ function MessagePreview({ jid }) {
                   </div>
                 )}
 
+                {msg.extracted !== "waiting_context" && msg.extracted !== "skipped" && (msg.relevanceCategory || msg.completenessReason) && (
+                  <div className="mt-3 pt-2 border-t border-white/5 flex items-center gap-2 text-[11px] text-muted-foreground/60 font-mono uppercase tracking-widest">
+                    <Info size={10} />
+                    <span>RELEVANCE: {msg.relevanceCategory || "—"}{msg.completenessReason ? ` • ${msg.completenessReason}` : ""}</span>
+                  </div>
+                )}
+
               </div>
             </motion.div>
           ))}
@@ -209,8 +216,8 @@ function ContactCrmDetailView({ insights }) {
               <div key={task.id} className="p-3 bg-[#151515] border border-amber-500/10 flex items-center justify-between gap-4">
                 <div className="flex flex-col gap-1 overflow-hidden">
                   <span className="text-[11px] font-mono text-muted-foreground uppercase leading-tight line-clamp-1">{task.description}</span>
-                  {task.dueDate && (
-                    <span className="text-[10px] font-mono text-amber-500/40 font-black tracking-widest">EXPIRA_EM: {task.dueDate}</span>
+                  {formatDueDate(task.dueDate) && (
+                    <span className="text-[10px] font-mono text-amber-500/40 font-black tracking-widest">EXPIRA_EM: {formatDueDate(task.dueDate)}</span>
                   )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -225,7 +232,52 @@ function ContactCrmDetailView({ insights }) {
   );
 }
 
-export default function ContactReviewQueue() {
+/**
+ * Classification detail for the expanded row: surfaces the AI fields
+ * written by the batch classifier (aiClassification, confidenceScore)
+ * plus the message-level relevance signals.
+ */
+function ContactAiDetailView({ item }) {
+  const classification = item.aiClassification || "unprocessed";
+  const confidence = typeof item.confidenceScore === "number" ? item.confidenceScore : null;
+  return (
+    <div className="px-6 py-4 bg-[#0d0d0d] border-b border-white/5">
+      <div className="flex items-center gap-2 mb-3 text-[11px] font-display uppercase tracking-[0.2em] text-muted-foreground/70">
+        <Brain size={12} />
+        AI_CLASSIFICATION_DETAIL
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[11px] font-mono uppercase tracking-widest">
+        <div className="p-3 bg-[#151515] border border-white/5">
+          <p className="text-muted-foreground/40 mb-1">CLASSIFICATION</p>
+          <p className="text-foreground">{classification}</p>
+        </div>
+        <div className="p-3 bg-[#151515] border border-white/5">
+          <p className="text-muted-foreground/40 mb-1">CONFIDENCE_SCORE</p>
+          <p className="text-foreground">{confidence != null ? `${Math.round(confidence * 100)}%` : "—"}</p>
+        </div>
+        <div className="p-3 bg-[#151515] border border-white/5">
+          <p className="text-muted-foreground/40 mb-1">WORKSPACE</p>
+          <p className="text-foreground truncate">{item.workspaceId || "—"}</p>
+        </div>
+      </div>
+      {item.aiInsightSummary && (
+        <p className="mt-3 text-[11px] font-mono leading-relaxed text-muted-foreground uppercase tracking-tight">{item.aiInsightSummary}</p>
+      )}
+    </div>
+  );
+}
+
+function formatDueDate(value) {
+  if (!value) return "";
+  if (typeof value?.toDate === "function") {
+    const date = value.toDate();
+    return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("pt-BR");
+  }
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? "" : value.toLocaleDateString("pt-BR");
+  return String(value);
+}
+
+export default function ContactReviewQueue({ user }) {
   const [contacts, setContacts] = useState([]);
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(Boolean(db));
@@ -233,36 +285,63 @@ export default function ContactReviewQueue() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [crmInsights, setCrmInsights] = useState({});
   const [queueLimitReached, setQueueLimitReached] = useState(false);
+  const [accessError, setAccessError] = useState("");
+  const workspaceId = user?.workspaceId || user?.defaultAccountId || null;
 
   const insightJids = useMemo(() => Array.from(new Set(
     [...contacts, ...groups].map((item) => item.id).filter(Boolean),
   )), [contacts, groups]);
 
   useEffect(() => {
-    if (!db) return undefined;
+    if (!db || !workspaceId) {
+      setLoading(false);
+      return undefined;
+    }
+
+    // A fila é restrita ao workspace e as coleções de WhatsApp têm
+    // leitura/admin nas regras — erros de permissão viram aviso honesto.
+    const handleListenError = (error) => {
+      console.error("WhatsApp review queue listen failed:", error);
+      setAccessError(
+        error?.code === "permission-denied"
+          ? "A fila de revisão exige acesso de administrador neste workspace."
+          : "Não foi possível carregar a fila de revisão agora.",
+      );
+      setLoading(false);
+    };
 
     // Escutar contatos individuais
-    const contactsQuery = query(collection(db, "whatsapp_contacts"), orderBy("lastMessageAt", "desc"), limit(100));
+    const contactsQuery = query(
+      collection(db, "whatsapp_contacts"),
+      where("workspaceId", "==", workspaceId),
+      orderBy("lastMessageAt", "desc"),
+      limit(100),
+    );
     const unsubContacts = onSnapshot(contactsQuery, (snap) => {
       const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data(), type: "contact" }));
       setContacts(data);
       setQueueLimitReached((current) => current || snap.size >= 100);
-    });
+    }, handleListenError);
 
     // Escutar grupos
-    const groupsQuery = query(collection(db, "whatsapp_groups"), orderBy("lastMessageAt", "desc"), limit(100));
+    const groupsQuery = query(
+      collection(db, "whatsapp_groups"),
+      where("workspaceId", "==", workspaceId),
+      orderBy("lastMessageAt", "desc"),
+      limit(100),
+    );
     const unsubGroups = onSnapshot(groupsQuery, (snap) => {
       const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data(), type: "group" }));
       setGroups(data);
       setQueueLimitReached((current) => current || snap.size >= 100);
       setLoading(false);
-    });
+    }, handleListenError);
 
     return () => {
       unsubContacts();
       unsubGroups();
     };
-  }, []);
+  }, [workspaceId]);
 
   useEffect(() => {
     if (!db || insightJids.length === 0) {
@@ -376,6 +455,7 @@ export default function ContactReviewQueue() {
         <div className={`flex items-center gap-2 ${color} font-display text-[11px] uppercase tracking-[0.15em]`}>
           <Icon size={12} />
           <span>{classification === "professional" ? "COMERCIAL" : "PESSOAL"}</span>
+          <span className="font-mono text-[10px] text-muted-foreground/60">{Math.round(confidence * 100)}%</span>
         </div>
         <div className="flex items-center gap-1.5 h-1 w-20 bg-white/5 overflow-hidden">
           <motion.div 
@@ -454,6 +534,20 @@ export default function ContactReviewQueue() {
         </div>
         {queueLimitReached && <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/40">Exibindo até 100 contatos e 100 grupos mais recentes.</p>}
       </div>
+
+      {!workspaceId && (
+        <div className="px-8 py-4 bg-amber-500/5 border-b border-amber-500/10 flex items-center gap-3">
+          <AlertCircle size={14} className="text-amber-500 shrink-0" />
+          <p className="text-[11px] font-mono uppercase tracking-widest text-amber-500/80">SELECIONE_UM_WORKSPACE_PARA_VER_A_FILA</p>
+        </div>
+      )}
+
+      {accessError && (
+        <div className="px-8 py-4 bg-red-500/5 border-b border-red-500/10 flex items-center gap-3">
+          <Shield size={14} className="text-red-500 shrink-0" />
+          <p className="text-[11px] font-mono uppercase tracking-widest text-red-500/80">{accessError}</p>
+        </div>
+      )}
 
       <div className="p-0">
         <div className="overflow-x-auto">
@@ -577,6 +671,7 @@ export default function ContactReviewQueue() {
                               exit={{ height: 0, opacity: 0 }}
                               transition={{ duration: 0.3, ease: "circOut" }}
                             >
+                              <ContactAiDetailView item={item} />
                               <ContactCrmDetailView insights={crmInsights[item.id]} />
                               <MessagePreview jid={item.id} />
                             </motion.div>
