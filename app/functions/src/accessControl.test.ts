@@ -1,4 +1,40 @@
-import { isConfiguredAdmin, isConfiguredOwner } from "./accessControl";
+import { isConfiguredAdmin, isConfiguredOwner, isWorkspaceMember } from "./accessControl";
+
+describe("workspace member read gate", () => {
+  const workspaceId = "workspace_inventoryos";
+
+  it("admits the owner without a member profile", () => {
+    expect(isWorkspaceMember({ uid: "owner-1" }, workspaceId, "owner-1")).toBe(true);
+  });
+
+  it("admits approved members of the same workspace", () => {
+    expect(isWorkspaceMember(
+      { uid: "u-1", accessStatus: "approved", workspaceId },
+      workspaceId,
+      "owner-1",
+    )).toBe(true);
+    expect(isWorkspaceMember(
+      { uid: "u-2", accessStatus: "approved", defaultAccountId: workspaceId },
+      workspaceId,
+      "owner-1",
+    )).toBe(true);
+  });
+
+  it("denies pending, revoked, and other-workspace profiles", () => {
+    expect(isWorkspaceMember(
+      { uid: "u-3", accessStatus: "pending", workspaceId },
+      workspaceId,
+      "owner-1",
+    )).toBe(false);
+    expect(isWorkspaceMember(
+      { uid: "u-4", accessStatus: "approved", workspaceId: "workspace_other" },
+      workspaceId,
+      "owner-1",
+    )).toBe(false);
+    expect(isWorkspaceMember(null, workspaceId, "owner-1")).toBe(false);
+    expect(isWorkspaceMember({ uid: "u-5", accessStatus: "approved", workspaceId }, "", "owner-1")).toBe(false);
+  });
+});
 
 describe("access owner resolution", () => {
   it("recognizes only a verified Google identity matching the configured owner email", () => {

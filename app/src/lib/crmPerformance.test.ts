@@ -103,3 +103,13 @@ describe("aggregateCrmPerformance", () => {
     expect(result.overdueContacts).toHaveLength(0);
   });
 });
+
+describe("formatSnapshotError", () => {
+  it("explains permission and auth failures with actionable hints", async () => {
+    const { formatSnapshotError } = await import("./crmPerformanceApi");
+    expect(formatSnapshotError({ code: "permission-denied" })).toContain("administrador");
+    expect(formatSnapshotError({ code: "unauthenticated" })).toContain("login");
+    expect(formatSnapshotError(new Error("boom"))).toBe("Não foi possível carregar a performance do CRM.");
+    expect(formatSnapshotError(null)).toBe("Não foi possível carregar a performance do CRM.");
+  });
+});

@@ -1,6 +1,6 @@
 import { getFirestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
-import { ensureAccessAdmin, getAccessConfig } from "./accessControl";
+import { ensureAccessAdmin, ensureWorkspaceMember, getAccessConfig } from "./accessControl";
 import { isFeatureEnabled, loadFeatureFlags } from "./featureFlags";
 import { withCallErrorHandling } from "./lib/errors";
 
@@ -208,8 +208,7 @@ export const getCrmPerformanceSnapshot = onCall(withCallErrorHandling(async (req
   if (!request.auth?.uid) throw new HttpsError("unauthenticated", "Faça login para consultar a performance.");
   const startedAt = Date.now();
   const db = getFirestore();
-  await ensureAccessAdmin(request.auth, db);
-  const { ownerUid, workspaceId } = await getAccessConfig(db);
+  const { ownerUid, workspaceId } = await ensureWorkspaceMember(request.auth, db);
   if (!workspaceId) throw new HttpsError("failed-precondition", "Workspace não configurado.");
 
   const periodDays = normalizePerformancePeriod(request.data?.periodDays);

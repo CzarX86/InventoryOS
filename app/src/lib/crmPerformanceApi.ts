@@ -49,3 +49,18 @@ export async function getCrmPerformanceSnapshot(periodDays: PeriodDays, options:
 export function prefetchCrmPerformanceSnapshot(periodDays: PeriodDays = 30) {
   return getCrmPerformanceSnapshot(periodDays).catch(() => undefined);
 }
+
+/**
+ * Maps callable failures to the message shown on the dashboard. Permission
+ * errors get an actionable hint instead of the generic load failure text.
+ */
+export function formatSnapshotError(error: unknown): string {
+  const code = (error as { code?: unknown } | null | undefined)?.code;
+  if (code === "permission-denied") {
+    return "Sua conta não tem acesso à performance da equipe. Peça a um administrador para aprovar seu acesso.";
+  }
+  if (code === "unauthenticated") {
+    return "Faça login novamente para ver a performance da equipe.";
+  }
+  return "Não foi possível carregar a performance do CRM.";
+}

@@ -16,7 +16,7 @@ import {
   Video,
 } from "lucide-react";
 import type { AccessUserSummary } from "@/lib/accessControl";
-import { getCrmPerformanceSnapshot } from "@/lib/crmPerformanceApi";
+import { formatSnapshotError, getCrmPerformanceSnapshot } from "@/lib/crmPerformanceApi";
 import {
   aggregateCrmPerformance,
   type CrmPerformanceContact,
@@ -180,10 +180,10 @@ export default function CrmPerformanceDashboard({ user }: { user: CrmPerformance
         setSnapshotState({ queryKey, status: "success", eventLimitReached: snapshot.eventLimitReached });
         setMetricsNow(Date.now());
       })
-      .catch(() => {
+      .catch((snapshotError: unknown) => {
         if (!active) return;
         setEmployees(mergeEmployees(user, []));
-        setSnapshotState({ queryKey, status: "error", error: "Não foi possível carregar a performance do CRM." });
+        setSnapshotState({ queryKey, status: "error", error: formatSnapshotError(snapshotError) });
         setMetricsNow(Date.now());
       })
 
