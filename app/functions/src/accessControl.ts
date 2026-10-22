@@ -184,6 +184,46 @@ export async function initializeAccessProfile(auth: any) {
   });
 }
 
+export interface WorkspaceMembership {
+  uid?: unknown;
+  accessStatus?: unknown;
+  workspaceId?: unknown;
+  defaultAccountId?: unknown;
+}
+
+/**
+ * Read-level gate for operational snapshots (performance, home). Unlike
+ * admin mutations, any approved workspace member may view the team's
+ * commercial activity — the same data already visible in the CRM views.
+ */
+export function isWorkspaceMember(
+  profile: WorkspaceMembership | null | undefined,
+  workspaceId: string,
+  ownerUid: string | null,
+): boolean {
+  const uid = typeof profile?.uid === "string" ? profile.uid : null;
+  if (!uid || !workspaceId) return false;
+  if (ownerUid && uid === ownerUid) return true;
+  if (profile?.accessStatus !== "approved") return false;
+  const memberWorkspace = typeof profile?.workspaceId === "string" && profile.workspaceId
+    ? profile.workspaceId
+    : typeof profile?.defaultAccountId === "string" ? profile.defaultAccountId : null;
+  return memberWorkspace === workspaceId;
+}
+
+export async function ensureWorkspaceMember(auth: any, db: Firestore = admin.firestore()) {
+  if (!auth?.uid) {
+    throw new HttpsError("unauthenticated", "Authentication required");
+  }
+  const { ownerUid, workspaceId } = await getAccessConfig(db);
+  const userSnapshot = await db.collection("users").doc(auth.uid).get();
+  const data = userSnapshot.data() || {};
+  if (!isWorkspaceMember({ uid: auth.uid, ...data }, workspaceId, ownerUid)) {
+    throw new HttpsError("permission-denied", "Workspace membership required");
+  }
+  return { ownerUid, workspaceId };
+}
+
 export async function ensureAccessAdmin(auth: any, db: Firestore = admin.firestore()) {
   if (!auth?.uid) {
     throw new HttpsError("unauthenticated", "Authentication required");
