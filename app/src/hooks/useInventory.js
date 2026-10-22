@@ -173,6 +173,11 @@ export default function useInventory(user = null, enabled = true) {
     }
   };
 
+  // Client-side search over cursor-paginated inventory. Firestore is read in
+  // INVENTORY_PAGE_SIZE chunks ordered by createdAt (see the onSnapshot
+  // subscription above and loadMore with startAfter), so filtering here only
+  // covers items already loaded into memory. The inventory list UI tells the
+  // user to load more items to widen search results.
   const filteredItems = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
     if (!query) return items;
@@ -184,7 +189,9 @@ export default function useInventory(user = null, enabled = true) {
         match(item.gtin) ||
         match(item.model) ||
         match(item.brand) ||
-        match(item.type)
+        match(item.type) ||
+        match(item.status) ||
+        match(item.specifications)
       );
     });
   }, [items, searchQuery]);
