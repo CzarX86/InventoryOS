@@ -7,6 +7,24 @@ import { withCallErrorHandling } from "./lib/errors";
 export const PERFORMANCE_PERIODS = [7, 30, 90] as const;
 export type PerformancePeriodDays = (typeof PERFORMANCE_PERIODS)[number] | null;
 
+export function getPerformanceQueryFields() {
+  return {
+    events: [
+      "eventType",
+      "channelType",
+      "actorUserId",
+      "ownerId",
+      "contactId",
+      "remoteJid",
+      "occurredAt",
+      "nextContactAt",
+    ],
+    contacts: ["name", "displayName", "companyId", "status", "lastContactAt", "nextContactAt"],
+    companies: ["name"],
+    users: ["email", "displayName", "photoURL", "accessStatus", "role", "requestedAt", "approvedAt", "revokedAt"],
+  };
+}
+
 export function normalizePerformancePeriod(value: unknown): PerformancePeriodDays {
   if (value === null || value === "all") return null;
   const parsed = Number(value);
@@ -188,6 +206,7 @@ export const getWorkspaceHomeSnapshot = onCall(withCallErrorHandling(async (requ
 
 export const getCrmPerformanceSnapshot = onCall(withCallErrorHandling(async (request: any, logger: any) => {
   if (!request.auth?.uid) throw new HttpsError("unauthenticated", "Faça login para consultar a performance.");
+  const startedAt = Date.now();
   const db = getFirestore();
   await ensureAccessAdmin(request.auth, db);
   const { ownerUid, workspaceId } = await getAccessConfig(db);
@@ -195,16 +214,29 @@ export const getCrmPerformanceSnapshot = onCall(withCallErrorHandling(async (req
 
   const periodDays = normalizePerformancePeriod(request.data?.periodDays);
   const eventStart = getPerformanceEventStart(Date.now(), periodDays);
+  const queryFields = getPerformanceQueryFields();
   let eventsQuery: FirebaseFirestore.Query = db.collection("crm_events")
     .where("workspaceId", "==", workspaceId);
   if (eventStart) eventsQuery = eventsQuery.where("occurredAt", ">=", eventStart);
-  eventsQuery = eventsQuery.limit(2000);
+  eventsQuery = eventsQuery.select(...queryFields.events).limit(2000);
 
   const [eventsSnapshot, contactsSnapshot, companiesSnapshot, usersSnapshot] = await Promise.all([
     eventsQuery.get(),
-    db.collection("contacts").where("workspaceId", "==", workspaceId).limit(1000).get(),
-    db.collection("accounts").where("workspaceId", "==", workspaceId).limit(500).get(),
-    db.collection("users").where("workspaceId", "==", workspaceId).limit(200).get(),
+    db.collection("contacts")
+      .where("workspaceId", "==", workspaceId)
+      .select(...queryFields.contacts)
+      .limit(1000)
+      .get(),
+    db.collection("accounts")
+      .where("workspaceId", "==", workspaceId)
+      .select(...queryFields.companies)
+      .limit(500)
+      .get(),
+    db.collection("users")
+      .where("workspaceId", "==", workspaceId)
+      .select(...queryFields.users)
+      .limit(200)
+      .get(),
   ]);
 
   const employees = usersSnapshot.docs
@@ -230,6 +262,7 @@ export const getCrmPerformanceSnapshot = onCall(withCallErrorHandling(async (req
     eventCount: eventsSnapshot.size,
     contactCount: contactsSnapshot.size,
     companyCount: companiesSnapshot.size,
+    durationMs: Date.now() - startedAt,
   });
 
   return {

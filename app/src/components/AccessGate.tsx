@@ -13,33 +13,39 @@ export default function AccessGate({ status, email, onLogout }: AccessGateProps)
   return (
     <main className="min-h-screen bg-background px-6 py-16 text-foreground">
       <div className="mx-auto flex min-h-[70vh] max-w-lg items-center justify-center">
-        <Card className="w-full rounded-none border border-[#484848]/30 bg-[#131313] shadow-none">
-          <CardHeader className="border-b border-[#484848]/20 px-6 py-7">
-            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-none border border-[#97a5ff]/30 bg-[#97a5ff]/10 text-[#97a5ff]">
-              {revoked ? <ShieldAlert size={24} /> : <Clock3 size={24} />}
+        <Card className="w-full shadow-sm">
+          <CardHeader className="border-b border-border/70 px-6 py-7">
+            <div
+              className={`mb-5 flex h-12 w-12 items-center justify-center rounded-xl border ${
+                revoked
+                  ? "border-destructive/20 bg-destructive/10 text-destructive"
+                  : "border-primary/20 bg-accent text-primary"
+              }`}
+            >
+              {revoked ? <ShieldAlert size={24} aria-hidden /> : <Clock3 size={24} aria-hidden />}
             </div>
-            <CardTitle className="font-display text-2xl font-normal uppercase tracking-tight text-[#e7e5e5]">
+            <CardTitle className="text-2xl font-semibold tracking-tight">
               {revoked ? "Acesso revogado" : "Aguardando aprovação"}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6 px-6 py-7">
-            <p className="text-sm leading-relaxed text-[#acabaa]">
+            <p className="text-sm leading-relaxed text-muted-foreground">
               {revoked
                 ? "Esta conta não tem mais acesso aos dados da plataforma. Fale com o administrador se precisar solicitar uma nova liberação."
                 : "Seu cadastro foi recebido. Um administrador precisa aprovar o acesso antes que os dados da plataforma sejam liberados."}
             </p>
             {email && (
-              <div className="border border-[#484848]/20 bg-[#0e0e0e] px-4 py-3">
-                <p className="mb-1 font-mono text-[9px] uppercase tracking-[0.2em] text-[#acabaa]/50">Conta solicitante</p>
-                <p className="truncate font-mono text-xs text-[#e7e5e5]">{email}</p>
+              <div className="rounded-lg border border-border/70 bg-muted/60 px-4 py-3">
+                <p className="mb-1 text-[11px] font-medium text-muted-foreground">Conta solicitante</p>
+                <p className="truncate font-mono text-xs text-foreground">{email}</p>
               </div>
             )}
             <Button
               variant="outline"
               onClick={onLogout}
-              className="h-10 w-full rounded-none border-[#ee7d77]/30 text-[#ee7d77] hover:bg-[#ee7d77]/10"
+              className="h-10 w-full gap-2 border-destructive/20 text-destructive hover:bg-destructive/10"
             >
-              <LogOut size={14} /> Sair da sessão
+              <LogOut size={14} aria-hidden /> Sair da sessão
             </Button>
           </CardContent>
         </Card>

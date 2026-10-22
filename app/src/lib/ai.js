@@ -5,7 +5,12 @@ import { normalizeUsageMetadata } from "./audit";
 import { functions as firebaseFunctions } from "./firebase";
 
 const geminiApiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-const deepseekApiKey = process.env.NEXT_PUBLIC_DEEPSEEK_API_KEY;
+// DeepSeek bearer tokens cannot be restricted by HTTP referrer, so the direct
+// browser fallback must never ship a production key. Production always goes
+// through the runAiExtraction callable gateway (firebaseFunctions is set);
+// the direct path below only serves local dev/test without Functions.
+const deepseekApiKey =
+  process.env.NODE_ENV === "production" ? undefined : process.env.NEXT_PUBLIC_DEEPSEEK_API_KEY;
 
 let genAI;
 function getClientGemini() {

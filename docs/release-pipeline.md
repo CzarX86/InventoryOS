@@ -76,7 +76,7 @@ Crie dois environments no repositório: `staging` e `production`.
 | Secret | Descrição |
 |---|---|
 | `FIREBASE_SERVICE_ACCOUNT` | JSON completo da service account com permissão para deploy de Hosting, Firestore, Storage e Functions |
-| `NEXT_PUBLIC_GEMINI_API_KEY` | API key do Gemini |
+| `NEXT_PUBLIC_GEMINI_API_KEY` | Chave do Gemini embutida no bundle público — restrinja por HTTP referrer aos domínios de hosting (`*.web.app` do projeto) |
 
 ### Secrets do runtime das Cloud Functions
 

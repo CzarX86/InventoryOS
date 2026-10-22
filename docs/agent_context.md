@@ -3,7 +3,7 @@ project: InventoryOS
 active_branch: codex/runtime-secret-readiness
 stack: Next.js 15, Firebase, Gemini/DeepSeek, TypeScript (Migration)
 release_channel: preview (expansion-track)
-last_updated: 2026-10-08
+last_updated: 2026-10-22
 ---
 
 # Agent Context Layer (Persistent)
@@ -38,6 +38,7 @@ InventoryOS is an operational platform currently focused on inventory and item m
 - **Local development auth**: `pnpm dev` loads the ignored `app/.env.development.local`, which enables a development-only approved fake user and disables Firebase initialization so local UI work never reaches a real project.
 - **Product catalog enrichment**: Inventory products are automatically enriched on creation or identifier changes through the free Open Icecat catalog. Exact/high-confidence matches persist structured technical specifications and source metadata without overwriting manually entered fields.
 - **Current implementation branch**: `codex/crm-governance`, based on `main`. Changes are local and require CI/PR before integration into `main`.
+- **Security hardening (main)**: fail-closed Evolution webhook (no `default_secret` fallback), hardened Storage/Firestore inventory write rules, and browser builds that never ship a production DeepSeek key.
 
 ## New Customer Input (September 2026)
 - A customer requested a simple prospecting CRM for Andreia to register a company/client, city, and contact dates, with optional supporting fields.

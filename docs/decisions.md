@@ -282,6 +282,12 @@ Location: `system_usage/ai_usage_summary_{YYYYMM}`
 - **Implicacoes**: Nao criar collections, feature flags, interfaces, fluxos de cotacao ou migracoes para esse diretorio sem uma nova repriorizacao explicita. A proposta e mantida em `expansion-track-backlog.md`.
 - **Status**: Deferred.
 
+## Decision: Fail-closed Evolution webhook authentication
+- **Decision**: `evolutionWebhook` rejects with 500 when `EVOLUTION_WEBHOOK_SECRET` is unconfigured and 401 on signature mismatch; the previous insecure-accept mode and `default_secret` fallback were removed. Signature comparison is length-guarded and 401 logs no longer dump header values.
+- **Reason**: Fail-open webhooks allow forged WhatsApp events, poisoned CRM data, and attacker-driven AI spend.
+- **Implications**: `EVOLUTION_WEBHOOK_SECRET` is required per environment (see `release-pipeline.md`) and must match the value configured on the Evolution instance via `setWhatsappWebhook`, which refuses to run without it.
+- **Status**: Active.
+
 ## Decision: Read-only team view on Home
 - **Decision**: Administrators and the platform owner can select an approved teammate on Home and inspect that person's recent CRM activity through the `getWorkspaceHomeSnapshot` callable. The selected-user view is read-only; interaction creation is disabled and writes are never impersonated.
 - **Reason**: Managers need the same operational overview employees use, while CRM history must remain correctly attributed to the authenticated user and must not reveal other workspaces.

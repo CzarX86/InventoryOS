@@ -84,6 +84,45 @@ service cloud.firestore {
         ]);
     }
 
+    // Legacy inventory docs carry no workspace/owner fields and are read
+    // collection-wide, so client writes are constrained by field allowlist +
+    // value checks instead. Server enrichment (metadata) bypasses rules via
+    // the Admin SDK and is never part of the client payload.
+    function inventoryWritableKeys() {
+      // "id" is tolerated for backward compatibility (the edit form echoes the
+      // doc id); the match block below pins it to the document id.
+      return [
+        "type", "brand", "model", "partNumber", "gtin", "specifications",
+        "status", "audioUrl", "productImageUrl", "updatedAt", "id"
+      ];
+    }
+
+    function validInventoryValues(data) {
+      return (!("type" in data) || (data.type is string && data.type.size() <= 120))
+        && (!("brand" in data) || (data.brand is string && data.brand.size() <= 120))
+        && (!("model" in data) || (data.model is string && data.model.size() <= 120))
+        && (!("partNumber" in data) || (data.partNumber is string && data.partNumber.size() <= 120))
+        && (!("gtin" in data) || (data.gtin is string && data.gtin.size() <= 32))
+        && (!("specifications" in data) || (data.specifications is string && data.specifications.size() <= 10000))
+        && (!("status" in data) || (data.status is string && data.status in ["IN STOCK", "SOLD", "REPAIR", "RESERVED"]))
+        && (!("audioUrl" in data) || (data.audioUrl is string && data.audioUrl.size() <= 2000))
+        && (!("productImageUrl" in data) || (data.productImageUrl is string && data.productImageUrl.size() <= 2000));
+    }
+
+    // Update path: only changed values are validated, so legacy documents
+    // with out-of-contract values stay editable on other fields.
+    function validInventoryChanges(affected, data) {
+      return (!affected.hasAny(["type"]) || (data.type is string && data.type.size() <= 120))
+        && (!affected.hasAny(["brand"]) || (data.brand is string && data.brand.size() <= 120))
+        && (!affected.hasAny(["model"]) || (data.model is string && data.model.size() <= 120))
+        && (!affected.hasAny(["partNumber"]) || (data.partNumber is string && data.partNumber.size() <= 120))
+        && (!affected.hasAny(["gtin"]) || (data.gtin is string && data.gtin.size() <= 32))
+        && (!affected.hasAny(["specifications"]) || (data.specifications is string && data.specifications.size() <= 10000))
+        && (!affected.hasAny(["status"]) || (data.status is string && data.status in ["IN STOCK", "SOLD", "REPAIR", "RESERVED"]))
+        && (!affected.hasAny(["audioUrl"]) || (data.audioUrl is string && data.audioUrl.size() <= 2000))
+        && (!affected.hasAny(["productImageUrl"]) || (data.productImageUrl is string && data.productImageUrl.size() <= 2000));
+    }
+
     function canEscalateOwnError() {
       return isApprovedMember() &&
         resource.data.userId == request.auth.uid &&
@@ -117,7 +156,24 @@ service cloud.firestore {
     }
 
     match /inventory/{itemId} {
-      allow read, write: if isApprovedMember();
+      allow read: if isApprovedMember();
+      allow create: if isApprovedMember()
+        && request.resource.data.keys().hasOnly([
+          "type", "brand", "model", "partNumber", "gtin", "specifications",
+          "status", "audioUrl", "productImageUrl", "updatedAt", "createdAt", "id"
+        ])
+        && (!("id" in request.resource.data) || request.resource.data.id == itemId)
+        && validInventoryValues(request.resource.data);
+      allow update: if isApprovedMember()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+          inventoryWritableKeys())
+        && validInventoryChanges(
+          request.resource.data.diff(resource.data).affectedKeys(), request.resource.data)
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(["id"])
+          || request.resource.data.id == itemId);
+      // Deletes stay client-direct (undo toast flow); a callable-owned delete
+      // is tracked as follow-up work.
+      allow delete: if isApprovedMember();
     }
 
     match /telemetry/{logId} {

@@ -266,6 +266,10 @@ export const deleteWhatsappInstance = onCall(async (request: CallableRequest) =>
  */
 export const setWhatsappWebhook = onCall(async (request: CallableRequest) => {
   await ensureAdmin(request.auth);
+  const webhookSecret = process.env.EVOLUTION_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    throw new HttpsError("failed-precondition", "EVOLUTION_WEBHOOK_SECRET não configurado.");
+  }
   const { instanceName } = request.data;
   const webhookUrl = `https://us-central1-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/evolutionWebhook`;
   
@@ -273,9 +277,9 @@ export const setWhatsappWebhook = onCall(async (request: CallableRequest) => {
     webhook: {
       url: webhookUrl,
       enabled: true,
-      secret: process.env.EVOLUTION_WEBHOOK_SECRET || "default_secret",
+      secret: webhookSecret,
       headers: {
-        Authorization: `Bearer ${process.env.EVOLUTION_WEBHOOK_SECRET || "default_secret"}`
+        Authorization: `Bearer ${webhookSecret}`
       },
       webhook_by_events: true, // keep for compat with older versions
       webhookByEvents: true, // add for v2
@@ -329,16 +333,47 @@ function sanitizeText(value: any, max = 140) {
 
 /**
  * Verifies HMAC signature for Evolution API webhooks.
+ * Fails closed: any missing input or length mismatch rejects (never throws).
  */
-function verifySignature(rawBody: Buffer, signature: string, secret: string) {
-  if (!secret) return true; // Insecure mode for dev
-  if (!signature) return false;
+export function verifySignature(
+  rawBody: Buffer | undefined,
+  signature: string | undefined,
+  secret: string,
+): boolean {
+  if (!secret || !rawBody || !signature) return false;
 
   const hmac = crypto.createHmac("sha256", secret);
   const digest = hmac.update(rawBody).digest("hex");
   const candidate = signature.replace("sha256=", "").toLowerCase();
-  
-  return crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(candidate));
+
+  const digestBuf = Buffer.from(digest);
+  const candidateBuf = Buffer.from(candidate);
+  if (digestBuf.length !== candidateBuf.length) return false;
+  return crypto.timingSafeEqual(digestBuf, candidateBuf);
+}
+
+export type WebhookAuthDecision = "ok" | "unauthorized" | "misconfigured";
+
+/**
+ * Pure webhook-auth decision: header-secret match, HMAC fallback, or
+ * fail-closed rejection. Exported for unit tests; see `evolutionWebhook`.
+ */
+export function resolveWebhookAuth(input: {
+  secret: string | undefined;
+  headers: Record<string, string | undefined>;
+  rawBody: Buffer | undefined;
+  signature: string | undefined;
+}): WebhookAuthDecision {
+  const { secret, headers, rawBody, signature } = input;
+  if (!secret) return "misconfigured";
+  if (
+    headers["apikey"] === secret ||
+    headers["authorization"] === `Bearer ${secret}` ||
+    headers["x-webhook-secret"] === secret
+  ) {
+    return "ok";
+  }
+  return verifySignature(rawBody, signature, secret) ? "ok" : "unauthorized";
 }
 
 /**
@@ -346,29 +381,20 @@ function verifySignature(rawBody: Buffer, signature: string, secret: string) {
  */
 export const evolutionWebhook = onRequest(withHttpErrorHandling(async (req: any, res: any, logger: any) => {
   const secret = process.env.EVOLUTION_WEBHOOK_SECRET;
-  const signature = req.headers["x-hub-signature-256"] || req.headers["x-evolution-signature"];
-  
-  // Verify signature
-  let isSignatureValid = false;
-  
-  if (!secret) {
-    isSignatureValid = true;
-  } else {
-    // 1. Check if the secret is just passed directly in a header
-    if (
-      req.headers["apikey"] === secret ||
-      req.headers["authorization"] === `Bearer ${secret}` ||
-      req.headers["x-webhook-secret"] === secret
-    ) {
-      isSignatureValid = true;
-    } else {
-      // 2. Fallback to HMAC validation
-      isSignatureValid = verifySignature(req.rawBody, signature as string, secret);
-    }
+  const headers = (req.headers || {}) as Record<string, string | undefined>;
+  const signature = headers["x-hub-signature-256"] || headers["x-evolution-signature"];
+
+  const decision = resolveWebhookAuth({ secret, headers, rawBody: req.rawBody, signature });
+
+  if (decision === "misconfigured") {
+    logger.error("EVOLUTION_WEBHOOK_SECRET is not configured; rejecting webhook.");
+    res.status(500).send("Webhook receiver misconfigured");
+    return;
   }
 
-  if (!isSignatureValid) {
-    logger.warn(`Invalid webhook signature rejected. Candidate: ${signature}. Headers: ${JSON.stringify(req.headers)}`);
+  if (decision !== "ok") {
+    // Never log header values: they may carry the Bearer [REDACTED] itself.
+    logger.warn("Invalid webhook signature rejected.", { hasSignature: Boolean(signature) });
     res.status(401).send("Unauthorized");
     return;
   }
