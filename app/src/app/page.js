@@ -65,6 +65,7 @@ export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("HOME");
+  const [crmFocusContactId, setCrmFocusContactId] = useState(null);
   const [itemToEdit, setItemToEdit] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
   const [activeMenuId, setActiveMenuId] = useState(null);
@@ -471,13 +472,13 @@ export default function Dashboard() {
                 ) : activeTab === "CRM_IMPORT" && isFeatureEnabled(expansionFlags, "crmImport") ? (
                   <CrmImportView user={user} onBack={() => setActiveTab("CRM")} />
                 ) : activeTab === "CRM" ? (
-                  <CrmView user={user} onOpenImport={() => setActiveTab("CRM_IMPORT")} />
+                  <CrmView user={user} onOpenImport={() => setActiveTab("CRM_IMPORT")} focusContactId={crmFocusContactId} />
                 ) : activeTab === "ADMIN" && isAdmin ? (
                   <AdminDashboard items={items} inventorySummary={stats} user={user} />
                 ) : activeTab === "WHATSAPP" ? (
                   <WhatsappView user={user} />
                 ) : activeTab === "ACTIONS" ? (
-                  <ActionInbox user={user} onOpenCrm={() => setActiveTab("CRM")} />
+                  <ActionInbox user={user} onOpenCrm={(contactId) => { if (contactId) setCrmFocusContactId(contactId); setActiveTab("CRM"); }} />
                 ) : activeTab === "SETTINGS" ? (
 
                   <SettingsView />

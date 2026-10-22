@@ -5,6 +5,7 @@ import {
   formatStatusLabel,
   formatTaskTypeLabel,
   getItemLinkage,
+  getRecommendedAction,
   getItemTitle,
   getReviewSource,
   isArchived,
@@ -114,5 +115,33 @@ describe("actionInbox helpers", () => {
   test("archive update marks the record without deleting it", () => {
     const now = new Date("2024-05-01T10:00:00.000Z");
     expect(buildArchiveUpdate(now)).toEqual({ archived: true, archivedAt: now, updatedAt: now });
+  });
+
+  test("recommends follow-up when the expected return date has passed", () => {
+    const now = Date.parse("2026-10-22T12:00:00.000Z");
+    const past = new Date(now - 3 * 24 * 60 * 60 * 1000);
+    expect(getRecommendedAction({ kind: "opportunity", stage: "proposal", nextActionAt: past }, now)).toEqual({
+      label: "Cobrar retorno",
+      hint: "Retorno previsto há 3 dias — entre em contato com o cliente.",
+      urgent: true,
+    });
+    expect(getRecommendedAction({ kind: "task", status: "pending", taskType: "call", dueAt: past }, now)?.urgent).toBe(true);
+  });
+
+  test("suggests stage-aware next steps when nothing is overdue", () => {
+    const now = Date.parse("2026-10-22T12:00:00.000Z");
+    expect(getRecommendedAction({ kind: "opportunity", stage: "new" }, now)?.label).toBe("Qualificar");
+    expect(getRecommendedAction({ kind: "opportunity", stage: "qualified" }, now)?.label).toBe("Enviar proposta");
+    expect(getRecommendedAction({ kind: "task", status: "pending", taskType: "follow_up" }, now)).toEqual({
+      label: "Retomar contato",
+      hint: "Follow-up pendente — chame o cliente e registre o resultado.",
+      urgent: false,
+    });
+  });
+
+  test("returns null for completed items and unknown kinds", () => {
+    expect(getRecommendedAction({ kind: "opportunity", stage: "closed_won" })).toBeNull();
+    expect(getRecommendedAction({ kind: "mystery" })).toBeNull();
+    expect(getRecommendedAction(null)).toBeNull();
   });
 });

@@ -374,13 +374,17 @@ function cleanAudioAnalysis(value: unknown): CrmAiAnalysis {
   };
 }
 
-export default function CrmView({ user, onOpenImport }: { user: CrmUser; onOpenImport?: () => void }) {
+export default function CrmView({ user, onOpenImport, focusContactId }: { user: CrmUser; onOpenImport?: () => void; focusContactId?: string | null }) {
   const workspaceId = user?.workspaceId || user?.defaultAccountId || null;
   const isAdmin = user?.role === "admin";
   const [companies, setCompanies] = useState<Company[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
+  // Deep-link vindo da Central de Ações ("Ver cliente no CRM").
+  useEffect(() => {
+    if (focusContactId) setSelectedContactId(focusContactId);
+  }, [focusContactId]);
   const [contactSearch, setContactSearch] = useState("");
   const [contactForm, setContactForm] = useState<ContactFormState>(createEmptyContactForm);
   const [editingContactId, setEditingContactId] = useState<string | null>(null);
