@@ -4,6 +4,7 @@ import { Zap, Clock, LogOut, Check, RefreshCw, Shield } from "lucide-react";
 import useAuth from "@/hooks/useAuth";
 import useFeatureFlags from "@/hooks/useFeatureFlags";
 import { isFeatureEnabled } from "@/lib/featureFlags";
+import { formatAppVersion } from "@/lib/appVersion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -162,7 +163,7 @@ export default function SettingsView() {
 
             <div className="flex items-center justify-between pt-4 border-t border-[#484848]/5">
               <p className="text-[8px] font-bold uppercase tracking-[0.4em] text-[#acabaa]/20 font-mono">
-                IOS_SYSTEM_CORE_V{process.env.NEXT_PUBLIC_APP_VERSION || "1.0.2"}
+                {formatAppVersion(process.env.NEXT_PUBLIC_APP_VERSION)}
               </p>
               <Badge variant="outline" className="text-[7px] font-normal uppercase tracking-widest border-[#484848]/10 text-[#acabaa]/20 rounded-none font-display">
                 DEPLOYED_STABLE_BUILD

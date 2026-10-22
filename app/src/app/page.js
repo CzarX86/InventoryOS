@@ -36,6 +36,7 @@ import { escalateErrorReport, recordAppError, toUserFacingError } from "@/lib/er
 import { db } from "@/lib/firebase";
 import { getBrandMeta } from "@/lib/utils";
 import { isFeatureEnabled } from "@/lib/featureFlags";
+import { formatAppVersion } from "@/lib/appVersion";
 
 const STATUS_CONFIG = {
   "IN STOCK":  { 
@@ -164,7 +165,7 @@ export default function Dashboard() {
           </p>
           {process.env.NEXT_PUBLIC_APP_VERSION && (
             <p className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-10 font-mono">
-              Versão {process.env.NEXT_PUBLIC_APP_VERSION}
+              Versão {formatAppVersion(process.env.NEXT_PUBLIC_APP_VERSION)}
             </p>
           )}
           <div className="h-px bg-border mb-8" />
