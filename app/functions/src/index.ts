@@ -425,16 +425,18 @@ export const syncWhatsappGroups = onCall(async (request: CallableRequest) => {
     }
 
     const groups = response.data || [];
+    const { workspaceId } = await getAccessConfig(db);
     const batch = db.batch();
     let count = 0;
 
     for (const group of groups) {
       if (!group.id || (!group.subject && !group.name)) continue;
-      
+
       const groupRef = db.collection("whatsapp_groups").doc(group.id);
       batch.set(groupRef, {
         id: group.id,
         name: group.subject || group.name,
+        workspaceId,
         updatedAt: FieldValue.serverTimestamp()
       }, { merge: true });
       count++;
@@ -468,6 +470,8 @@ export const processWhatsappEvent = onDocumentCreated("whatsapp_webhook_events/{
   const db = getFirestore();
   const payload = eventData.payload;
   const data = payload.data;
+  // Workspace scoping for the review-queue queries (merge keeps old docs valid).
+  const { workspaceId } = await getAccessConfig(db);
 
   // 1. Handle Group Metadata Caching
   if (eventData.eventType === "groups.upsert" || eventData.eventType === "groups.update") {
@@ -477,6 +481,7 @@ export const processWhatsappEvent = onDocumentCreated("whatsapp_webhook_events/{
       await db.collection("whatsapp_groups").doc(groupId).set({
         id: groupId,
         name: groupName,
+        workspaceId,
         updatedAt: FieldValue.serverTimestamp()
       }, { merge: true });
       logger.info("Group metadata cached", { groupId, groupName });
@@ -528,6 +533,7 @@ export const processWhatsappEvent = onDocumentCreated("whatsapp_webhook_events/{
             await db.collection("whatsapp_groups").doc(remoteJid).set({
               id: remoteJid,
               name: groupName,
+              workspaceId,
               updatedAt: FieldValue.serverTimestamp()
             }, { merge: true });
             logger.info("Group metadata retrieved from API and cached", { groupId: remoteJid, groupName });
@@ -546,6 +552,7 @@ export const processWhatsappEvent = onDocumentCreated("whatsapp_webhook_events/{
     const contactUpdate: any = {
       id: remoteJid,
       name: isGroup ? groupName : (data.pushName || "Desconhecido"),
+      workspaceId,
       updatedAt: FieldValue.serverTimestamp(),
       lastMessageAt: FieldValue.serverTimestamp(),
     };

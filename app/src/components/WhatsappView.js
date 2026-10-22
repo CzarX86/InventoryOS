@@ -266,10 +266,14 @@ export default function WhatsappView({ user }) {
           </button>
           {showConfiguration && (
             <div className="mt-5 space-y-8">
+              <p className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
+                <ShieldCheck size={15} className="mt-0.5 shrink-0 text-emerald-600" />
+                A configuração e o monitoramento abaixo são áreas operacionais restritas a administradores do workspace — a solicitação acima libera o módulo, não o acesso direto a esses painéis.
+              </p>
               <div className="rounded-2xl border border-border/70 bg-card p-4 sm:p-6">
                 <WhatsappInstanceManager />
               </div>
-              <ContactReviewQueue />
+              <ContactReviewQueue user={user} />
             </div>
           )}
         </div>
