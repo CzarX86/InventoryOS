@@ -191,7 +191,8 @@ export default function useInventory(user = null, enabled = true) {
         match(item.brand) ||
         match(item.type) ||
         match(item.status) ||
-        match(item.specifications)
+        match(item.specifications) ||
+        match(item.priceSource)
       );
     });
   }, [items, searchQuery]);
