@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { collection, doc, getDocs, limit, query, updateDoc, where } from "firebase/firestore";
+import { collection, doc, documentId, getDocs, limit, query, updateDoc, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import {
   AlertCircle,
@@ -12,8 +12,10 @@ import {
   CalendarClock,
   CheckCircle2,
   CheckSquare2,
+  ChevronDown,
   CircleHelp,
   Clock3,
+  ExternalLink,
   Inbox,
   MessageCircle,
   Search,
@@ -29,6 +31,7 @@ import {
   formatTaskTypeLabel,
   getItemLinkage,
   getItemTitle,
+  getRecommendedAction,
   getReviewSource,
   isCompletedItem,
   timestampValue,
@@ -65,6 +68,10 @@ export default function ActionInbox({ onOpenCrm, user }) {
   const [pendingArchive, setPendingArchive] = useState(null);
   const [feedback, setFeedback] = useState("");
   const [limitReached, setLimitReached] = useState(false);
+  const [expandedId, setExpandedId] = useState(null);
+  const [contactNames, setContactNames] = useState({});
+  const [companyNames, setCompanyNames] = useState({});
+  const [memberNames, setMemberNames] = useState({});
   const workspaceId = user?.workspaceId || user?.defaultAccountId || null;
 
   useEffect(() => {
@@ -94,6 +101,62 @@ export default function ActionInbox({ onOpenCrm, user }) {
 
     return () => { cancelled = true; };
   }, [workspaceId]);
+
+  // Resolve technical ids (contact / company / assignee) to display names so
+  // the inbox never shows bare codes. Bounded `in` queries in chunks of 10.
+  useEffect(() => {
+    if (!db || !workspaceId) return undefined;
+    let cancelled = false;
+    const collectIds = (items, pick) => {
+      const ids = new Set();
+      items.forEach((item) => {
+        const value = pick(item);
+        if (typeof value === "string" && value.trim()) ids.add(value.trim());
+      });
+      return [...ids];
+    };
+    const fetchNames = async (collectionName, ids, pickName) => {
+      const names = {};
+      for (let index = 0; index < ids.length; index += 10) {
+        const chunk = ids.slice(index, index + 10);
+        const snapshot = await getDocs(query(collection(db, collectionName), where(documentId(), "in", chunk)));
+        snapshot.docs.forEach((item) => {
+          const data = item.data() || {};
+          names[item.id] = pickName(data) || null;
+        });
+      }
+      return names;
+    };
+    void (async () => {
+      try {
+        const peerItems = [...opportunities, ...tasks, ...reviews];
+        const contactIds = collectIds(peerItems, (item) => (getItemLinkage(item).contactId || getReviewSource(item).contactId));
+        const companyIds = collectIds(peerItems, (item) => (getItemLinkage(item).companyId || getReviewSource(item).companyId));
+        const assigneeIds = collectIds(tasks, (item) => item.assignedToUserId);
+        const [contacts, companies] = await Promise.all([
+          contactIds.length > 0 ? fetchNames("contacts", contactIds, (data) => data.displayName || data.name) : {},
+          companyIds.length > 0 ? fetchNames("accounts", companyIds, (data) => data.name) : {},
+        ]);
+        let members = {};
+        if (assigneeIds.length > 0) {
+          const snapshot = await getDocs(query(collection(db, "users"), where("workspaceId", "==", workspaceId), limit(200)));
+          snapshot.docs.forEach((item) => {
+            const data = item.data() || {};
+            if (assigneeIds.includes(item.id)) members[item.id] = data.displayName || data.email || null;
+          });
+        }
+        if (!cancelled) {
+          setContactNames(contacts);
+          setCompanyNames(companies);
+          setMemberNames(members);
+        }
+      } catch (resolveError) {
+        console.error("Inbox name resolution failed:", resolveError);
+      }
+    })();
+    return () => { cancelled = true; };
+    // `db` é um singleton de módulo e não participa do ciclo de render.
+  }, [workspaceId, opportunities, tasks, reviews]);
 
   const handleUpdate = async (item, nextStatus) => {
     const collectionName = item.kind === "opportunity" ? "opportunities" : "tasks";
@@ -204,7 +267,7 @@ export default function ActionInbox({ onOpenCrm, user }) {
         {feedback && <Alert className="mb-5 border-emerald-200 bg-emerald-50 text-emerald-950"><CheckCircle2 /><AlertDescription>{feedback}</AlertDescription></Alert>}
         {limitReached && <p className="mb-5 text-xs text-muted-foreground">Exibindo até 100 registros por fila.</p>}
 
-        {reviews.filter((item) => item.status === "pending").length > 0 && <ReviewQueue reviews={reviews.filter((item) => item.status === "pending")} onReview={handleReview} />}
+        {reviews.filter((item) => item.status === "pending").length > 0 && <ReviewQueue reviews={reviews.filter((item) => item.status === "pending")} onReview={handleReview} contactNames={contactNames} companyNames={companyNames} onOpenCrm={onOpenCrm} />}
 
         <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-border/70 bg-card p-3 shadow-sm sm:flex-row">
           <div className="relative flex-1">
@@ -228,7 +291,7 @@ export default function ActionInbox({ onOpenCrm, user }) {
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3 px-1"><p className="text-sm font-semibold">Pendências para revisar</p><p className="text-xs text-muted-foreground">{filteredItems.length} registro{filteredItems.length === 1 ? "" : "s"}</p></div>
             <AnimatePresence initial={false}>
-              {filteredItems.map((item) => <ActionItem key={`${item.kind}-${item.id}`} item={item} onUpdate={handleUpdate} onArchive={setPendingArchive} />)}
+              {filteredItems.map((item) => <ActionItem key={`${item.kind}-${item.id}`} item={item} onUpdate={handleUpdate} onArchive={setPendingArchive} contactNames={contactNames} companyNames={companyNames} memberNames={memberNames} expanded={expandedId === `${item.kind}-${item.id}`} onToggle={() => setExpandedId((current) => current === `${item.kind}-${item.id}` ? null : `${item.kind}-${item.id}`)} onOpenCrm={onOpenCrm} />)}
             </AnimatePresence>
           </div>
         )}
@@ -248,32 +311,34 @@ function HowItWorks({ icon: Icon, title, text, last = false }) {
   return <div className={`relative flex gap-3 ${!last ? "after:absolute after:-right-3 after:top-1/2 after:hidden after:h-px after:w-6 after:bg-border sm:after:block" : ""}`}><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700"><Icon size={17} /></span><div><p className="text-sm font-semibold">{title}</p><p className="mt-1 text-xs leading-relaxed text-muted-foreground">{text}</p></div></div>;
 }
 
-function ReviewQueue({ reviews, onReview }) {
+function ReviewQueue({ reviews, onReview, contactNames, companyNames, onOpenCrm }) {
   return <section className="mb-6 rounded-2xl border border-violet-200 bg-violet-50/60 p-4 shadow-sm sm:p-5">
     <div className="mb-4 flex items-start gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-violet-700 shadow-sm"><Sparkles size={18} /></span><div><p className="text-sm font-semibold text-violet-950">Sugestões da IA para revisar</p><p className="mt-1 text-xs leading-relaxed text-violet-900/75">A IA encontrou oportunidades, tarefas ou possibilidades de cross-selling. Nada entra no CRM sem a decisão da equipe.</p></div></div>
-    <div className="space-y-3">{reviews.map((review) => <ReviewItem key={review.id} review={review} onReview={onReview} />)}</div>
+    <div className="space-y-3">{reviews.map((review) => <ReviewItem key={review.id} review={review} onReview={onReview} contactNames={contactNames} companyNames={companyNames} onOpenCrm={onOpenCrm} />)}</div>
   </section>;
 }
 
-function ReviewItem({ review, onReview }) {
+function ReviewItem({ review, onReview, contactNames = {}, companyNames = {}, onOpenCrm }) {
   const suggestion = review.suggestion || {};
   const kindLabel = { opportunity: "Oportunidade", task: "Tarefa", cross_sell: "Cross-selling" }[review.kind] || "Sugestão";
   const title = suggestion.title || suggestion.description || suggestion.name || review.summary || "Sugestão sem descrição";
   const source = getReviewSource(review);
+  const contactName = source.contactId ? contactNames[source.contactId] : null;
+  const companyName = source.companyId ? companyNames[source.companyId] : null;
   const sourceBits = [
+    contactName || (source.contactId ? `Contato ${source.contactId.slice(0, 8)}…` : null),
+    companyName || (source.companyId ? `Empresa ${source.companyId.slice(0, 8)}…` : null),
     source.remoteJid ? source.remoteJid.split("@")[0] : null,
-    source.contactId ? `contato ${source.contactId}` : null,
-    source.companyId ? `empresa ${source.companyId}` : null,
     source.sourceMessageIds.length > 0 ? `${source.sourceMessageIds.length} mensagem(ns) de origem` : null,
   ].filter(Boolean);
-  return <article className="flex flex-col gap-4 rounded-xl border border-violet-200 bg-card p-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="mb-1 flex flex-wrap items-center gap-2"><Badge variant="outline" className="rounded-full border-violet-200 bg-violet-50 text-[10px] text-violet-800">{kindLabel}</Badge>{review.confidence != null && <span className="text-[11px] text-muted-foreground">Confiança {Math.round(Number(review.confidence) * 100)}%</span>}</div><p className="text-sm font-semibold">{title}</p><p className="mt-1 text-xs leading-relaxed text-muted-foreground">{review.summary || "Sugestão extraída de uma conversa do WhatsApp."}</p>{sourceBits.length > 0 && <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground/80">Origem: {sourceBits.join(" • ")}</p>}</div><div className="flex shrink-0 gap-2"><Button size="sm" variant="outline" onClick={() => onReview(review, "reject")} className="h-9 rounded-lg">Descartar</Button><Button size="sm" onClick={() => onReview(review, "approve")} className="h-9 gap-1.5 rounded-lg"><CheckCircle2 size={14} /> Aprovar</Button></div></article>;
+  return <article className="flex flex-col gap-4 rounded-xl border border-violet-200 bg-card p-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="mb-1 flex flex-wrap items-center gap-2"><Badge variant="outline" className="rounded-full border-violet-200 bg-violet-50 text-[10px] text-violet-800">{kindLabel}</Badge>{review.confidence != null && <span className="text-[11px] text-muted-foreground">Confiança {Math.round(Number(review.confidence) * 100)}%</span>}</div><p className="text-sm font-semibold">{title}</p><p className="mt-1 text-xs leading-relaxed text-muted-foreground">{review.summary || "Sugestão extraída de uma conversa do WhatsApp."}</p>{sourceBits.length > 0 && <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground/80">Origem: {sourceBits.join(" • ")}</p>}</div><div className="flex shrink-0 flex-wrap gap-2">{source.contactId && onOpenCrm && <Button size="sm" variant="outline" onClick={() => onOpenCrm(source.contactId)} className="h-9 gap-1.5 rounded-lg"><ExternalLink size={14} /> Ver cliente</Button>}<Button size="sm" variant="outline" onClick={() => onReview(review, "reject")} className="h-9 rounded-lg">Descartar</Button><Button size="sm" onClick={() => onReview(review, "approve")} className="h-9 gap-1.5 rounded-lg"><CheckCircle2 size={14} /> Aprovar</Button></div></article>;
 }
 
 function Count({ children }) {
   return <span className="rounded-full bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground">{children}</span>;
 }
 
-function ActionItem({ item, onUpdate, onArchive }) {
+function ActionItem({ item, onUpdate, onArchive, contactNames = {}, companyNames = {}, memberNames = {}, expanded = false, onToggle, onOpenCrm }) {
   const isOpportunity = item.kind === "opportunity";
   const title = getItemTitle(item);
   const status = isOpportunity ? item.stage || "new" : item.status || "pending";
@@ -281,31 +346,55 @@ function ActionItem({ item, onUpdate, onArchive }) {
   const tone = isOpportunity ? "border-blue-100 bg-blue-50 text-blue-700" : "border-amber-100 bg-amber-50 text-amber-700";
   const linkage = getItemLinkage(item);
   const money = isOpportunity ? formatMoney(item.estimatedValue, item.currency) : null;
+  const recommended = getRecommendedAction(item);
+  const contactName = linkage.contactId ? contactNames[linkage.contactId] : null;
+  const companyName = linkage.companyId ? companyNames[linkage.companyId] : null;
+  const assigneeName = !isOpportunity && item.assignedToUserId ? memberNames[String(item.assignedToUserId)] : null;
+  const description = String(item.description || item.summary || "").trim();
 
   return (
-    <motion.article initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} className="group flex flex-col gap-4 rounded-2xl border border-border/70 bg-card p-4 shadow-sm transition-shadow hover:shadow-md sm:flex-row sm:items-center sm:p-5">
-      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${tone}`}><Icon size={19} /></div>
-      <div className="min-w-0 flex-1">
-        <div className="mb-1 flex flex-wrap items-center gap-2"><Badge variant="outline" className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${tone}`}>{isOpportunity ? "Oportunidade" : "Tarefa"}</Badge>{!isOpportunity && item.taskType && <Badge variant="outline" className="rounded-full px-2 py-0.5 text-[10px] font-medium text-muted-foreground">{formatTaskTypeLabel(item.taskType)}</Badge>}<span className="text-xs text-muted-foreground">{formatDateLabel(item.createdAt)}</span></div>
-        <h2 className="truncate text-sm font-semibold text-foreground sm:text-base">{title}</h2>
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1.5"><MessageCircle size={13} /> {linkage.remoteJid ? linkage.remoteJid.split("@")[0] : "Origem não informada"}</span>
-          {money && <span className="font-medium text-emerald-700">{money}</span>}
-          {isOpportunity && item.nextActionAt && <span className="inline-flex items-center gap-1"><CalendarClock size={13} /> Próxima ação {formatDateLabel(item.nextActionAt)}</span>}
-          {!isOpportunity && item.dueAt && <span className="inline-flex items-center gap-1"><CalendarClock size={13} /> Vence {formatDateLabel(item.dueAt)}</span>}
-          {!isOpportunity && item.assignedToUserId && <span className="inline-flex items-center gap-1"><UserRound size={13} /> {String(item.assignedToUserId)}</span>}
-          {linkage.contactId && <span className="inline-flex items-center gap-1"><UserRound size={13} /> Contato {linkage.contactId}</span>}
-          {linkage.companyId && <span className="inline-flex items-center gap-1"><Building2 size={13} /> Empresa {linkage.companyId}</span>}
-          {linkage.sourceMessageIds.length > 0 && <span>{linkage.sourceMessageIds.length} mensagem(ns) de origem</span>}
+    <motion.article initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} className={`group flex flex-col gap-4 rounded-2xl border bg-card p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5 ${recommended?.urgent ? "border-red-200" : "border-border/70"}`}>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${tone}`}><Icon size={19} /></div>
+        <div className="min-w-0 flex-1">
+          <div className="mb-1 flex flex-wrap items-center gap-2"><Badge variant="outline" className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${tone}`}>{isOpportunity ? "Oportunidade" : "Tarefa"}</Badge>{recommended?.urgent && <Badge variant="outline" className="rounded-full border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-700">Precisa de atenção</Badge>}{!isOpportunity && item.taskType && <Badge variant="outline" className="rounded-full px-2 py-0.5 text-[10px] font-medium text-muted-foreground">{formatTaskTypeLabel(item.taskType)}</Badge>}<span className="text-xs text-muted-foreground">{formatDateLabel(item.createdAt)}</span></div>
+          <h2 className="truncate text-sm font-semibold text-foreground sm:text-base">{title}</h2>
+          {recommended && <p className="mt-1.5 flex items-start gap-1.5 text-xs leading-relaxed text-foreground/80"><Target size={13} className={`mt-0.5 shrink-0 ${recommended.urgent ? "text-red-600" : "text-blue-700"}`} /> <span><strong className="font-semibold">{recommended.label}:</strong> {recommended.hint}</span></p>}
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5"><UserRound size={13} /> {contactName || (linkage.contactId ? `Contato ${linkage.contactId.slice(0, 8)}…` : "Sem contato vinculado")}</span>
+            {companyName && <span className="inline-flex items-center gap-1"><Building2 size={13} /> {companyName}</span>}
+            <span className="inline-flex items-center gap-1.5"><MessageCircle size={13} /> {linkage.remoteJid ? linkage.remoteJid.split("@")[0] : "Origem não informada"}</span>
+            {money && <span className="font-medium text-emerald-700">{money}</span>}
+            {assigneeName && <span className="inline-flex items-center gap-1"><UserRound size={13} /> {assigneeName}</span>}
+          </div>
+        </div>
+        <div className="flex items-center justify-between gap-3 sm:justify-end">
+          <Badge variant="outline" className="rounded-full border-border px-2.5 py-1 text-xs font-medium text-muted-foreground">{formatStatusLabel(status)}</Badge>
+          <div className="flex items-center gap-2">
+            {onToggle && <Button variant="ghost" size="icon" onClick={onToggle} className="h-9 w-9 rounded-lg text-muted-foreground" aria-label={expanded ? `Recolher ${title}` : `Ver contexto de ${title}`} aria-expanded={expanded}><ChevronDown size={15} className={`transition-transform ${expanded ? "rotate-180" : ""}`} /></Button>}
+            <Button variant="ghost" size="icon" onClick={() => onArchive(item)} className="h-9 w-9 rounded-lg text-muted-foreground hover:text-destructive" aria-label={`Arquivar ${title}`}><Archive size={15} /></Button>
+          </div>
         </div>
       </div>
-      <div className="flex items-center justify-between gap-3 border-t border-border/70 pt-3 sm:border-t-0 sm:pt-0">
-        <Badge variant="outline" className="rounded-full border-border px-2.5 py-1 text-xs font-medium text-muted-foreground">{formatStatusLabel(status)}</Badge>
-        <div className="flex items-center gap-2">
-          <Button size="sm" onClick={() => onUpdate(item, isOpportunity ? "closed_won" : "completed")} className="h-9 gap-1.5 rounded-lg">{isOpportunity ? "Concluir" : "Resolver"}<ArrowRight size={14} /></Button>
-          <Button variant="ghost" size="icon" onClick={() => onArchive(item)} className="h-9 w-9 rounded-lg text-muted-foreground hover:text-destructive" aria-label={`Arquivar ${title}`}><Archive size={15} /></Button>
-        </div>
-      </div>
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.18 }} className="overflow-hidden">
+            <div className="space-y-2 rounded-xl bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
+              {description && <p><strong className="font-semibold text-foreground/80">Contexto:</strong> {description}</p>}
+              <div className="flex flex-wrap gap-x-4 gap-y-1">
+                {isOpportunity && item.nextActionAt && <span className="inline-flex items-center gap-1"><CalendarClock size={13} /> Próxima ação {formatDateLabel(item.nextActionAt)}</span>}
+                {!isOpportunity && item.dueAt && <span className="inline-flex items-center gap-1"><CalendarClock size={13} /> Vence {formatDateLabel(item.dueAt)}</span>}
+                {linkage.sourceMessageIds.length > 0 && <span>{linkage.sourceMessageIds.length} mensagem(ns) de origem</span>}
+                <span>Criado em {formatDateLabel(item.createdAt)}</span>
+              </div>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {linkage.contactId && onOpenCrm && <Button size="sm" variant="outline" onClick={() => onOpenCrm(linkage.contactId)} className="h-8 gap-1.5 rounded-lg text-xs"><ExternalLink size={13} /> Ver cliente no CRM</Button>}
+                <Button size="sm" onClick={() => onUpdate(item, isOpportunity ? "closed_won" : "completed")} className="h-8 gap-1.5 rounded-lg text-xs">{recommended?.label || (isOpportunity ? "Concluir" : "Resolver")}<ArrowRight size={13} /></Button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.article>
   );
 }

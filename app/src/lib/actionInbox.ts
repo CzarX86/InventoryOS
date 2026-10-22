@@ -185,6 +185,100 @@ export function getReviewSource(review: Record<string, unknown> | null | undefin
   };
 }
 
+export interface RecommendedAction {
+  /** Short imperative label for the primary button (e.g. "Resolver agora"). */
+  label: string;
+  /** One-line context explaining why this is the next step. */
+  hint: string;
+  /** True when the item is overdue and needs attention now. */
+  urgent: boolean;
+}
+
+function daysOverdue(deadline: unknown, now: number): number | null {
+  const timestamp = timestampValue(deadline);
+  if (!timestamp || timestamp >= now) return null;
+  return Math.max(1, Math.ceil((now - timestamp) / (24 * 60 * 60 * 1000)));
+}
+
+function formatDayCount(days: number): string {
+  return days === 1 ? "há 1 dia" : `há ${days} dias`;
+}
+
+/**
+ * Derives the recommended next step for an inbox item so the UI can show
+ * a clear call to action instead of a bare status badge. Pure and tested.
+ */
+export function getRecommendedAction(
+  item: InboxItem | null | undefined,
+  now: number = Date.now(),
+): RecommendedAction | null {
+  if (!item || isCompletedItem(item)) return null;
+
+  if (item.kind === "opportunity") {
+    const stage = String(item.stage || "new");
+    const overdue = daysOverdue(item.nextActionAt, now);
+    if (overdue !== null) {
+      return {
+        label: "Cobrar retorno",
+        hint: `Retorno previsto ${formatDayCount(overdue)} — entre em contato com o cliente.`,
+        urgent: true,
+      };
+    }
+    if (stage === "proposal" || stage === "negotiation") {
+      return {
+        label: "Acompanhar proposta",
+        hint: "Proposta em aberto — registre o retorno do cliente para avançar a etapa.",
+        urgent: false,
+      };
+    }
+    if (stage === "qualified") {
+      return {
+        label: "Enviar proposta",
+        hint: "Oportunidade qualificada — monte a proposta e agende o retorno.",
+        urgent: false,
+      };
+    }
+    return {
+      label: "Qualificar",
+      hint: "Nova oportunidade — confirme o interesse antes de propor valores.",
+      urgent: false,
+    };
+  }
+
+  if (item.kind === "task") {
+    const overdue = daysOverdue(item.dueAt, now);
+    if (overdue !== null) {
+      return {
+        label: "Resolver agora",
+        hint: `Venceu ${formatDayCount(overdue)} — conclua ou reagende esta tarefa.`,
+        urgent: true,
+      };
+    }
+    if (String(item.taskType || "") === "follow_up") {
+      return {
+        label: "Retomar contato",
+        hint: "Follow-up pendente — chame o cliente e registre o resultado.",
+        urgent: false,
+      };
+    }
+    return {
+      label: "Resolver",
+      hint: "Tarefa pendente — conclua para tirar da central.",
+      urgent: false,
+    };
+  }
+
+  if (item.kind === "review") {
+    const confidence = Number((item as Record<string, unknown>).confidence);
+    const hint = Number.isFinite(confidence)
+      ? `Sugestão da IA com ${Math.round(confidence * 100)}% de confiança — aprove ou descarte.`
+      : "Sugestão da IA — aprove para levar ao CRM ou descarte.";
+    return { label: "Revisar sugestão", hint, urgent: false };
+  }
+
+  return null;
+}
+
 /**
  * Update payload that archives a record in place. Deletion is denied by
  * Firestore rules, so archiving keeps the audit trail while hiding the
