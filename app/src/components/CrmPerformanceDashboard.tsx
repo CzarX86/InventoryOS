@@ -152,7 +152,8 @@ export default function CrmPerformanceDashboard({ user }: { user: CrmPerformance
   const [companies, setCompanies] = useState<Company[]>([]);
   const [employees, setEmployees] = useState<CrmPerformanceEmployee[]>([]);
   const [periodDays, setPeriodDays] = useState<PeriodDays>(30);
-  const queryKey = workspaceId ? `${workspaceId}:${periodDays ?? "all"}:${user?.uid || ""}` : null;
+  const [refreshNonce, setRefreshNonce] = useState(0);
+  const queryKey = workspaceId ? `${workspaceId}:${periodDays ?? "all"}:${user?.uid || ""}:${refreshNonce}` : null;
   const [snapshotState, setSnapshotState] = useState<{
     queryKey: string;
     status: "success" | "error";
@@ -164,7 +165,7 @@ export default function CrmPerformanceDashboard({ user }: { user: CrmPerformance
   const error = snapshotStatus === "error" ? snapshotState?.error || null : null;
   const employeeError = snapshotStatus === "error";
   const eventLimitReached = snapshotStatus === "success" && snapshotState?.eventLimitReached === true;
-  const [metricsNow] = useState(() => Date.now());
+  const [metricsNow, setMetricsNow] = useState(() => Date.now());
 
   useEffect(() => {
     if (!workspaceId || !queryKey) return undefined;
@@ -177,15 +178,17 @@ export default function CrmPerformanceDashboard({ user }: { user: CrmPerformance
         setCompanies(snapshot.companies);
         setEmployees(mergeEmployees(user, snapshot.employees));
         setSnapshotState({ queryKey, status: "success", eventLimitReached: snapshot.eventLimitReached });
+        setMetricsNow(Date.now());
       })
       .catch(() => {
         if (!active) return;
         setEmployees(mergeEmployees(user, []));
         setSnapshotState({ queryKey, status: "error", error: "Não foi possível carregar a performance do CRM." });
+        setMetricsNow(Date.now());
       })
 
     return () => { active = false; };
-  }, [periodDays, queryKey, user, workspaceId]);
+  }, [periodDays, queryKey, refreshNonce, user, workspaceId]);
 
   const metrics = useMemo(() => aggregateCrmPerformance({
     now: metricsNow,
@@ -202,7 +205,7 @@ export default function CrmPerformanceDashboard({ user }: { user: CrmPerformance
   const trendMax = Math.max(...metrics.trend.map((point) => point.interactions), 1);
   const hasData = metrics.totalInteractions > 0;
 
-  if (loading && workspaceId) {
+  if (loading && workspaceId && !snapshotState) {
     return (
       <div className="flex min-h-[520px] items-center justify-center gap-3 bg-[#0e0e0e] text-[#acabaa]/60">
         <Loader2 size={18} className="animate-spin text-[#97a5ff]" />
@@ -236,8 +239,9 @@ export default function CrmPerformanceDashboard({ user }: { user: CrmPerformance
                 <option value="all">Todo o histórico</option>
               </select>
             </div>
-            <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="h-9 rounded-none border-[#484848]/30 text-[10px] uppercase tracking-widest">
-              <RefreshCw size={13} /> Atualizar
+            {loading && snapshotState && <span className="inline-flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-widest text-[#acabaa]/50"><Loader2 size={12} className="animate-spin" /> Atualizando</span>}
+            <Button variant="outline" size="sm" onClick={() => setRefreshNonce((current) => current + 1)} disabled={loading} className="h-9 rounded-none border-[#484848]/30 text-[10px] uppercase tracking-widest">
+              <RefreshCw size={13} className={loading ? "animate-spin" : undefined} /> Atualizar
             </Button>
           </div>
         </div>

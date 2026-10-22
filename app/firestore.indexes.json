@@ -74,6 +74,14 @@
         { "fieldPath": "workspaceId", "order": "ASCENDING" },
         { "fieldPath": "contactId", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "crm_import_jobs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "workspaceId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
