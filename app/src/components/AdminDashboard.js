@@ -60,6 +60,9 @@ export default function AdminDashboard({ items = [], inventorySummary = null, us
   const [activityLog, setActivityLog] = useState([]);
   const [errorReports, setErrorReports] = useState([]);
   const [moduleRequests, setModuleRequests] = useState([]);
+  const [moduleTab, setModuleTab] = useState("pending");
+  const [auditLog, setAuditLog] = useState([]);
+  const [auditAccessError, setAuditAccessError] = useState(null);
   const [undoingId, setUndoingId] = useState(null);
   const [updatingErrorId, setUpdatingErrorId] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -113,7 +116,12 @@ export default function AdminDashboard({ items = [], inventorySummary = null, us
       query(collection(db, "module_requests"), limit(20)),
       snap => setModuleRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     );
-    return () => { unsubTele(); unsubHealth(); unsubAiRuns(); unsubTokenUsage(); unsubActivity(); unsubErrors(); unsubModuleRequests(); };
+    const unsubAudit = onSnapshot(
+      query(collection(db, "system_audit_logs"), orderBy("timestamp", "desc"), limit(20)),
+      snap => setAuditLog(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      () => setAuditAccessError("Sem acesso à trilha de auditoria com esta conta.")
+    );
+    return () => { unsubTele(); unsubHealth(); unsubAiRuns(); unsubTokenUsage(); unsubActivity(); unsubErrors(); unsubModuleRequests(); unsubAudit(); };
   }, []);
 
   const undoneActivityIds = useMemo(() => {
@@ -125,6 +133,15 @@ export default function AdminDashboard({ items = [], inventorySummary = null, us
         .filter(Boolean)
     );
   }, [activityLog]);
+
+  const pendingModuleRequests = useMemo(
+    () => moduleRequests.filter(request => request.status === "pending"),
+    [moduleRequests]
+  );
+  const decidedModuleRequests = useMemo(
+    () => moduleRequests.filter(request => request.status !== "pending"),
+    [moduleRequests]
+  );
 
   const loadedInventoryStats = useMemo(() => items.reduce((acc, item) => {
     if (item.status === "IN STOCK") acc.inStock += 1;
@@ -248,17 +265,24 @@ export default function AdminDashboard({ items = [], inventorySummary = null, us
 
         <AccessManagement currentUser={user} />
 
-        {moduleRequests.filter(request => request.status === "pending").length > 0 && (
-          <section className="space-y-4">
-            <div className="flex items-end justify-between border-b border-border/70 pb-2">
-              <div>
-                <h2 className="text-lg font-semibold tracking-tight text-foreground">Solicitações de módulos</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Pedidos de liberação enviados pela equipe.</p>
-              </div>
-              <Badge variant="outline" className="rounded-full border-blue-200 bg-blue-50 text-blue-800">{moduleRequests.filter(request => request.status === "pending").length} pendente(s)</Badge>
+        <section className="space-y-4">
+          <div className="flex items-end justify-between border-b border-border/70 pb-2">
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight text-foreground">Solicitações de módulos</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Pedidos de liberação enviados pela equipe.</p>
             </div>
+            <Badge variant="outline" className="rounded-full border-blue-200 bg-blue-50 text-blue-800">{pendingModuleRequests.length} pendente(s)</Badge>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant={moduleTab === "pending" ? "default" : "outline"} onClick={() => setModuleTab("pending")} className="rounded-lg">Pendentes</Button>
+            <Button size="sm" variant={moduleTab === "history" ? "default" : "outline"} onClick={() => setModuleTab("history")} className="rounded-lg">Histórico</Button>
+          </div>
+          {moduleTab === "pending" ? (
             <div className="grid gap-3">
-              {moduleRequests.filter(request => request.status === "pending").map(request => (
+              {pendingModuleRequests.length === 0 ? (
+                <div className="py-8 text-center text-xs text-muted-foreground">Nenhuma solicitação pendente.</div>
+              ) : (
+                pendingModuleRequests.map(request => (
                 <div key={request.id} className="flex flex-col gap-4 rounded-2xl border border-border/70 bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex min-w-0 items-center gap-3">
                       <UserAvatar user={{ displayName: request.requesterName, email: request.requesterEmail, photoURL: request.requesterPhotoURL }} size="default" />
@@ -269,10 +293,30 @@ export default function AdminDashboard({ items = [], inventorySummary = null, us
                   </div>
                   <div className="flex shrink-0 gap-2"><Button size="sm" onClick={() => handleModuleRequestStatus(request, "approved")} className="rounded-lg">Liberar</Button><Button size="sm" variant="outline" onClick={() => handleModuleRequestStatus(request, "rejected")} className="rounded-lg">Recusar</Button></div>
                 </div>
-              ))}
+                ))
+              )}
             </div>
-          </section>
-        )}
+          ) : (
+            <div className="grid gap-3">
+              {decidedModuleRequests.length === 0 ? (
+                <div className="py-8 text-center text-xs text-muted-foreground">Nenhuma solicitação decidida ainda.</div>
+              ) : (
+                decidedModuleRequests.map(request => (
+                  <div key={request.id} className="flex flex-col gap-2 rounded-2xl border border-border/70 bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <UserAvatar user={{ displayName: request.requesterName, email: request.requesterEmail, photoURL: request.requesterPhotoURL }} size="default" />
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className="rounded-full border-emerald-200 bg-emerald-50 text-emerald-800">{request.moduleLabel || request.module}</Badge><span className="text-xs text-muted-foreground">{request.requesterName || request.requesterEmail || "Usuário sem e-mail"}</span></div>
+                        <p className="mt-2 text-sm font-medium text-foreground">{request.message || "Solicitação sem observações adicionais."}</p>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className={`shrink-0 rounded-full ${request.status === "approved" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800"}`}>{request.status === "approved" ? "Aprovada" : "Recusada"}</Badge>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </section>
 
         {/* Inventory Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -293,8 +337,8 @@ export default function AdminDashboard({ items = [], inventorySummary = null, us
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
           {[
             { label: "Processamentos de IA", value: systemHealth?.totalAIRequests ?? 0, mono: true },
-            { label: "Serviço", value: "Online", highlight: true },
-            { label: "Banco de dados", value: "14ms", mono: true },
+            { label: "Serviço", value: systemHealth?.status ?? "não medido", highlight: true },
+            { label: "Banco de dados", value: systemHealth?.dbLatencyMs != null ? `${systemHealth.dbLatencyMs}ms` : "não medido", mono: true },
           ].map(({ label, value, mono, highlight }) => (
             <div key={label} className="bg-[#131313] p-4 rounded-none">
               <span className="text-[10px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground mb-3 block">{label}</span>
@@ -532,6 +576,51 @@ export default function AdminDashboard({ items = [], inventorySummary = null, us
                       </TableRow>
                     );
                   })}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </section>
+
+        {/* Audit trail */}
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-lg font-display font-normal tracking-tight text-foreground">Trilha de auditoria</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Ações críticas registradas pelos serviços (segurança, FinOps, dados).</p>
+          </div>
+          <div className="bg-[#131313] rounded-none border border-foreground/5">
+            {auditAccessError ? (
+              <div className="py-12 text-center text-muted-foreground font-display font-normal uppercase tracking-[0.2em] text-[10px]">
+                {auditAccessError}
+              </div>
+            ) : auditLog.length === 0 ? (
+              <div className="py-12 text-center text-muted-foreground font-display font-normal uppercase tracking-[0.2em] text-[10px]">
+                Nenhum evento de auditoria registrado.
+              </div>
+            ) : (
+              <Table>
+                <TableBody>
+                  {auditLog.map(entry => (
+                    <TableRow key={entry.id} className="hover:bg-[#1f2020] border-foreground/5 transition-none leading-none">
+                      <TableCell className="w-[100px] font-mono text-[10px] text-muted-foreground/40">
+                        {entry.timestamp?.toDate?.()?.toLocaleTimeString?.(undefined, { hour12: false }) || "--:--:--"}
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-display font-normal uppercase tracking-wider text-[11px] text-foreground">
+                          {entry.action}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-[10px] font-mono text-muted-foreground/60 uppercase hidden md:table-cell">
+                        {entry.category || "—"}
+                      </TableCell>
+                      <TableCell className="text-[10px] font-mono text-muted-foreground/30 uppercase hidden md:table-cell">
+                        {entry.severity || "info"}
+                      </TableCell>
+                      <TableCell className="text-right text-[10px] font-mono text-muted-foreground/30 uppercase">
+                        {displayActorId(entry.actorId)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             )}

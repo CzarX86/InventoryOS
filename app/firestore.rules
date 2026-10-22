@@ -235,6 +235,13 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin();
     }
 
+    // Immutable audit trail written only by Cloud Functions (Admin SDK).
+    // Administrators can read it from the admin dashboard.
+    match /system_audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     match /error_reports/{errorId} {
       allow create: if isApprovedMember() && request.resource.data.userId == request.auth.uid;
       allow update: if canEscalateOwnError() || isAdmin();
