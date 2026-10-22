@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import AdminDashboard from "./AdminDashboard";
 
 jest.mock("@/hooks/useFeatureFlags", () => jest.fn(() => ({
@@ -119,6 +119,50 @@ jest.mock("firebase/firestore", () => ({
     if (ref.collectionName === "system") {
       cb({ data: () => ({ totalAIRequests: 7 }) });
     }
+    if (ref.collectionName === "module_requests") {
+      cb({
+        docs: [
+          {
+            id: "req-pending",
+            data: () => ({
+              module: "whatsapp",
+              moduleLabel: "WhatsApp",
+              status: "pending",
+              message: "Preciso do WhatsApp liberado.",
+              requesterName: "User One",
+              requesterEmail: "user1@example.com",
+            }),
+          },
+          {
+            id: "req-approved",
+            data: () => ({
+              module: "whatsapp",
+              moduleLabel: "WhatsApp",
+              status: "approved",
+              message: "Pedido antigo.",
+              requesterName: "User Two",
+              requesterEmail: "user2@example.com",
+            }),
+          },
+        ],
+      });
+    }
+    if (ref.collectionName === "system_audit_logs") {
+      cb({
+        docs: [
+          {
+            id: "audit-1",
+            data: () => ({
+              action: "BILLING_RECONCILED",
+              category: "finops",
+              actorId: "system",
+              severity: "info",
+              timestamp: { toDate: () => new Date("2026-01-03T10:00:00Z") },
+            }),
+          },
+        ],
+      });
+    }
     return jest.fn();
   }),
 }));
@@ -141,5 +185,32 @@ describe("AdminDashboard", () => {
     expect(screen.getByText("Erros para acompanhar")).toBeInTheDocument();
     expect(screen.getByText(/RESOURCE_EXHAUSTED/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /rollback/i })).toBeInTheDocument();
+  });
+
+  it("shows honest health values instead of hardcoded Online/14ms", async () => {
+    render(<AdminDashboard items={[]} user={{ uid: "admin-1", email: "admin@example.com" }} />);
+
+    expect(await screen.findByText("Saúde técnica")).toBeInTheDocument();
+    expect(screen.queryByText("Online")).not.toBeInTheDocument();
+    expect(screen.queryByText("14ms")).not.toBeInTheDocument();
+    expect(screen.getAllByText("não medido").length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("shows module requests in pending and history tabs", async () => {
+    render(<AdminDashboard items={[]} user={{ uid: "admin-1", email: "admin@example.com" }} />);
+
+    expect(await screen.findByText("Solicitações de módulos")).toBeInTheDocument();
+    expect(screen.getByText(/1 pendente/)).toBeInTheDocument();
+    expect(screen.getByText("Preciso do WhatsApp liberado.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /histórico/i }));
+    expect(screen.getByText("Pedido antigo.")).toBeInTheDocument();
+  });
+
+  it("exposes the system audit log for admins", async () => {
+    render(<AdminDashboard items={[]} user={{ uid: "admin-1", email: "admin@example.com" }} />);
+
+    expect(await screen.findByText("Trilha de auditoria")).toBeInTheDocument();
+    expect(screen.getByText("BILLING_RECONCILED")).toBeInTheDocument();
   });
 });
