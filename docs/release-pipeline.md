@@ -44,6 +44,19 @@ pnpm validate:local    # lint nos arquivos alterados + Jest completo + build
 
 O comando `pnpm validate:local` replica o gate essencial do CI antes do push e é executado automaticamente pelo hook versionado `.githooks/pre-push`.
 
+## Gate E2E pré-produção
+
+Antes de aprovar o `Deploy Production`, rode a suíte E2E contra o staging:
+
+```bash
+cd app
+pnpm run e2e:staging   # @smoke contra https://inventoryos-effd5.web.app
+pnpm run e2e:smoke      # @smoke local (sem login)
+E2E_AUTH_BYPASS=1 pnpm run e2e:authed  # fluxos logados com admin local (só local)
+```
+
+O modo autenticado usa `NEXT_PUBLIC_LOCAL_AUTH_BYPASS=true` no dev server e nunca toca em credenciais reais. O CI executa `@smoke` e `@authed` a cada PR.
+
 ### Hook local
 
 O `pnpm install` passa a configurar `core.hooksPath=.githooks` automaticamente quando o repositório está em um clone local comum. Se necessário, a instalação manual do hook pode ser refeita com:
