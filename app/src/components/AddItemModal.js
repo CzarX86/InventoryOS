@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { X, Loader2, Camera, Check, Sparkles, Mic, Square } from "lucide-react";
+import { X, Loader2, Camera, Check, Sparkles, Mic, Square, Link2, Plus, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { db, storage } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
@@ -34,12 +34,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  MAX_PRICE_REFERENCES,
+  normalizePriceForSave,
+  toPriceFormState,
+} from "@/lib/inventoryPricing";
 
 const STATUS_OPTIONS = ["IN STOCK", "SOLD", "REPAIR", "RESERVED"];
 
 const EMPTY_FORM = {
   type: "", brand: "", model: "", partNumber: "", gtin: "",
   specifications: "", status: "IN STOCK", audioUrl: "", productImageUrl: "",
+  salePrice: "", priceSource: "", priceReferences: [],
 };
 
 export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null }) {
@@ -94,7 +100,8 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
     if (editItem) {
       setFormData({
         ...EMPTY_FORM,
-        ...editItem
+        ...editItem,
+        ...toPriceFormState(editItem),
       });
     } else {
       setFormData(EMPTY_FORM);
@@ -229,7 +236,37 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
     if (!formData.brand?.trim()) return "O campo 'Fabricante / Marca' é obrigatório.";
     if (!formData.model?.trim()) return "O campo 'Modelo' é obrigatório.";
 
+    const priceCheck = normalizePriceForSave(formData);
+    if (priceCheck.error) return priceCheck.error;
+
     return null;
+  };
+
+  const updatePriceReference = (index, field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      priceReferences: (prev.priceReferences || []).map((ref, i) =>
+        i === index ? { ...ref, [field]: value } : ref
+      ),
+    }));
+  };
+
+  const addPriceReference = () => {
+    setFormData(prev => {
+      const current = prev.priceReferences || [];
+      if (current.length >= MAX_PRICE_REFERENCES) return prev;
+      return {
+        ...prev,
+        priceReferences: [...current, { url: "", price: "", label: "" }],
+      };
+    });
+  };
+
+  const removePriceReference = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      priceReferences: (prev.priceReferences || []).filter((_, i) => i !== index),
+    }));
   };
 
   const handleSubmit = async () => {
@@ -261,14 +298,35 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
         finalProductImageUrl = await getDownloadURL(imageRef);
       }
 
+      const priceSave = normalizePriceForSave(formData);
+      if (priceSave.error) {
+        setValidationError(priceSave.error);
+        setSupportError(null);
+        setSaving(false);
+        return;
+      }
+      const {
+        salePrice: _rawSalePrice,
+        priceSource: _rawPriceSource,
+        priceReferences: _rawPriceReferences,
+        ...restForm
+      } = formData;
       const auditSnapshot = {
-        ...formData,
+        ...restForm,
+        salePrice: priceSave.salePrice,
+        priceSource: priceSave.priceSource,
+        priceReferences: priceSave.priceReferences,
+        priceCheckedAt: priceSave.hasPriceData ? new Date().toISOString() : null,
         audioUrl: finalAudioUrl,
         productImageUrl: finalProductImageUrl,
         updatedAt: new Date().toISOString(),
       };
       const data = {
-        ...formData,
+        ...restForm,
+        salePrice: priceSave.salePrice,
+        priceSource: priceSave.priceSource,
+        priceReferences: priceSave.priceReferences,
+        priceCheckedAt: priceSave.hasPriceData ? serverTimestamp() : null,
         audioUrl: finalAudioUrl,
         productImageUrl: finalProductImageUrl,
         updatedAt: serverTimestamp(),
@@ -689,6 +747,87 @@ export default function AddItemModal({ isOpen, onClose, onAdded, editItem = null
                         value={formData.specifications}
                         onChange={e => set("specifications", (e.target.value || "").toUpperCase())}
                       />
+                    </div>
+                  </div>
+
+                  {/* Pricing */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 px-1">
+                      <div className="w-1 h-3 bg-primary/30" />
+                      <Label className="text-[10px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground">MOD_PRICING_VENDA</Label>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                      <div className="space-y-4">
+                        <Label htmlFor="salePrice" className="text-[10px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground px-1">
+                          PREÇO_VENDA_R$
+                        </Label>
+                        <Input
+                          id="salePrice"
+                          inputMode="decimal"
+                          className="h-12 rounded-none border-foreground/10 bg-[#131313]/60 focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary transition-none border-[1px] font-mono text-sm tracking-tight"
+                          placeholder="1.234,56"
+                          value={formData.salePrice}
+                          onChange={e => set("salePrice", e.target.value || "")}
+                        />
+                      </div>
+                      <div className="space-y-4">
+                        <Label htmlFor="priceSource" className="text-[10px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground px-1">
+                          FONTE_PREÇO
+                        </Label>
+                        <Input
+                          id="priceSource"
+                          className="h-12 rounded-none border-foreground/10 bg-[#131313]/60 focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary transition-none border-[1px] font-display font-normal text-xs uppercase tracking-wider"
+                          placeholder="MERCADO LIVRE // AMAZON"
+                          value={formData.priceSource}
+                          onChange={e => set("priceSource", (e.target.value || "").toUpperCase())}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 px-1">
+                        <Link2 size={12} className="text-muted-foreground" />
+                        <span className="text-[10px] font-display font-normal uppercase tracking-[0.2em] text-muted-foreground">
+                          ANÚNCIOS_REFERÊNCIA ({(formData.priceReferences || []).length}/{MAX_PRICE_REFERENCES})
+                        </span>
+                      </div>
+                      {(formData.priceReferences || []).map((ref, index) => (
+                        <div key={index} className="grid grid-cols-[1fr_110px_auto] gap-2 items-center">
+                          <Input
+                            className="h-11 rounded-none border-foreground/10 bg-[#131313]/60 focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary transition-none border-[1px] font-mono text-xs tracking-tight"
+                            placeholder="https://..."
+                            value={ref.url}
+                            onChange={e => updatePriceReference(index, "url", e.target.value || "")}
+                          />
+                          <Input
+                            inputMode="decimal"
+                            className="h-11 rounded-none border-foreground/10 bg-[#131313]/60 focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary transition-none border-[1px] font-mono text-xs tracking-tight"
+                            placeholder="R$"
+                            value={ref.price}
+                            onChange={e => updatePriceReference(index, "price", e.target.value || "")}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-11 w-11 rounded-none border-foreground/10 bg-[#131313]/60 hover:bg-white/5 transition-none"
+                            onClick={() => removePriceReference(index)}
+                            aria-label={`Remover referência ${index + 1}`}
+                          >
+                            <Trash2 size={14} />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={(formData.priceReferences || []).length >= MAX_PRICE_REFERENCES}
+                        className="rounded-none border-foreground/10 bg-[#131313]/60 hover:bg-white/5 transition-none text-[10px] font-display font-normal uppercase tracking-[0.2em]"
+                        onClick={addPriceReference}
+                      >
+                        <Plus size={14} className="mr-2" /> ADD_LINK_ANÚNCIO
+                      </Button>
                     </div>
                   </div>
                 </div>

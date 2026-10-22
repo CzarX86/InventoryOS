@@ -116,3 +116,57 @@ describe("ItemDetailModal catalog enrichment", () => {
     ).not.toBeInTheDocument();
   });
 });
+
+describe("ItemDetailModal pricing", () => {
+  const pricedItem = {
+    id: "item-priced-1",
+    model: "CFW500",
+    brand: "WEG",
+    status: "IN STOCK",
+    salePrice: 1800,
+    priceSource: "MERCADO LIVRE",
+    priceReferences: [
+      { url: "https://example.test/a", price: 1000, label: "Anúncio A" },
+      { url: "https://example.test/b", price: 2000, label: "Anúncio B" },
+    ],
+  };
+
+  it("shows sale price, reference average and links", () => {
+    render(
+      <ItemDetailModal
+        isOpen
+        onClose={() => {}}
+        item={pricedItem}
+        onEdit={() => {}}
+      />
+    );
+
+    expect(screen.getByText("PREÇO_MÉDIO_VENDA.DB")).toBeInTheDocument();
+    expect(screen.getByText("R$ 1.800,00")).toBeInTheDocument();
+    expect(screen.getByText("MÉDIA_REFERÊNCIAS (2)")).toBeInTheDocument();
+    expect(screen.getByText("R$ 1.500,00")).toBeInTheDocument();
+    expect(screen.getByText("Anúncio A")).toHaveAttribute(
+      "href",
+      "https://example.test/a"
+    );
+    expect(screen.getByText("Anúncio B")).toHaveAttribute(
+      "href",
+      "https://example.test/b"
+    );
+  });
+
+  it("hides the pricing section when there is no price data", () => {
+    render(
+      <ItemDetailModal
+        isOpen
+        onClose={() => {}}
+        item={{ id: "item-plain-2", model: "CFW500", brand: "WEG" }}
+        onEdit={() => {}}
+      />
+    );
+
+    expect(
+      screen.queryByText("PREÇO_MÉDIO_VENDA.DB")
+    ).not.toBeInTheDocument();
+  });
+});

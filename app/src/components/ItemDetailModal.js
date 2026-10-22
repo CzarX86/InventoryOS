@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { averageReferencePrice, formatBRL } from "@/lib/inventoryPricing";
 
 function DetailField({ icon: Icon, label, value, mono = false }) {
   return (
@@ -45,8 +46,13 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
     { label: "CATALOG_MANUAL_URL", url: item.catalogManualUrl },
   ].filter((link) => Boolean(link.url));
 
+  const priceReferences = Array.isArray(item.priceReferences) ? item.priceReferences : [];
+  const referenceAverage = averageReferencePrice(priceReferences);
+  const hasPricing = item.salePrice != null || priceReferences.length > 0;
+
   const handleShare = async (platform = "native") => {
-    const text = `Equipamento: ${item.model}\nMarca: ${item.brand}\nPN: ${item.partNumber}\n\nEspecificações:\n${item.specifications}`;
+    const priceLine = item.salePrice != null ? `\nPreço: ${formatBRL(item.salePrice)}` : "";
+    const text = `Equipamento: ${item.model}\nMarca: ${item.brand}\nPN: ${item.partNumber}${priceLine}\n\nEspecificações:\n${item.specifications}`;
     
     if (platform === "whatsapp") {
       window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
@@ -158,6 +164,45 @@ export default function ItemDetailModal({ isOpen, onClose, item, onEdit }) {
             <DetailField icon={Calendar} label="ENTRY_TIMESTAMP" value={formatDate(item.createdAt)} />
             <DetailField icon={Activity} label="LAST_SYNCHRONIZATION" value={formatDate(item.updatedAt)} />
           </div>
+
+          {hasPricing && (
+            <div className="p-10 border-b border-foreground/5">
+              <div className="flex items-center gap-2 mb-6 opacity-40">
+                <Tag size={14} className="text-primary/60" />
+                <h4 className="text-[11px] font-display font-normal uppercase tracking-[0.2em]">PREÇO_MÉDIO_VENDA.DB</h4>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 border border-foreground/10 bg-[#131313] px-10">
+                <DetailField icon={Tag} label="PREÇO_VENDA" value={formatBRL(item.salePrice)} mono />
+                <DetailField
+                  icon={Activity}
+                  label={`MÉDIA_REFERÊNCIAS (${priceReferences.filter(ref => typeof ref?.price === "number").length})`}
+                  value={formatBRL(referenceAverage)}
+                  mono
+                />
+                <DetailField icon={Server} label="FONTE_PREÇO" value={item.priceSource} />
+                <DetailField icon={Calendar} label="VERIFICADO_EM" value={formatDate(item.priceCheckedAt)} />
+              </div>
+              {priceReferences.length > 0 && (
+                <div className="flex flex-col gap-2 mt-4">
+                  {priceReferences.map((ref, index) => (
+                    <div key={index} className="flex items-center justify-between gap-4 border border-foreground/10 bg-[#131313] px-4 py-3">
+                      <a
+                        href={ref.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs font-mono uppercase tracking-widest text-primary underline underline-offset-4 truncate"
+                      >
+                        {ref.label || `ANÚNCIO_${index + 1}`}
+                      </a>
+                      <span className="text-xs font-mono text-foreground/80 shrink-0">
+                        {formatBRL(ref.price) || "—"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="p-10">
             {/* Specifications Section */}
