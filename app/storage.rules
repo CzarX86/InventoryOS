@@ -9,12 +9,51 @@ service firebase.storage {
       return isApprovedMember() && request.auth.token.workspaceId == workspaceId;
     }
 
-    match /crm-imports/{workspaceId}/{jobId}/{fileName} {
-      allow read, write: if isApprovedWorkspace(workspaceId);
+    function isAudioUpload() {
+      return request.resource.contentType.matches('audio/.*');
     }
 
-    match /{allPaths=**} {
-      allow read, write: if isApprovedMember();
+    function isImageUpload() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    // CRM spreadsheet imports: server-generated workspace path, 10 MB cap
+    // (mirrors MAX_FILE_SIZE_BYTES in functions/src/crmImport.ts). The server
+    // parses and deletes these files via the Admin SDK.
+    match /crm-imports/{workspaceId}/{jobId}/{fileName} {
+      allow read: if isApprovedWorkspace(workspaceId);
+      allow create: if isApprovedWorkspace(workspaceId)
+        && request.resource.size <= 10 * 1024 * 1024;
+      allow update, delete: if false;
+    }
+
+    // CRM interaction audio: the client uploads and may delete its own failed
+    // upload (see CrmView.tsx). 5 MB cap matches the product contract.
+    match /crm_audio/{workspaceId}/{contactId}/{fileName} {
+      allow read: if isApprovedWorkspace(workspaceId);
+      allow create: if isApprovedWorkspace(workspaceId)
+        && isAudioUpload()
+        && request.resource.size <= 5 * 1024 * 1024;
+      allow delete: if isApprovedWorkspace(workspaceId);
+      allow update: if false;
+    }
+
+    // Legacy inventory attachments (inventory docs carry no workspace, so
+    // these stay member-scoped with type + size guards).
+    match /inventory_audio/{fileName} {
+      allow read: if isApprovedMember();
+      allow create: if isApprovedMember()
+        && isAudioUpload()
+        && request.resource.size <= 10 * 1024 * 1024;
+      allow update, delete: if false;
+    }
+
+    match /inventory_images/{fileName} {
+      allow read: if isApprovedMember();
+      allow create: if isApprovedMember()
+        && isImageUpload()
+        && request.resource.size <= 10 * 1024 * 1024;
+      allow update, delete: if false;
     }
   }
 }
