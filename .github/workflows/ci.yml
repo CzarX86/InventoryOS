@@ -167,7 +167,10 @@ jobs:
         run: pnpm exec playwright install chromium --with-deps
 
       - name: Run E2E Smoke Tests
-        run: pnpm run e2e -- --project=chromium --grep @smoke || echo "No smoke tests found"
+        run: pnpm run e2e:smoke || echo "No smoke tests found"
+
+      - name: Run E2E Authenticated Flows
+        run: pnpm run e2e:authed
 
   build:
     name: Build
