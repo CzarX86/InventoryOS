@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { httpsCallable, type Functions } from "firebase/functions";
 import { uploadBytes, ref, type FirebaseStorage } from "firebase/storage";
-import { collection, limit, onSnapshot, query, where, type Firestore } from "firebase/firestore";
+import { collection, limit, onSnapshot, orderBy, query, where, type Firestore } from "firebase/firestore";
 import { AlertCircle, ArrowLeft, Check, CheckCircle2, Download, FileSpreadsheet, History, Loader2, Upload, X } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -44,10 +44,11 @@ export default function CrmImportView({ user, onBack }: { user: ImportUser; onBa
   const [history, setHistory] = useState<ImportJob[]>([]);
   const [status, setStatus] = useState<"idle" | "uploading" | "validating" | "ready" | "importing" | "completed">("idle");
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const [showAllErrors, setShowAllErrors] = useState(false);
 
   useEffect(() => {
     if (!db || !workspaceId) return undefined;
-    const jobsQuery = query(collection(db, "crm_import_jobs"), where("workspaceId", "==", workspaceId), limit(8));
+    const jobsQuery = query(collection(db, "crm_import_jobs"), where("workspaceId", "==", workspaceId), orderBy("createdAt", "desc"), limit(8));
     return onSnapshot(jobsQuery, (snapshot) => {
       setHistory(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as ImportJob)).sort((left, right) => timestampValue(right.createdAt) - timestampValue(left.createdAt)));
     }, () => setMessage({ tone: "error", text: "Não foi possível carregar o histórico de importações." }));
@@ -63,6 +64,7 @@ export default function CrmImportView({ user, onBack }: { user: ImportUser; onBa
     setSummary(null);
     setPreview([]);
     setErrors([]);
+    setShowAllErrors(false);
   };
 
   const handleDrop = (event: DragEvent<HTMLDivElement>) => {
@@ -87,6 +89,7 @@ export default function CrmImportView({ user, onBack }: { user: ImportUser; onBa
       setSummary(result.summary);
       setPreview(result.preview || []);
       setErrors(result.errors || []);
+      setShowAllErrors(false);
       setStatus("ready");
       setMessage({ tone: "success", text: "Arquivo validado. Revise os alertas antes de importar os dados válidos." });
     } catch (error) {
@@ -114,6 +117,7 @@ export default function CrmImportView({ user, onBack }: { user: ImportUser; onBa
   };
 
   const statusLabel = useMemo(() => ({ idle: "Pronto para importar", uploading: "Enviando arquivo…", validating: "Validando dados…", ready: "Revisão pronta", importing: "Importando dados…", completed: "Importação concluída" }[status]), [status]);
+  const { visible: visibleErrors, remaining: remainingErrors, total: totalErrors } = useMemo(() => visibleImportErrors(errors, showAllErrors), [errors, showAllErrors]);
 
   return (
     <div className="min-h-full bg-background pb-20 text-foreground">
@@ -144,8 +148,10 @@ export default function CrmImportView({ user, onBack }: { user: ImportUser; onBa
           <Card className="rounded-2xl border-border/70 shadow-sm"><CardHeader className=""><CardTitle className="text-base">2. Revise e confirme</CardTitle></CardHeader><CardContent className="">
             {!summary ? <div className="rounded-xl border border-dashed border-border px-5 py-10 text-center text-sm text-muted-foreground">O resumo da validação aparecerá aqui depois do envio.</div> : <>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"><Metric label="Linhas lidas" value={summary.totalRows || 0} /><Metric label="Prontas para importar" value={summary.validRows || 0} tone="positive" /><Metric label="Com alerta" value={summary.invalidRows || 0} tone={summary.invalidRows ? "warning" : "neutral"} /><Metric label="Repetidas no arquivo" value={summary.duplicateCandidates || 0} tone={summary.duplicateCandidates ? "warning" : "neutral"} /><Metric label="Já cadastradas" value={summary.existingMatches || 0} tone="neutral" /></div>
-              {errors.length > 0 && <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4"><div className="flex items-start gap-3"><AlertCircle size={17} className="mt-0.5 shrink-0 text-amber-700" /><div><p className="text-sm font-semibold text-amber-950">Algumas linhas precisam de atenção</p><p className="mt-1 text-xs leading-relaxed text-amber-900/80">As linhas válidas serão importadas. Você pode corrigir as demais e fazer uma nova importação depois.</p><div className="mt-3 space-y-1 text-xs text-amber-900">{errors.slice(0, 5).map((row) => <p key={row.rowNumber}>Linha {row.rowNumber}: {row.errors.join("; ")}</p>)}{errors.length > 5 && <p>+ {errors.length - 5} alertas na lista completa</p>}</div></div></div></div>}
-              {preview.length > 0 && <div className="mt-5 overflow-x-auto rounded-xl border border-border/70"><table className="w-full min-w-[620px] text-left text-xs"><thead className="bg-muted/50 text-muted-foreground"><tr><th className="px-3 py-2 font-medium">Linha</th><th className="px-3 py-2 font-medium">Empresa</th><th className="px-3 py-2 font-medium">Contato</th><th className="px-3 py-2 font-medium">E-mail</th><th className="px-3 py-2 font-medium">Status</th></tr></thead><tbody className="divide-y divide-border/60">{preview.map((row) => <tr key={row.rowNumber}><td className="px-3 py-2 text-muted-foreground">{row.rowNumber}</td><td className="px-3 py-2 font-medium">{row.companyName || "—"}</td><td className="px-3 py-2">{row.contactName || "—"}</td><td className="px-3 py-2">{row.email || row.phone || "—"}</td><td className="px-3 py-2">{row.errors?.length ? <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">Revisar</Badge> : <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-800">Válida</Badge>}</td></tr>)}</tbody></table></div>}
+              {((summary.duplicateCandidates || 0) > 0 || (summary.existingMatches || 0) > 0) && status !== "completed" && <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{(summary.duplicateCandidates || 0) > 0 && <>Linhas repetidas no arquivo serão importadas uma única vez. </>}{(summary.existingMatches || 0) > 0 && <>Contatos já cadastrados serão atualizados em vez de duplicados.</>}</p>}
+              {status === "completed" && <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4"><p className="text-sm font-semibold text-emerald-950">Resultado da importação</p><div className="mt-3 grid gap-3 sm:grid-cols-3"><Metric label="Criados" value={summary.created || 0} tone="positive" /><Metric label="Atualizados" value={summary.updated || 0} tone="neutral" /><Metric label="Ignorados (com alerta)" value={summary.skippedRows || 0} tone={(summary.skippedRows || 0) ? "warning" : "neutral"} /></div></div>}
+              {errors.length > 0 && <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4"><div className="flex items-start gap-3"><AlertCircle size={17} className="mt-0.5 shrink-0 text-amber-700" /><div className="min-w-0 flex-1"><p className="text-sm font-semibold text-amber-950">Algumas linhas precisam de atenção</p><p className="mt-1 text-xs leading-relaxed text-amber-900/80">As linhas válidas serão importadas. Você pode corrigir as demais e fazer uma nova importação depois.</p><div className="mt-3 space-y-1 text-xs text-amber-900">{visibleErrors.map((row) => <p key={row.rowNumber}>Linha {row.rowNumber}: {row.errors.join("; ")}</p>)}</div>{remainingErrors > 0 && <Button type="button" variant="outline" size="sm" onClick={() => setShowAllErrors(true)} className="mt-3 h-8 rounded-lg border-amber-300 bg-white/70 text-xs text-amber-900 hover:bg-white">Ver lista completa ({totalErrors} alertas)</Button>}{showAllErrors && totalErrors > 5 && <Button type="button" variant="ghost" size="sm" onClick={() => setShowAllErrors(false)} className="mt-3 h-8 rounded-lg text-xs text-amber-900 hover:bg-amber-100">Mostrar menos</Button>}</div></div></div>}
+              {preview.length > 0 && <div className="mt-5 overflow-x-auto rounded-xl border border-border/70"><table className="w-full min-w-[720px] text-left text-xs"><thead className="bg-muted/50 text-muted-foreground"><tr><th className="px-3 py-2 font-medium">Linha</th><th className="px-3 py-2 font-medium">Empresa</th><th className="px-3 py-2 font-medium">Contato</th><th className="px-3 py-2 font-medium">E-mail</th><th className="px-3 py-2 font-medium">Telefone</th><th className="px-3 py-2 font-medium">Status</th></tr></thead><tbody className="divide-y divide-border/60">{preview.map((row) => <tr key={row.rowNumber}><td className="px-3 py-2 text-muted-foreground">{row.rowNumber}</td><td className="px-3 py-2 font-medium">{row.companyName || "—"}</td><td className="px-3 py-2">{row.contactName || "—"}</td><td className="px-3 py-2">{row.email || "—"}</td><td className="px-3 py-2">{row.phone || "—"}</td><td className="px-3 py-2">{row.errors?.length ? <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">Revisar</Badge> : <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-800">Válida</Badge>}</td></tr>)}</tbody></table></div>}
               <div className="mt-5 flex justify-end"><Button onClick={confirmImport} disabled={status !== "ready" || !summary?.validRows} className="h-10 gap-2 rounded-xl">{status === "importing" ? <Loader2 size={15} className="animate-spin" /> : status === "completed" ? <CheckCircle2 size={15} /> : <Upload size={15} />} {status === "completed" ? "Importação concluída" : "Importar dados válidos"}</Button></div>
             </>}
           </CardContent></Card>
@@ -162,4 +168,11 @@ export default function CrmImportView({ user, onBack }: { user: ImportUser; onBa
 
 function Metric({ label, value, tone = "neutral" }: { label: string; value: number; tone?: "positive" | "warning" | "neutral" }) { return <div className={`rounded-xl border p-3 ${tone === "positive" ? "border-emerald-200 bg-emerald-50" : tone === "warning" ? "border-amber-200 bg-amber-50" : "border-border/70 bg-muted/25"}`}><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-xl font-semibold">{value.toLocaleString("pt-BR")}</p></div>; }
 function TemplateLink({ href, title, description }: { href: string; title: string; description: string }) { return <a href={href} download className="flex items-start gap-3 rounded-xl border border-border/70 p-3 transition-colors hover:border-primary/40 hover:bg-accent/40"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700"><Download size={16} /></span><span className="min-w-0"><span className="block text-sm font-medium">{title}</span><span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{description}</span></span></a>; }
-function formatJobStatus(status?: string) { return ({ awaiting_upload: "Aguardando", ready: "Pronta", completed: "Concluída", partial: "Parcial", expired: "Expirada" } as Record<string, string>)[status || ""] || "Em análise"; }
+export function formatJobStatus(status?: string) { return ({ awaiting_upload: "Aguardando", ready: "Pronta", completed: "Concluída", partial: "Parcial", expired: "Expirada" } as Record<string, string>)[status || ""] || "Em análise"; }
+
+const MAX_COLLAPSED_ERRORS = 5;
+
+export function visibleImportErrors(rows: ImportRow[], expanded: boolean, limit = MAX_COLLAPSED_ERRORS) {
+  const visible = expanded ? rows : rows.slice(0, limit);
+  return { visible, remaining: rows.length - visible.length, total: rows.length };
+}

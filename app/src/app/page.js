@@ -466,7 +466,7 @@ export default function Dashboard() {
                 {activeTab === "CRM_PERFORMANCE" && crmPerformanceEnabled ? (
                   <CrmPerformanceDashboard user={user} />
                 ) : activeTab === "HOME" ? (
-                  <WorkspaceHome user={user} inventoryCount={stats.inStock} canViewTeam={teamHomeViewEnabled} onOpenCrm={() => setActiveTab("CRM")} />
+                  <WorkspaceHome user={user} inventoryCount={stats.inStock} canViewTeam={teamHomeViewEnabled} onOpenCrm={() => setActiveTab("CRM")} onOpenContact={() => setActiveTab("CRM")} />
                 ) : activeTab === "CRM_IMPORT" && isFeatureEnabled(expansionFlags, "crmImport") ? (
                   <CrmImportView user={user} onBack={() => setActiveTab("CRM")} />
                 ) : activeTab === "CRM" ? (

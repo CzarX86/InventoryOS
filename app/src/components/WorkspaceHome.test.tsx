@@ -55,6 +55,37 @@ describe("buildHomeMetrics", () => {
     expect(metrics.dailyCounts).toHaveLength(7);
     expect(metrics.dailyCounts.reduce((total, dayPoint) => total + dayPoint.count, 0)).toBe(2);
   });
+
+  it("surfaces overdue follow-ups separately from the ones due today", () => {
+    const now = new Date(2026, 8, 17, 12, 0, 0).getTime();
+    const day = 24 * 60 * 60 * 1000;
+    const metrics = buildHomeMetrics([
+      {
+        id: "overdue",
+        eventType: "contact_interaction",
+        contactId: "contact-1",
+        occurredAt: now - (2 * day),
+        nextContactAt: now - day,
+      },
+      {
+        id: "due-today",
+        eventType: "contact_interaction",
+        contactId: "contact-2",
+        occurredAt: now - (60 * 60 * 1000),
+        nextContactAt: now + (60 * 60 * 1000),
+      },
+      {
+        id: "no-follow-up",
+        eventType: "contact_interaction",
+        contactId: "contact-3",
+        occurredAt: now - (60 * 60 * 1000),
+      },
+    ], now);
+
+    expect(metrics.overdueFollowUps).toBe(1);
+    expect(metrics.overdueEvents.map((event) => event.id)).toEqual(["overdue"]);
+    expect(metrics.scheduledFollowUps).toBe(1);
+  });
 });
 
 describe("WorkspaceHome team view", () => {
